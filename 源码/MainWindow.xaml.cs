@@ -98,6 +98,7 @@ public partial class MainWindow : Window
 
     private void InitializeNative()
     {
+        NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle);
         _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         _source?.AddHook(WindowProc);
         if (!NativeMethods.RegisterHotKey(_source!.Handle, NativeMethods.HotkeyId, 0x4003, 0x20))

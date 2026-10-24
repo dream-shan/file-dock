@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,6 +12,39 @@ namespace FileDockDemo;
 internal static class NativeMethods
 {
     internal const int HotkeyId = 0xD0C;
+    private const int ExtendedStyleIndex = -20;
+    private const long ToolWindowStyle = 0x00000080, AppWindowStyle = 0x00040000;
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)] private static extern IntPtr GetWindowLongPtr64(IntPtr window, int index);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)] private static extern int GetWindowLong32(IntPtr window, int index);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)] private static extern IntPtr SetWindowLongPtr64(IntPtr window, int index, IntPtr value);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)] private static extern int SetWindowLong32(IntPtr window, int index, int value);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+
+    internal static long GetExtendedWindowStyle(IntPtr window)
+    {
+        Marshal.SetLastPInvokeError(0);
+        long style = IntPtr.Size == 8 ? GetWindowLongPtr64(window, ExtendedStyleIndex).ToInt64() : GetWindowLong32(window, ExtendedStyleIndex);
+        int error = Marshal.GetLastPInvokeError();
+        if (style == 0 && error != 0) throw new Win32Exception(error);
+        return style;
+    }
+
+    internal static void HideFromTaskSwitcher(IntPtr window)
+    {
+        // ShowInTaskbar alone does not exclude WPF windows from Alt+Tab.
+        // Keep activation enabled so the panel still accepts clicks and typing.
+        long style = (GetExtendedWindowStyle(window) | ToolWindowStyle) & ~AppWindowStyle;
+        Marshal.SetLastPInvokeError(0);
+        long previous = IntPtr.Size == 8
+            ? SetWindowLongPtr64(window, ExtendedStyleIndex, new IntPtr(style)).ToInt64()
+            : SetWindowLong32(window, ExtendedStyleIndex, unchecked((int)style));
+        int error = Marshal.GetLastPInvokeError();
+        if (previous == 0 && error != 0) throw new Win32Exception(error);
+        // Refresh cached styles without moving, resizing, activating or reordering.
+        if (!SetWindowPos(window, IntPtr.Zero, 0, 0, 0, 0, 0x0037))
+            throw new Win32Exception(Marshal.GetLastPInvokeError());
+    }
+
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
@@ -34,6 +68,12 @@ internal sealed class DockTabWindow : Window
     private readonly MainWindow _owner;
     private Point _start;
     private bool _moved;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle);
+    }
 
     internal DockTabWindow(MainWindow owner)
     {

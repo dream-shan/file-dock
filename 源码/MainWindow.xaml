@@ -301,9 +301,10 @@
                     </Grid>
                 </Border>
                 <Grid Grid.Row="2" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="FolderCountText" Text="文件夹内容" FontSize="11" Foreground="#8B96A8" VerticalAlignment="Center" />
-                    <ComboBox x:Name="FolderFilterComboBox" Grid.Column="1" Width="73" Height="24" SelectedIndex="0" FontSize="11" Foreground="#778399" AutomationProperties.Name="当前文件夹类型筛选">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="FolderCountText" Text="文件夹内容" FontSize="11" Foreground="#8B96A8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <CheckBox x:Name="IncludeSubfoldersCheckBox" Grid.Column="1" Content="包含子文件夹" IsChecked="True" FontSize="10" Foreground="#778399" VerticalAlignment="Center" Margin="6,0,10,0" Cursor="Hand" ToolTip="输入关键词时，同时搜索当前文件夹和所有子文件夹" AutomationProperties.Name="包含子文件夹" />
+                    <ComboBox x:Name="FolderFilterComboBox" Grid.Column="2" Width="73" Height="24" SelectedIndex="0" FontSize="11" Foreground="#778399" AutomationProperties.Name="当前文件夹类型筛选">
                         <ComboBoxItem Content="全部" /><ComboBoxItem Content="文档" /><ComboBoxItem Content="表格" /><ComboBoxItem Content="图片" /><ComboBoxItem Content="文件夹" />
                     </ComboBox>
                 </Grid>

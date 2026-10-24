@@ -11,7 +11,7 @@
     <AssemblyName>FileDockDemo</AssemblyName>
     <RootNamespace>FileDockDemo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <DebugType>none</DebugType>
     <!-- WPF owns DPI configuration; WinForms is used only for the tray icon. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>

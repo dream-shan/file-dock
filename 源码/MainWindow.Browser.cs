@@ -31,6 +31,8 @@ public partial class MainWindow
             if (CurrentFolderPath != null) await NavigateToFolderAsync(CurrentFolderPath, false, true);
         };
         FolderFilterComboBox.SelectionChanged += (_, _) => ApplyFolderFilters();
+        IncludeSubfoldersCheckBox.Checked += (_, _) => { UpdateFolderSearchHint(); ApplyFolderFilters(); };
+        IncludeSubfoldersCheckBox.Unchecked += (_, _) => { UpdateFolderSearchHint(); ApplyFolderFilters(); };
         FolderList.ContextMenu = new ContextMenu();
         FolderList.ContextMenuOpening += Items_ContextMenuOpening;
     }
@@ -53,8 +55,7 @@ public partial class MainWindow
         _folderEntries.Clear();
         PinsSection.Visibility = RecentSection.Visibility = Visibility.Collapsed;
         BrowserPanel.Visibility = Visibility.Visible;
-        SearchPlaceholder.Text = "搜索当前文件夹";
-        SearchBox.ToolTip = "按名称筛选当前文件夹，不包含子文件夹的内容";
+        UpdateFolderSearchHint();
         FolderTitle.Text = FileName(fullPath);
         FolderPathText.Text = fullPath;
         FolderUpButton.IsEnabled = ParentPath(fullPath) != null;
@@ -103,12 +104,21 @@ public partial class MainWindow
         if (CurrentFolderPath == null || FolderList == null) return;
         string query = SearchBox.Text.Trim();
         string filter = (FolderFilterComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "全部";
+        if (IncludeSubfoldersCheckBox.IsChecked == true && query.Length > 0 && !_folderLoading && !_folderFailed)
+        {
+            StartRecursiveFolderSearch(query);
+            ShowRecursiveFolderSearch(filter);
+            return;
+        }
+        bool wasRecursiveSearch = _recursiveSearchRoot != null;
+        CancelRecursiveFolderSearch();
         var visible = _folderEntries.Where(e => (query.Length == 0 || e.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)) && (filter == "全部" || e.Kind == filter)).ToList();
         FolderList.ItemsSource = visible;
         FolderCountText.Text = _folderLoading ? "正在读取…" : _folderFailed ? "读取失败" : query.Length > 0 || filter != "全部" ? $"{visible.Count} / {_folderEntries.Count} 个项目" : $"{visible.Count} 个项目";
         FolderEmptyText.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (_folderFailed) return;
         FolderEmptyText.Text = _folderLoading ? "正在读取文件夹内容…" : _folderEntries.Count == 0 ? "这个文件夹是空的" : "没有匹配的项目\n试试其他关键词，或切换到“全部”";
+        if (wasRecursiveSearch && !_folderLoading) SetStatus($"当前层显示 {visible.Count} 个项目");
     }
 
     internal async Task GoBackAsync()
@@ -142,6 +152,7 @@ public partial class MainWindow
 
     private void CancelFolderLoad()
     {
+        CancelRecursiveFolderSearch();
         ++_folderRequestVersion;
         _folderCancellation?.Cancel();
         _folderCancellation?.Dispose();
@@ -190,7 +201,7 @@ public partial class MainWindow
         if (key == Key.F5) { _ = NavigateToFolderAsync(CurrentFolderPath, false, true); e.Handled = true; return true; }
         if (key == Key.Enter)
         {
-            if (Keyboard.FocusedElement is Button || FolderFilterComboBox.IsKeyboardFocusWithin) return true;
+            if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.ButtonBase || FolderFilterComboBox.IsKeyboardFocusWithin) return true;
             var entry = FolderList.SelectedItem as EntryView ?? FolderList.Items.Cast<EntryView>().FirstOrDefault();
             if (entry != null) OpenEntry(entry);
             e.Handled = true; return true;

@@ -1,0 +1,23 @@
+# Personal settings and local file history
+/Data/
+/更新备份/
+
+# Published applications and build output
+*.exe
+*.dll
+*.pdb
+*.zip
+**/bin/
+**/obj/
+/重建输出/
+/publish/
+/artifacts/
+
+# Editor and internal verification output
+.vs/
+.idea/
+*.user
+*.suo
+/work/
+/verify*/
+/test-results/

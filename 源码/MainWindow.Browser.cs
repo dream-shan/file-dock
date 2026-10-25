@@ -42,6 +42,7 @@ public partial class MainWindow
         string fullPath;
         try { fullPath = Path.GetFullPath(path); }
         catch (Exception ex) { SetStatus("无法浏览此路径：" + ex.Message, true); return; }
+        ClearFileSelection();
         ++_openRequestVersion;
         CancelFolderLoad();
         int request = _folderRequestVersion;
@@ -50,10 +51,11 @@ public partial class MainWindow
         if (CurrentFolderPath == null) _homeSearch = SearchBox.Text;
         else if (addHistory && FileService.NormalizeKey(CurrentFolderPath) != FileService.NormalizeKey(fullPath)) _folderBack.Push(CurrentFolderPath);
         CurrentFolderPath = fullPath;
+        UpdatePerformanceActivity();
         _folderLoading = true;
         _folderFailed = false;
         _folderEntries.Clear();
-        PinsSection.Visibility = RecentSection.Visibility = Visibility.Collapsed;
+        PinsSection.Visibility = PerformanceSection.Visibility = Visibility.Collapsed;
         BrowserPanel.Visibility = Visibility.Visible;
         UpdateFolderSearchHint();
         FolderTitle.Text = FileName(fullPath);
@@ -70,8 +72,7 @@ public partial class MainWindow
             if (token.IsCancellationRequested || request != _folderRequestVersion || _quitting) return;
             foreach (var item in items)
             {
-                _directoryKinds[item.Path] = item.IsDirectory;
-                var view = MakeView(item.Path, item.Name, "", false, "", item.IsDirectory ? "›" : "");
+                var view = MakeView(item.Path, item.Name, "", false, item.IsDirectory ? "›" : "", item.IsDirectory);
                 view.Subtitle = item.IsDirectory ? "文件夹 · 点击进入" : FormatSize(item.Length);
                 if (!item.IsDirectory && item.LastModified.HasValue) view.Subtitle += "  ·  " + item.LastModified.Value.ToString("yyyy-MM-dd HH:mm");
                 _folderEntries.Add(view);
@@ -114,6 +115,7 @@ public partial class MainWindow
         CancelRecursiveFolderSearch();
         var visible = _folderEntries.Where(e => (query.Length == 0 || e.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)) && (filter == "全部" || e.Kind == filter)).ToList();
         FolderList.ItemsSource = visible;
+        ReconcileFileSelection();
         FolderCountText.Text = _folderLoading ? "正在读取…" : _folderFailed ? "读取失败" : query.Length > 0 || filter != "全部" ? $"{visible.Count} / {_folderEntries.Count} 个项目" : $"{visible.Count} 个项目";
         FolderEmptyText.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (_folderFailed) return;
@@ -135,15 +137,17 @@ public partial class MainWindow
     internal void GoHome()
     {
         if (CurrentFolderPath == null) return;
+        ClearFileSelection();
         ++_openRequestVersion;
         CancelFolderLoad();
         CurrentFolderPath = null;
+        UpdatePerformanceActivity();
         _folderBack.Clear();
         _folderEntries.Clear();
         FolderList.ItemsSource = null;
         BrowserPanel.Visibility = Visibility.Collapsed;
-        PinsSection.Visibility = RecentSection.Visibility = Visibility.Visible;
-        SearchPlaceholder.Text = "搜索文件名或路径";
+        PinsSection.Visibility = PerformanceSection.Visibility = Visibility.Visible;
+        SearchPlaceholder.Text = "搜索常用文件或路径";
         SearchBox.ToolTip = null;
         SearchBox.Text = _homeSearch;
         ApplyFilters();

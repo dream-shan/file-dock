@@ -9,7 +9,7 @@ using System.Windows.Media;
 
 namespace FileDockDemo;
 
-internal static class NativeMethods
+internal static partial class NativeMethods
 {
     internal const int HotkeyId = 0xD0C;
     private const int ExtendedStyleIndex = -20;
@@ -48,63 +48,35 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr window, out RectNative rect);
-    [DllImport("user32.dll")] internal static extern IntPtr GetShellWindow();
-    [DllImport("user32.dll")] internal static extern IntPtr GetDesktopWindow();
-    [StructLayout(LayoutKind.Sequential)] internal struct RectNative { public int Left, Top, Right, Bottom; }
-
-    internal static bool ForegroundIsFullscreen(IntPtr ownWindow, IntPtr dockWindow)
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
+    internal static bool IsAboveForeground(IntPtr window)
     {
         IntPtr foreground = GetForegroundWindow();
-        if (foreground == IntPtr.Zero || foreground == ownWindow || foreground == dockWindow || foreground == GetDesktopWindow() || foreground == GetShellWindow()) return false;
-        if (!GetWindowRect(foreground, out var rect)) return false;
-        var screen = System.Windows.Forms.Screen.FromHandle(foreground);
-        return rect.Left <= screen.Bounds.Left && rect.Top <= screen.Bounds.Top && rect.Right >= screen.Bounds.Right && rect.Bottom >= screen.Bounds.Bottom;
-    }
-}
-
-internal sealed class DockTabWindow : Window
-{
-    private readonly MainWindow _owner;
-    private Point _start;
-    private bool _moved;
-
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-        NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle);
-    }
-
-    internal DockTabWindow(MainWindow owner)
-    {
-        _owner = owner;
-        Title = "文件坞入口"; Width = 34; Height = 76;
-        WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
-        AllowsTransparency = true; Background = Brushes.Transparent;
-        ShowInTaskbar = false; ShowActivated = false; Topmost = true;
-        var body = new Border { CornerRadius = new CornerRadius(13), Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(212, 223, 239)), BorderThickness = new Thickness(1), Margin = new Thickness(1), Cursor = Cursors.Hand, ToolTip = "文件坞 · 点击展开\n拖动调整位置\nCtrl + Alt + Space" };
-        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        stack.Children.Add(new TextBlock { Text = "▦", FontSize = 26, Foreground = new SolidColorBrush(Color.FromRgb(41, 111, 235)), HorizontalAlignment = HorizontalAlignment.Center });
-        stack.Children.Add(new TextBlock { Text = "‹", FontSize = 17, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, -5, 0, 0) });
-        body.Child = stack; Content = body;
-        body.MouseLeftButtonDown += (_, e) => { _start = e.GetPosition(this); _moved = false; CaptureMouse(); e.Handled = true; };
-        MouseMove += (_, e) =>
+        if (foreground == IntPtr.Zero || foreground == window) return true;
+        // Bound traversal because another process can destroy/reorder windows.
+        IntPtr current = foreground;
+        for (int i = 0; i < 512 && current != IntPtr.Zero; i++)
         {
-            if (!IsMouseCaptured || e.LeftButton != MouseButtonState.Pressed) return;
-            var p = e.GetPosition(this);
-            if (Math.Abs(p.X - _start.X) + Math.Abs(p.Y - _start.Y) > 4) _moved = true;
-            if (_moved) { Left += p.X - _start.X; Top += p.Y - _start.Y; }
-        };
-        MouseLeftButtonUp += (_, e) =>
-        {
-            if (!IsMouseCaptured) return;
-            ReleaseMouseCapture();
-            if (_moved) owner.DockMoved(Left, Top); else owner.ExpandPanel();
-            e.Handled = true;
-        };
-        var menu = new ContextMenu();
-        var open = new MenuItem { Header = "展开文件坞" }; open.Click += (_, _) => owner.ExpandPanel();
-        var quit = new MenuItem { Header = "退出" }; quit.Click += (_, _) => owner.Quit();
-        menu.Items.Add(open); menu.Items.Add(quit); ContextMenu = menu;
+            current = GetWindow(current, 3); // GW_HWNDPREV: next window above.
+            if (current == window) return true;
+        }
+        return false;
+    }
+    internal delegate void WinEventCallback(IntPtr hook, uint eventType, IntPtr window, int objectId, int childId, uint threadId, uint time);
+    [DllImport("user32.dll")] internal static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr module, WinEventCallback callback, uint process, uint thread, uint flags);
+    [DllImport("user32.dll")] internal static extern bool UnhookWinEvent(IntPtr hook);
+    // HWND_TOPMOST, NOSIZE | NOMOVE | NOACTIVATE. Restore z-order without
+    // stealing focus from the foreground application or polling every second.
+    internal static bool RaiseWithoutActivation(IntPtr window) =>
+        SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, 0x0013);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
+    [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
+    [DllImport("user32.dll", EntryPoint = "GetDpiForWindow")] internal static extern uint WindowDpi(IntPtr window);
+    internal static void RoundEdgeWindow(IntPtr window, double width, double height)
+    {
+        double scale = WindowDpi(window) / 96d;
+        var region = CreateRoundRectRgn(0, 0, (int)Math.Ceiling(width * scale) + 1, (int)Math.Ceiling(height * scale) + 1, (int)(16 * scale), (int)(16 * scale));
+        if (region != IntPtr.Zero && SetWindowRgn(window, region, true) == 0) DeleteObject(region);
     }
 }

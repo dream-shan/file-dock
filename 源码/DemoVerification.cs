@@ -34,12 +34,12 @@ internal static class DemoVerification
             return !target.ShowInTaskbar && (style & 0x80) != 0 && (style & 0x40000) == 0 && (style & 0x08000000) == 0;
         }
         Check(IsUtilityWindow(window), "Main panel is excluded from Alt+Tab and taskbar while remaining activatable");
-        var dock = Application.Current.Windows.OfType<DockTabWindow>().Single();
+        var dock = window.DockEntry;
         dock.Left = -10000; dock.Top = -10000;
         dock.Show();
-        Check(IsUtilityWindow(dock), "Edge entry is excluded from Alt+Tab and taskbar");
+        Check((!dock.ShowInTaskbar && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x80) != 0 && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x40000) == 0), "Edge entry is excluded from Alt+Tab and taskbar");
         dock.Hide(); dock.Show();
-        Check(IsUtilityWindow(dock), "Edge entry retains utility style after hiding and showing");
+        Check((!dock.ShowInTaskbar && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x80) != 0 && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x40000) == 0), "Edge entry retains utility style after hiding and showing");
         dock.Hide();
         window.AddPins(new[] { project, note, budget, plan, note.ToUpperInvariant() });
         Check(window.State.Pins.Count == 4, "Pin files/folders and deduplicate paths");
@@ -47,21 +47,7 @@ internal static class DemoVerification
         Check(File.Exists(note) && File.Exists(budget), "Pinning preserves source files");
         window.SearchBox.Text = "预算";
         Check(window.PinsList.Items.Count == 1, "Search by Chinese filename");
-        window.SearchBox.Text = ""; window.FilterComboBox.SelectedIndex = 2;
-        Check(window.PinsList.Items.Count == 1, "Filter spreadsheets");
-        window.FilterComboBox.SelectedIndex = 0;
-        window.State.History = new List<RecentEntry>
-        {
-            new() { Path = plan, DisplayName = "产品方案.txt", LastUsed = DateTime.Now, Source = "从这里打开" },
-            new() { Path = note, DisplayName = "每周周报.txt", LastUsed = DateTime.Now.AddMinutes(-12), Source = "从这里打开" },
-            new() { Path = budget, DisplayName = "项目预算.csv", LastUsed = DateTime.Now.AddHours(-1), Source = "从这里打开" },
-            new() { Path = note.ToUpperInvariant(), DisplayName = "duplicate", LastUsed = DateTime.Now.AddDays(-1), Source = "从这里打开" }
-        };
-        window.ApplyFilters();
-        Check(window.RecentList.Items.Count == 3, "Merge duplicate recent records");
-        window.State.HiddenRecent.Add(note); window.ApplyFilters();
-        Check(window.RecentList.Items.Count == 2, "Hide recent record locally");
-        window.State.HiddenRecent.Clear(); window.ApplyFilters();
+        window.SearchBox.Clear();
         var saved = window.Storage.Load();
         saved.DockSide = "Left"; window.Storage.Save(saved);
         File.WriteAllText(Path.Combine(directory, "data", "state.json"), "{invalid");
@@ -89,15 +75,11 @@ internal static class DemoVerification
         window.Width = 380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "ui-small.png"));
-        Check(window.RecentList.ActualHeight > 40 && window.DropZone.ActualHeight > 20, "Minimum window size preserves recent list and drop zone");
+        Check(window.PerformanceSection.ActualHeight > 150 && window.AddButton.IsVisible, "Minimum window size preserves performance panel and add button");
         window.Width = 430; window.Height = 650;
         window.CollapsePanel(); Check(!window.IsVisible, "Collapse hides main window");
         window.Show(); Check(window.IsVisible, "Expanded window can be restored");
         Check(IsUtilityWindow(window), "Main panel retains utility style after hiding and showing");
-        int recentCount = await Task.Run(() => RecentService.LoadSystemRecent(100).Count);
-        Check(recentCount >= 0 && recentCount <= 100, "Read real Windows Recent entries via COM");
-        checks.Add("System recent count: " + recentCount);
-
         // Exercise the same entry-opening path used by pinned cards and browser rows.
         string child = Path.Combine(project, "设计稿.v2"), empty = Path.Combine(project, "空文件夹");
         Directory.CreateDirectory(child); Directory.CreateDirectory(empty);
@@ -184,8 +166,8 @@ internal static class DemoVerification
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-small.png"));
         Check(window.FolderList.ActualHeight > 80 && window.FolderBackButton.IsVisible && window.FolderUpButton.IsVisible &&
-            window.FolderHomeButton.IsVisible && window.FolderRefreshButton.IsVisible && window.DropZone.ActualHeight > 20,
-            "Minimum window size preserves folder contents, navigation and drop zone");
+            window.FolderHomeButton.IsVisible && window.FolderRefreshButton.IsVisible,
+            "Minimum window size preserves folder contents and navigation");
         window.Width = 430; window.Height = 650;
         window.GoHome();
 
@@ -241,8 +223,8 @@ internal static class DemoVerification
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "search-small.png"));
         Check(window.FolderList.ActualHeight > 80 && window.IncludeSubfoldersCheckBox.IsVisible &&
-            window.DropZone.ActualHeight > 20,
-            "Minimum window size preserves recursive results, search scope and drop zone");
+            window.FolderList.ActualHeight > 40,
+            "Minimum window size preserves recursive results and search scope");
         window.Width = 430; window.Height = 650;
 
         window.SearchBox.Text = "共享预算";
@@ -400,11 +382,83 @@ internal static class DemoVerification
         Check(limitedSearch.Items.Count == 1000 && limitedSearch.Truncated,
             "Recursive search bounds results at 1000 and reports an incomplete traversal");
 
+        window.GoHome();
+        window.SearchBox.Text = "";
+        int cachedKinds = window.CachedPathKindCount;
+        await window.NavigateToFolderAsync(limitRoot);
+        Check(window.FolderList.Items.Count == 1001 && window.CachedPathKindCount == cachedKinds,
+            "Browsing a large folder does not retain its paths in the home metadata cache");
+        window.GoHome();
+        var originalPins = window.State.Pins;
+        window.State.Pins = Enumerable.Range(0, 500).Select(i => new PinnedEntry
+        { Id = "perf-" + i, Path = i == 499 ? project : Path.Combine(limitRoot, $"上限匹配-{i:D4}.txt"), DisplayName = $"常用-{i:D4}", Order = i }).ToList();
+        window.ApplyFilters(); window.UpdateLayout();
+        T? FindVisual<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent is T match) return match;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            { var found = FindVisual<T>(VisualTreeHelper.GetChild(parent, i)); if (found != null) return found; }
+            return null;
+        }
+        var pinPanel = FindVisual<VirtualizingPinPanel>(window.PinsList)!;
+        Check(pinPanel != null && VisualTreeHelper.GetChildrenCount(pinPanel) <= 12 && window.PinsList.Items.Count == 500,
+            "500 pins realize only visible card containers");
+        pinPanel!.SetVerticalOffset(double.PositiveInfinity); window.UpdateLayout();
+        var finalCard = window.PinsList.ItemContainerGenerator.ContainerFromIndex(499) as FrameworkElement;
+        Check(finalCard?.DataContext is EntryView last && last.Id == "perf-499", "Scrolling reaches the last virtualized pin with correct binding");
+        Check(VisualTreeHelper.GetChildrenCount(pinPanel) <= 12, "Scrolling releases offscreen pin containers");
+        FindVisual<Button>(finalCard!)!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        for (int i = 0; i < 100 && !AtFolder(project); i++) await Task.Delay(20);
+        Check(AtFolder(project), "Clicking a virtualized final card opens its own folder inside the panel");
+        window.GoHome(); window.UpdateLayout();
+        pinPanel.SetVerticalOffset(double.PositiveInfinity); window.UpdateLayout();
+        window.SearchBox.Text = "常用-0499"; window.UpdateLayout();
+        Check(window.PinsList.Items.Count == 1 && pinPanel.VerticalOffset == 0 &&
+            ((EntryView)window.PinsList.Items[0]).Id == "perf-499", "Filtering from the final row resets scrolling and preserves item identity");
+        window.SearchBox.Text = "no-such-pin"; window.UpdateLayout();
+        Check(window.PinsList.Items.Count == 0 && VisualTreeHelper.GetChildrenCount(pinPanel) == 0, "Empty pin results release realized containers");
+        window.SearchBox.Text = ""; window.Width = 380; window.Height = 480; window.UpdateLayout();
+        Check(VisualTreeHelper.GetChildrenCount(pinPanel) <= 8 && window.PerformanceSection.ActualHeight > 150,
+            "Virtualized pins preserve the compact window layout");
+        window.Width = 430; window.Height = 650; window.UpdateLayout();
+        var timings = new List<double>();
+        for (int i = 0; i < 20; i++)
+        {
+            var watch = Stopwatch.StartNew();
+            window.SearchBox.Text = i % 2 == 0 ? "常用-04" : "";
+            window.UpdateLayout(); timings.Add(watch.Elapsed.TotalMilliseconds);
+        }
+        checks.Add($"PERF: 500-pin filter/layout median={timings.OrderBy(t => t).ElementAt(10):F2}ms max={timings.Max():F2}ms, realized={VisualTreeHelper.GetChildrenCount(pinPanel)}");
+        SaveRender(window, Path.Combine(directory, "ui-500-pins.png"));
+        window.MovePin("perf-499", "perf-0"); window.UpdateLayout();
+        Check(window.State.Pins[0].Id == "perf-499" && ((EntryView)window.PinsList.Items[0]).Id == "perf-499",
+            "Drag reorder path preserves pin identity and refreshes the virtualized first row");
+        window.State.Pins = originalPins; window.ApplyFilters();
+        string restartData = Path.Combine(directory, "restart-data");
+        new StorageService(restartData).Save(new AppState { Pins = originalPins });
+        var restarted = new MainWindow(restartData) { Left = -10000, Top = -10000, ShowActivated = false };
+        try
+        {
+            restarted.Show(); restarted.UpdateLayout();
+            Check(restarted.PinsList.Items.Count == originalPins.Count &&
+                restarted.PinsList.ItemContainerGenerator.ContainerFromIndex(0) != null,
+                "Starting with saved pins initializes and renders virtualized cards");
+        }
+        finally { restarted.DisposeResources(); restarted.Close(); }
+        Check(dock.Width == 20 && dock.Height == 48 && dock.Opacity < 0.5, "Edge entry is compact and translucent while idle");
+        dock.Show();
+        IntPtr foreground = NativeMethods.GetForegroundWindow();
+        Check(NativeMethods.RaiseWithoutActivation(dock.Handle) &&
+            NativeMethods.GetForegroundWindow() == foreground, "Raising the edge entry does not steal foreground focus");
+        dock.Hide();
+
+        await FeatureVerification.Run(window, directory, Check);
+        await PerformanceVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }
 
-    private static void SaveRender(Window window, string path)
+    internal static void SaveRender(Window window, string path)
     {
         window.UpdateLayout();
         var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
@@ -413,3 +467,4 @@ internal static class DemoVerification
         using var file = File.Create(path); encoder.Save(file);
     }
 }
+

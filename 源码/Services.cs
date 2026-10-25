@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Threading;
 
 namespace FileDockDemo;
 
@@ -108,13 +105,10 @@ public sealed class StorageService
 
     private static void Validate(AppState state)
     {
-        if (state.Pins is null || state.History is null || state.HiddenRecent is null)
+        if (state.Pins is null)
             throw new InvalidDataException("配置文件中的列表无效。");
         if (state.Pins.Any(entry => entry is null || string.IsNullOrWhiteSpace(entry.Path) ||
-                                    string.IsNullOrWhiteSpace(entry.Id) || entry.DisplayName is null) ||
-            state.History.Any(entry => entry is null || string.IsNullOrWhiteSpace(entry.Path) ||
-                                       entry.DisplayName is null || entry.Source is null) ||
-            state.HiddenRecent.Any(string.IsNullOrWhiteSpace))
+                                    string.IsNullOrWhiteSpace(entry.Id) || entry.DisplayName is null))
             throw new InvalidDataException("配置文件中的文件记录无效。");
         if (state.DockSide is not ("Left" or "Right") || !double.IsFinite(state.DockTop))
             throw new InvalidDataException("配置文件中的窗口位置无效。");
@@ -154,103 +148,5 @@ public static class FileService
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(path))
             .ToUpperInvariant();
-    }
-}
-
-public static class RecentService
-{
-    public static List<RecentEntry> LoadSystemRecent(int max = 100)
-    {
-        if (max < 0)
-            throw new ArgumentOutOfRangeException(nameof(max));
-        if (max == 0)
-            return [];
-        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
-            return LoadOnStaThread(max);
-
-        List<RecentEntry>? result = null;
-        ExceptionDispatchInfo? failure = null;
-        var thread = new Thread(() =>
-        {
-            try { result = LoadOnStaThread(max); }
-            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
-        }) { IsBackground = true, Name = "FileDock.SystemRecent" };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        failure?.Throw();
-        return result ?? [];
-    }
-
-    private static List<RecentEntry> LoadOnStaThread(int max)
-    {
-        var recentDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Recent);
-        if (string.IsNullOrWhiteSpace(recentDirectory))
-            return [];
-        FileInfo[] shortcuts;
-        try
-        {
-            shortcuts = new DirectoryInfo(recentDirectory).GetFiles("*.lnk", SearchOption.TopDirectoryOnly);
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return [];
-        }
-
-        var shellType = Type.GetTypeFromProgID("WScript.Shell")
-                        ?? throw new InvalidOperationException("当前系统无法读取最近使用的快捷方式。");
-        object? shell = null;
-        var entries = new List<RecentEntry>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            shell = Activator.CreateInstance(shellType)
-                    ?? throw new InvalidOperationException("无法创建 Windows 快捷方式读取服务。");
-            foreach (var shortcutFile in shortcuts.OrderByDescending(file => file.LastWriteTime))
-            {
-                object? shortcut = null;
-                try
-                {
-                    shortcut = ((dynamic)shell).CreateShortcut(shortcutFile.FullName);
-                    string target = ((dynamic)shortcut).TargetPath;
-                    if (string.IsNullOrWhiteSpace(target))
-                        continue;
-                    target = Environment.ExpandEnvironmentVariables(target);
-                    if (!System.IO.Path.IsPathFullyQualified(target))
-                        continue;
-                    if (!seen.Add(FileService.NormalizeKey(target)))
-                        continue;
-                    var displayName = System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(target));
-                    entries.Add(new RecentEntry
-                    {
-                        Path = target,
-                        DisplayName = string.IsNullOrWhiteSpace(displayName) ? target : displayName,
-                        LastUsed = shortcutFile.LastWriteTime,
-                        Source = "系统记录"
-                    });
-                    if (entries.Count >= max)
-                        break;
-                }
-                catch (Exception error) when (error is COMException or IOException or UnauthorizedAccessException or ArgumentException)
-                {
-                    // Windows may remove or rewrite an individual recent shortcut during this scan.
-                }
-                finally
-                {
-                    ReleaseCom(shortcut);
-                }
-            }
-        }
-        finally
-        {
-            ReleaseCom(shell);
-        }
-        return entries;
-    }
-
-    private static void ReleaseCom(object? value)
-    {
-        if (value is not null && Marshal.IsComObject(value))
-            Marshal.FinalReleaseComObject(value);
     }
 }

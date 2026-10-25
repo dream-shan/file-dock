@@ -53,8 +53,7 @@ public partial class MainWindow
             if (!IsCurrent()) return;
             foreach (var item in result.Items)
             {
-                _directoryKinds[item.Path] = item.IsDirectory;
-                var entry = MakeView(item.Path, item.Name, "", false, "", item.IsDirectory ? "›" : "");
+                var entry = MakeView(item.Path, item.Name, "", false, item.IsDirectory ? "›" : "", item.IsDirectory);
                 string parent = Path.GetDirectoryName(item.Path) ?? root;
                 string relative = Path.GetRelativePath(root, parent);
                 entry.Subtitle = (relative == "." ? "当前文件夹" : relative) + "  ·  " + (item.IsDirectory ? "文件夹" : FormatSize(item.Length));
@@ -84,6 +83,7 @@ public partial class MainWindow
     {
         var visible = _recursiveSearchEntries.Where(e => filter == "全部" || e.Kind == filter).ToList();
         FolderList.ItemsSource = visible;
+        ReconcileFileSelection();
         FolderEmptyText.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         FolderCountText.Text = _recursiveSearchPending ? "搜索中…" : _recursiveSearchFailed ? "搜索失败" : $"{visible.Count} 个结果" + (_recursiveSearchTruncated ? "（上限）" : "");
         FolderCountText.ToolTip = _recursiveSearchPending ? "正在搜索当前文件夹及其子文件夹" : $"匹配 {_recursiveSearchEntries.Count} 项，当前筛选显示 {visible.Count} 项。" + (_recursiveSearchTruncated ? "已达 1000 项显示上限，请增加关键词缩小范围。" : "") + (_recursiveSearchSkipped > 0 ? $"跳过 {_recursiveSearchSkipped} 个无法读取的子目录，结果可能不全。" : "");

@@ -24,8 +24,11 @@ public sealed class HalfWidthConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
-public sealed class EntryView
+public sealed class EntryView : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private bool _isChosen;
+    public bool IsChosen { get => _isChosen; set { if (_isChosen != value) { _isChosen = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChosen))); } } }
     public string Id { get; set; } = "";
     public string Path { get; set; } = "";
     public string DisplayName { get; set; } = "";
@@ -42,18 +45,22 @@ public partial class MainWindow : Window
     internal readonly StorageService Storage;
     internal AppState State;
     private readonly string _dataDirectory;
-    private List<RecentEntry> _systemRecent = new();
-    private List<EntryView> _displayPins = new(), _displayRecents = new();
-    private bool _loaded, _quitting, _refreshing, _keepOpen, _isCollapsed, _inDialog, _menuOpen;
+    private List<EntryView> _displayPins = new();
+    private bool _loaded, _quitting, _keepOpen, _isCollapsed, _inDialog, _menuOpen;
     private readonly Dictionary<string, bool> _directoryKinds = new(StringComparer.OrdinalIgnoreCase);
+    internal int CachedPathKindCount => _directoryKinds.Count;
     private bool _dragging, _saveFailed;
     private Point _dragStart;
     private EntryView? _dragEntry;
     private DockTabWindow? _dock;
+    internal DockTabWindow DockEntry => _dock!;
     private Forms.NotifyIcon? _tray;
     private System.Drawing.Icon? _trayIcon;
     private HwndSource? _source;
-    private readonly DispatcherTimer _fullscreenTimer;
+    private NativeMethods.WinEventCallback? _foregroundCallback;
+    private IntPtr _foregroundHook, _locationHook, _reorderHook;
+    private bool _foregroundUpdateQueued;
+    private static readonly Dictionary<string, Brush> IconBrushes = new();
     private Forms.Screen _screen;
 
     public MainWindow(string dataDirectory)
@@ -65,19 +72,17 @@ public partial class MainWindow : Window
         _screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         InitializeComponent();
         InitializeFolderBrowser();
+        InitializeTransfers();
+        InitializePerformance();
         SizeChanged += (_, _) => PinsList.MaxHeight = ActualHeight < 560 ? 82 : 158;
         SearchBox.TextChanged += (_, _) => ApplyFilters();
-        FilterComboBox.SelectionChanged += (_, _) => ApplyFilters();
         KeepOpenButton.Click += (_, _) => { _keepOpen = !_keepOpen; State.KeepOpen = _keepOpen; UpdateKeepOpen(); Persist(); };
         CollapseButton.Click += (_, _) => CollapsePanel();
-        RefreshButton.Click += async (_, _) => await RefreshRecentAsync();
         SettingsButton.Click += (_, _) => OpenSettings();
         PinsList.ContextMenuOpening += Items_ContextMenuOpening;
-        RecentList.ContextMenuOpening += Items_ContextMenuOpening;
         PinsList.ContextMenu = new ContextMenu();
-        RecentList.ContextMenu = new ContextMenu();
-        PinsList.PreviewMouseMove += Pins_PreviewMouseMove;
-        RecentList.PreviewMouseLeftButtonUp += Recent_SingleClick;
+
+
         var addMenu = new ContextMenu();
         AddMenu(addMenu, "添加文件…", AddFilesDialog);
         AddMenu(addMenu, "添加文件夹…", AddFolderDialog);
@@ -86,13 +91,6 @@ public partial class MainWindow : Window
         addMenu.Opened += (_, _) => _menuOpen = true;
         addMenu.Closed += (_, _) => _menuOpen = false;
         SourceInitialized += (_, _) => InitializeNative();
-        _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _fullscreenTimer.Tick += (_, _) =>
-        {
-            if (_dock == null || !_isCollapsed) return;
-            bool fullscreen = NativeMethods.ForegroundIsFullscreen(new WindowInteropHelper(this).Handle, new WindowInteropHelper(_dock).Handle);
-            if (fullscreen) _dock.Hide(); else if (!_dock.IsVisible) _dock.Show();
-        };
         ApplyFilters();
     }
 
@@ -117,7 +115,37 @@ public partial class MainWindow : Window
         _tray.ContextMenuStrip = menu;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Dispatcher.Invoke(ExpandPanel); };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
-        if (!App.IsSelfTest) _fullscreenTimer.Start();
+        if (!App.IsSelfTest)
+        {
+            _foregroundCallback = (_, eventType, window, objectId, childId, _, _) =>
+            {
+                if (eventType == 3 || (objectId == 0 && childId == 0 &&
+                    (eventType == 0x8004 || window == NativeMethods.GetForegroundWindow()))) QueueDockRaise();
+            };
+            _foregroundHook = NativeMethods.SetWinEventHook(3, 3, IntPtr.Zero, _foregroundCallback, 0, 0, 2);
+            _locationHook = NativeMethods.SetWinEventHook(0x800B, 0x800B, IntPtr.Zero, _foregroundCallback, 0, 0, 2);
+            _reorderHook = NativeMethods.SetWinEventHook(0x8004, 0x8004, IntPtr.Zero, _foregroundCallback, 0, 0, 2);
+            if (_foregroundHook == IntPtr.Zero || _locationHook == IntPtr.Zero || _reorderHook == IntPtr.Zero)
+                SetStatus("窗口变化通知不可用，仍可通过 Ctrl + Alt + Space 唤出。", true);
+            WatchCaptureWindows();
+        }
+    }
+
+    private void QueueDockRaise()
+    {
+        if (_quitting || !_isCollapsed || _foregroundUpdateQueued) return;
+        _foregroundUpdateQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _foregroundUpdateQueued = false;
+            if (_quitting || !_isCollapsed || _dock == null) return;
+            if (UpdateCaptureVisibility()) return;
+            if (!_dock.IsVisible) _dock.Show();
+            IntPtr handle = _dock.Handle;
+            // Reorder events also occur while unrelated windows change. Avoid
+            // redundant raises and feedback when we already sit above the app.
+            if (!NativeMethods.IsAboveForeground(handle)) NativeMethods.RaiseWithoutActivation(handle);
+        }, DispatcherPriority.Background);
     }
 
     private static System.Drawing.Icon CreateTrayIcon()
@@ -140,7 +168,7 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         if (_loaded) return;
         _loaded = true;
@@ -154,7 +182,8 @@ public partial class MainWindow : Window
                 File.WriteAllText(System.IO.Path.Combine(_dataDirectory, "initialized"), "1");
             }
             PositionPanel();
-            await RefreshRecentAsync();
+            _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray());
+            UpdatePerformanceActivity();
         }
     }
 
@@ -184,33 +213,23 @@ public partial class MainWindow : Window
 
     internal void ApplyFilters()
     {
-        if (PinsList == null || RecentList == null) return;
+        if (PinsList == null) return;
         if (CurrentFolderPath != null) { ApplyFolderFilters(); return; }
         string query = SearchBox.Text.Trim();
-        string filter = (FilterComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "全部";
-        bool Match(EntryView e) => (query.Length == 0 || e.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) || e.Path.Contains(query, StringComparison.OrdinalIgnoreCase)) && (filter == "全部" || e.Kind == filter);
-        _displayPins = State.Pins.OrderBy(p => p.Order).Select(p => MakeView(p.Path, p.DisplayName, p.Id, true, "", "")).Where(Match).ToList();
-        var hidden = new HashSet<string>(State.HiddenRecent.Select(FileService.NormalizeKey), StringComparer.Ordinal);
-        _displayRecents = State.History.Concat(_systemRecent)
-            .Where(r => !hidden.Contains(FileService.NormalizeKey(r.Path)))
-            .GroupBy(r => FileService.NormalizeKey(r.Path))
-            .Select(g => g.OrderByDescending(r => r.LastUsed).First())
-            .OrderByDescending(r => r.LastUsed).Take(100)
-            .Select(r => MakeView(r.Path, r.DisplayName, "", false, r.Source, r.Source == "从这里打开" ? RelativeTime(r.LastUsed) : "系统记录"))
-            .Where(Match).ToList();
+        _displayPins = State.Pins.OrderBy(p => p.Order)
+            .Select(p => MakeView(p.Path, p.DisplayName, p.Id, true, ""))
+            .Where(e => query.Length == 0 || e.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) || e.Path.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
         PinsList.ItemsSource = _displayPins;
-        RecentList.ItemsSource = _displayRecents;
+        ReconcileFileSelection();
         PinsEmptyText.Visibility = _displayPins.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        RecentEmptyText.Visibility = _displayRecents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        PinsEmptyText.Text = query.Length > 0 ? "没有匹配的常用项目" : "拖入文件或文件夹，放进你的常用";
-        RecentEmptyText.Text = query.Length > 0 ? "没有匹配的最近项目" : "暂无记录，打开文件后会显示在这里";
+        PinsEmptyText.Text = query.Length > 0 ? "没有匹配的常用项目" : "点击“＋ 添加”，选择常用文件或文件夹";
     }
 
-    private EntryView MakeView(string path, string name, string id, bool pinned, string source, string time)
+    private EntryView MakeView(string path, string name, string id, bool pinned, string time, bool? directory = null)
     {
         string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
         string glyph = "FILE", color = "#74839B", kind = "文档";
-        bool isDirectory = _directoryKinds.TryGetValue(path, out var knownKind) ? knownKind : ext == "";
+        bool isDirectory = directory ?? (_directoryKinds.TryGetValue(path, out var knownKind) ? knownKind : ext == "");
         if (isDirectory) { glyph = "▰"; color = "#E9A322"; kind = "文件夹"; }
         else if (ext is ".doc" or ".docx" or ".rtf") { glyph = "W"; color = "#347BDA"; }
         else if (ext is ".xls" or ".xlsx" or ".csv") { glyph = "X"; color = "#26A176"; kind = "表格"; }
@@ -219,7 +238,12 @@ public partial class MainWindow : Window
         else if (ext is ".ppt" or ".pptx") { glyph = "P"; color = "#D88244"; }
         else if (ext is ".exe" or ".lnk") { glyph = "APP"; color = "#617AD0"; }
         string parent = System.IO.Path.GetDirectoryName(path.TrimEnd('\\')) ?? path;
-        return new EntryView { Id = id, Path = path, DisplayName = string.IsNullOrEmpty(name) ? FileName(path) : name, Subtitle = parent, TimeLabel = time, IconGlyph = glyph, IconBrush = (Brush)new BrushConverter().ConvertFromString(color)!, Kind = kind, IsPinned = pinned };
+        if (!IconBrushes.TryGetValue(color, out Brush? iconBrush))
+        {
+            iconBrush = (Brush)new BrushConverter().ConvertFromString(color)!;
+            iconBrush.Freeze(); IconBrushes[color] = iconBrush;
+        }
+        return new EntryView { Id = id, Path = path, DisplayName = string.IsNullOrEmpty(name) ? FileName(path) : name, Subtitle = parent, TimeLabel = time, IconGlyph = glyph, IconBrush = iconBrush, Kind = kind, IsPinned = pinned };
     }
 
     private async Task LoadKindsAsync(string[] paths)
@@ -227,32 +251,10 @@ public partial class MainWindow : Window
         var pending = paths.Distinct(StringComparer.OrdinalIgnoreCase).Where(p => !_directoryKinds.ContainsKey(p)).ToArray();
         if (pending.Length == 0) return;
         var found = await Task.Run(() => pending.Select(p => (Path: p, IsDirectory: Directory.Exists(p))).ToArray());
-        foreach (var item in found) _directoryKinds[item.Path] = item.IsDirectory;
+        var active = State.Pins.Select(p => p.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string stale in _directoryKinds.Keys.Where(p => !active.Contains(p)).ToArray()) _directoryKinds.Remove(stale);
+        foreach (var item in found) if (active.Contains(item.Path)) _directoryKinds[item.Path] = item.IsDirectory;
         ApplyFilters();
-    }
-
-    private static string RelativeTime(DateTime time)
-    {
-        double minutes = (DateTime.Now - time.ToLocalTime()).TotalMinutes;
-        if (minutes < 1) return "刚刚";
-        if (minutes < 60) return $"{(int)minutes} 分钟前";
-        if (minutes < 1440) return $"{(int)(minutes / 60)} 小时前";
-        return time.ToLocalTime().ToString("MM-dd");
-    }
-
-    internal async Task RefreshRecentAsync()
-    {
-        if (_refreshing) return;
-        _refreshing = true;
-        RefreshButton.IsEnabled = false;
-        try
-        {
-            _systemRecent = await RunSta(() => RecentService.LoadSystemRecent(100));
-            ApplyFilters(); if (CurrentFolderPath == null) SetStatus($"已读取 {_systemRecent.Count} 条系统记录 · 文件夹内浏览，文件单击打开");
-            _ = LoadKindsAsync(_systemRecent.Select(r => r.Path).Concat(State.Pins.Select(p => p.Path)).ToArray());
-        }
-        catch (Exception ex) { if (CurrentFolderPath == null) SetStatus("系统记录暂不可用：" + ex.Message, true); }
-        finally { _refreshing = false; RefreshButton.IsEnabled = true; }
     }
 
     private static Task<T> RunSta<T>(Func<T> action)
@@ -266,12 +268,6 @@ public partial class MainWindow : Window
     {
         if (!_dragging && sender is FrameworkElement element && (element.Tag ?? element.DataContext) is EntryView entry) OpenEntry(entry);
         e.Handled = true;
-    }
-    private void Recent_DoubleClick(object sender, MouseButtonEventArgs e) { e.Handled = true; }
-    private void Recent_SingleClick(object sender, MouseButtonEventArgs e)
-    {
-        var entry = FindEntry(e.OriginalSource as DependencyObject);
-        if (entry != null) { OpenEntry(entry); e.Handled = true; }
     }
     private async void OpenEntry(EntryView entry) => await OpenEntryAsync(entry);
     internal async Task OpenEntryAsync(EntryView entry)
@@ -288,12 +284,6 @@ public partial class MainWindow : Window
                 return;
             }
             await RunSta(() => { FileService.Open(entry.Path); return true; });
-            string key = FileService.NormalizeKey(entry.Path);
-            State.History.RemoveAll(r => FileService.NormalizeKey(r.Path) == key);
-            State.HiddenRecent.RemoveAll(p => FileService.NormalizeKey(p) == key);
-            State.History.Insert(0, new RecentEntry { Path = entry.Path, DisplayName = entry.DisplayName, LastUsed = DateTime.Now, Source = "从这里打开" });
-            State.History = State.History.Take(100).ToList();
-            Persist(); ApplyFilters();
             if (request != _openRequestVersion || _quitting) return;
             SetStatus("已请求系统打开：" + entry.DisplayName);
             if (!_keepOpen && !_saveFailed) CollapsePanel();
@@ -315,7 +305,11 @@ public partial class MainWindow : Window
     {
         EntryView? entry = FindEntry(e.OriginalSource as DependencyObject) ?? (sender as ListBox)?.SelectedItem as EntryView;
         if (entry == null) { e.Handled = true; return; }
+        if (!_selectedPaths.Contains(entry.Path)) SelectFile(entry, false);
         var menu = new ContextMenu();
+        AddMenu(menu, _selectedPaths.Count > 1 ? $"复制 {_selectedPaths.Count} 个文件（Ctrl+C）" : "复制文件（Ctrl+C）", () => _ = CopySelectedFilesAsync());
+        if (entry.Kind == "图片" && _selectedPaths.Count == 1) AddMenu(menu, "复制图片", () => _ = CopySelectedFilesAsync(true));
+        menu.Items.Add(new Separator());
         AddMenu(menu, entry.Kind == "文件夹" ? "在文件坞中浏览" : "打开", () => OpenEntry(entry));
         if (entry.Kind == "文件夹") AddMenu(menu, "在文件管理器中打开", () => { try { FileService.Open(entry.Path); } catch (Exception ex) { SetStatus(ex.Message, true); } });
         AddMenu(menu, "打开所在位置", () => { try { FileService.Reveal(entry.Path); } catch (Exception ex) { SetStatus(ex.Message, true); } });
@@ -331,7 +325,6 @@ public partial class MainWindow : Window
         else
         {
             AddMenu(menu, "固定到常用", () => AddPins(new[] { entry.Path }));
-            if (!ReferenceEquals(sender, FolderList)) AddMenu(menu, "隐藏这条记录", () => { State.HiddenRecent.Add(entry.Path); Persist(); ApplyFilters(); });
         }
         ShowMenu(menu, sender as UIElement); e.Handled = true;
     }
@@ -404,9 +397,8 @@ public partial class MainWindow : Window
             catch (Exception ex) { SetStatus(ex.Message, true); }
         };
         menu.Items.Add(startup);
-        AddMenu(menu, "恢复隐藏的最近记录", () => { State.HiddenRecent.Clear(); Persist(); ApplyFilters(); });
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; MessageBox.Show(this, "拖入文件或文件夹即可固定；拖动常用卡片调整顺序。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时可勾选包含子文件夹，搜索当前目录及所有子目录；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n最近记录由 Windows 提供，覆盖取决于各应用。\n固定项及设置保存在程序旁的 Data 文件夹。", "文件坞 Demo", MessageBoxButton.OK, MessageBoxImage.Information); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; MessageBox.Show(this, "点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时可勾选包含子文件夹，搜索当前目录及所有子目录；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 2 秒更新，收起或浏览文件夹时暂停采集。\n固定项及设置保存在程序旁的 Data 文件夹。", "文件坞 Demo", MessageBoxButton.OK, MessageBoxImage.Information); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }
@@ -415,51 +407,47 @@ public partial class MainWindow : Window
         try { using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"); return key?.GetValue("FileDockDemo") is string; } catch { return false; }
     }
 
-    private void Pin_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _dragEntry = FindEntry(e.OriginalSource as DependencyObject); _dragStart = e.GetPosition(this); _dragging = false; }
-    private void Pins_PreviewMouseMove(object sender, MouseEventArgs e)
+    private void Window_DragOver(object sender, DragEventArgs e)
     {
-        if (_dragEntry == null || e.LeftButton != MouseButtonState.Pressed || _dragging) return;
-        Point current = e.GetPosition(this);
-        if (Math.Abs(current.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(current.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-        _dragging = true;
-        try { DragDrop.DoDragDrop(PinsList, new DataObject("FileDockPin", _dragEntry.Id), DragDropEffects.Move); }
-        finally { _dragEntry = null; Dispatcher.BeginInvoke(() => _dragging = false, DispatcherPriority.Background); }
+        e.Effects = e.Data.GetDataPresent("FileDockPin") && CurrentFolderPath == null ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true;
     }
-    private void Window_DragOver(object sender, DragEventArgs e) { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : e.Data.GetDataPresent("FileDockPin") ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; }
     private void Window_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files) AddPins(files);
-        else if (e.Data.GetData("FileDockPin") is string id)
+        if (CurrentFolderPath == null && e.Data.GetData("FileDockPin") is string id)
         {
             var target = FindEntry(e.OriginalSource as DependencyObject);
-            var pin = State.Pins.FirstOrDefault(p => p.Id == id);
-            if (target?.Id == id) { e.Handled = true; return; }
-            if (pin != null)
-            {
-                State.Pins.Remove(pin);
-                int index = target == null ? State.Pins.Count : State.Pins.FindIndex(p => p.Id == target.Id);
-                State.Pins.Insert(index < 0 ? State.Pins.Count : index, pin); ReorderAndSave();
-            }
+            MovePin(id, target?.Id);
         }
-        e.Handled = true;
+        e.Effects = CurrentFolderPath == null && e.Data.GetDataPresent("FileDockPin") ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true;
+    }
+    internal void MovePin(string id, string? targetId)
+    {
+        if (targetId == id) return;
+        var pin = State.Pins.FirstOrDefault(p => p.Id == id);
+        if (pin == null) return;
+        State.Pins.Remove(pin);
+        int index = targetId == null ? State.Pins.Count : State.Pins.FindIndex(p => p.Id == targetId);
+        State.Pins.Insert(index < 0 ? State.Pins.Count : index, pin); ReorderAndSave();
     }
     private void ReorderAndSave() { for (int i = 0; i < State.Pins.Count; i++) State.Pins[i].Order = i; Persist(); ApplyFilters(); }
 
     public void ExpandPanel()
     {
         _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); SearchBox.Focus();
-        if (CurrentFolderPath == null) _ = RefreshRecentAsync();
+        NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
+        UpdatePerformanceActivity();
     }
     internal void CollapsePanel()
     {
         if (App.IsSelfTest) { _isCollapsed = true; Hide(); return; }
-        _isCollapsed = true; Hide(); PositionDock(); _dock?.Show();
+        _isCollapsed = true; Hide(); PositionDock(); if (_captureActive) return; _dock?.Show();
+        if (_dock != null) NativeMethods.RaiseWithoutActivation(_dock.Handle);
     }
     internal void DockMoved(double left, double top)
     {
-        var dpi = VisualTreeHelper.GetDpi(_dock!);
-        _screen = Forms.Screen.FromHandle(new WindowInteropHelper(_dock!).Handle);
-        State.DockSide = left * dpi.DpiScaleX < _screen.WorkingArea.Left + _screen.WorkingArea.Width / 2 ? "Left" : "Right";
+        double scale = _dock!.ScaleFactor;
+        _screen = Forms.Screen.FromHandle(_dock!.Handle);
+        State.DockSide = left * scale < _screen.WorkingArea.Left + _screen.WorkingArea.Width / 2 ? "Left" : "Right";
         State.DockTop = top; PositionDock(); Persist();
     }
     private Rect WorkArea(Visual? target = null)
@@ -480,7 +468,8 @@ public partial class MainWindow : Window
     private void PositionDock()
     {
         if (_dock == null) return;
-        Rect area = WorkArea(_dock);
+        var bounds = _screen.WorkingArea; double scale = _dock.ScaleFactor;
+        Rect area = new Rect(bounds.Left / scale, bounds.Top / scale, bounds.Width / scale, bounds.Height / scale);
         _dock.Left = State.DockSide == "Left" ? area.Left : area.Right - _dock.Width;
         _dock.Top = Math.Clamp(State.DockTop < 0 ? area.Top + area.Height / 2 - _dock.Height / 2 : State.DockTop, area.Top, Math.Max(area.Top, area.Bottom - _dock.Height));
     }
@@ -502,16 +491,16 @@ public partial class MainWindow : Window
     }
     private void Window_Deactivated(object sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => { if (!_keepOpen && !_inDialog && !_dragging && !IsActive && !AnyMenuOpen() && !App.IsSelfTest) CollapsePanel(); }, DispatcherPriority.Background);
+        Dispatcher.BeginInvoke(() => { if (!_keepOpen && !_inDialog && !_dragging && !UpdateCaptureVisibility() && !IsActive && !AnyMenuOpen() && !App.IsSelfTest) CollapsePanel(); }, DispatcherPriority.Background);
     }
     private bool AnyMenuOpen() => _menuOpen || AddButton.ContextMenu?.IsOpen == true;
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (HandleBrowserKey(e)) return;
-        if (e.Key == Key.Escape) { CollapsePanel(); e.Handled = true; }
+        if (HandleTransferKey(e) || HandleBrowserKey(e)) return;
+        if (e.Key == Key.Escape) { if (Environment.TickCount64 >= _ignoreDragEscapeUntil) CollapsePanel(); e.Handled = true; }
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; }
-        if (e.Key == Key.Enter) { var entry = RecentList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault() ?? _displayRecents.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
-        if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && RecentList.Items.Count > 0) { RecentList.SelectedIndex = 0; RecentList.Focus(); e.Handled = true; }
+        if (e.Key == Key.Enter) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
+        if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
     private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); });
@@ -521,8 +510,15 @@ public partial class MainWindow : Window
     public void Quit() { _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()
     {
+        DisposePerformance();
         CancelFolderLoad();
-        _fullscreenTimer.Stop();
+        _copyRequest?.Cancel(); _copyRequest?.Dispose();
+        if (_foregroundHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_foregroundHook); _foregroundHook = IntPtr.Zero; }
+        if (_locationHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_locationHook); _locationHook = IntPtr.Zero; }
+        if (_reorderHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_reorderHook); _reorderHook = IntPtr.Zero; }
+        _captureRecovery?.Stop();
+        if (_captureKeyHook != IntPtr.Zero) { NativeMethods.UnhookWindowsHookEx(_captureKeyHook); _captureKeyHook = IntPtr.Zero; }
+        if (_captureHook != IntPtr.Zero) NativeMethods.UnhookWinEvent(_captureHook);
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         if (_source != null) { NativeMethods.UnregisterHotKey(_source.Handle, NativeMethods.HotkeyId); _source.RemoveHook(WindowProc); }
         _tray?.Dispose(); _trayIcon?.Dispose(); _dock?.Close();

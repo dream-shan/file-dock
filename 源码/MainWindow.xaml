@@ -72,13 +72,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="10">
+                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="10" BorderThickness="1" BorderBrush="Transparent">
                             <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#EAF0FF" />
-                            </Trigger>
+                            <DataTrigger Binding="{Binding IsChosen}" Value="True">
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#4A6CF7" />
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ItemBorder" Property="Background" Value="#F1F4FA" />
                             </Trigger>
@@ -143,7 +143,7 @@
                         <TextBox x:Name="SearchBox" Background="Transparent" BorderThickness="0" Padding="0"
                                  FontSize="12" Foreground="{StaticResource Ink}" VerticalContentAlignment="Center"
                                  AutomationProperties.Name="搜索文件名或路径" />
-                        <TextBlock x:Name="SearchPlaceholder" Text="搜索文件名或路径" Foreground="#98A2B3" IsHitTestVisible="False" VerticalAlignment="Center">
+                        <TextBlock x:Name="SearchPlaceholder" Text="搜索常用文件或路径" Foreground="#98A2B3" IsHitTestVisible="False" VerticalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -170,22 +170,23 @@
                 </Grid.RowDefinitions>
                 <TextBlock Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="#4A6CF7"
-                        HorizontalAlignment="Right" ToolTip="选择文件或文件夹，也可以直接拖入面板" />
+                        HorizontalAlignment="Right" ToolTip="添加常用文件或文件夹" />
                 <Grid Grid.Row="1">
-                    <TextBlock x:Name="PinsEmptyText" Text="把常用文件拖进来，随手就能打开" Foreground="#9AA4B4"
+                    <TextBlock x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="#9AA4B4"
                                FontSize="11" TextAlignment="Center" TextWrapping="Wrap" Margin="10,17" Visibility="Visible" />
                     <ListBox x:Name="PinsList" Background="Transparent" BorderThickness="0" Padding="0" MaxHeight="158"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ItemContainerStyle="{StaticResource PlainItem}" PreviewMouseLeftButtonDown="Pin_PreviewMouseLeftButtonDown">
+                             ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
+                             ItemContainerStyle="{StaticResource PlainItem}">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
+                                <local:VirtualizingPinPanel />
                             </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollContentPresenter}, Converter={StaticResource HalfWidth}}" Height="70" Margin="0,3,5,3" Tag="{Binding}" Click="Item_Open"
-                                        ToolTip="{Binding Subtitle}" Background="#F3F6FC" Style="{StaticResource QuietButton}"
+                                <Button HorizontalAlignment="Stretch" Height="70" Margin="0,3,5,3" Tag="{Binding}" Click="Item_Open"
+                                         Background="#F3F6FC" Style="{StaticResource QuietButton}"
                                         Padding="11,9" HorizontalContentAlignment="Stretch">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -193,8 +194,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <Border Background="#FFFFFF" Width="27" Height="32" CornerRadius="7" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding IconGlyph}" Foreground="{Binding IconBrush}" FontFamily="Segoe UI"
-                                                       FontSize="11" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                            <local:EntryThumbnail />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
                                             <TextBlock Text="{Binding DisplayName}" Foreground="#36435A" FontSize="11" FontWeight="SemiBold"
@@ -210,65 +210,32 @@
                 </Grid>
             </Grid>
 
-            <Grid x:Name="RecentSection" Grid.Row="3" Margin="0,0,0,12">
+            <Grid x:Name="PerformanceSection" Grid.Row="3" Margin="0,0,0,10">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="35" />
+                    <RowDefinition Height="30" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="35" />
                 </Grid.RowDefinitions>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="最近使用" Style="{StaticResource SectionHeading}" />
-                        <Border Background="#E7F3ED" Width="5" Height="5" CornerRadius="3" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-                    <ComboBox x:Name="FilterComboBox" Grid.Column="1" Width="73" Height="24" SelectedIndex="0"
-                              FontSize="11" VerticalAlignment="Center" Background="#F6F8FC" Foreground="#778399"
-                              BorderBrush="#E7ECF4" AutomationProperties.Name="文件类型筛选">
-                        <ComboBoxItem Content="全部" />
-                        <ComboBoxItem Content="文档" />
-                        <ComboBoxItem Content="表格" />
-                        <ComboBoxItem Content="图片" />
-                        <ComboBoxItem Content="文件夹" />
-                    </ComboBox>
-                    <Button x:Name="RefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;"
-                            Margin="5,0,0,0" ToolTip="刷新最近使用" AutomationProperties.Name="刷新最近使用" />
-                </Grid>
-                <Grid Grid.Row="1">
-                    <TextBlock x:Name="RecentEmptyText" Text="最近使用的文件会显示在这里" Foreground="#9AA4B4" FontSize="11"
-                               TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Margin="10,12" Visibility="Visible" />
-                    <ListBox x:Name="RecentList" BorderThickness="0" Background="Transparent" Padding="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ItemContainerStyle="{StaticResource PlainItem}" MouseDoubleClick="Recent_DoubleClick">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="7,8" ToolTip="{Binding Subtitle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="36" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Background="#F0F3F9" Width="29" Height="34" CornerRadius="8" HorizontalAlignment="Left">
-                                        <TextBlock Text="{Binding IconGlyph}" Foreground="{Binding IconBrush}" FontFamily="Segoe UI"
-                                                   FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="3,0,9,0">
-                                        <TextBlock Text="{Binding DisplayName}" Foreground="#3B475D" FontSize="11.5" FontWeight="Medium"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Subtitle}" Foreground="#9CA6B6" FontSize="9.5" Margin="0,4,0,0"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="{Binding TimeLabel}" FontSize="9" Foreground="#A0A9B8"
-                                               VerticalAlignment="Center" MaxWidth="64" TextTrimming="CharacterEllipsis" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Grid>
+                <TextBlock Text="电脑状态" Style="{StaticResource SectionHeading}" />
+                <TextBlock x:Name="PerformanceHint" Text="每 2 秒更新" FontSize="9" Foreground="#99A3B5" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <Grid MinHeight="190">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <local:PerformanceCard x:Name="CpuCard" Label="CPU" Trend="True" Accent="#4A6CF7" Margin="0,0,4,4" MinHeight="91" />
+                        <local:PerformanceCard x:Name="GpuCard" Label="GPU" Trend="True" Accent="#8B68D8" Grid.Column="1" Margin="4,0,0,4" MinHeight="91" />
+                        <local:PerformanceCard x:Name="MemoryCard" Label="内存" Accent="#239C88" Grid.Row="1" Margin="0,4,4,0" MinHeight="91" />
+                        <local:PerformanceCard x:Name="VramCard" Label="显存" Accent="#C38A3A" Grid.Row="1" Grid.Column="1" Margin="4,4,0,0" MinHeight="91" />
+                    </Grid>
+                </ScrollViewer>
+                <Border x:Name="NetworkBar" Grid.Row="2" Background="#F3F6FC" CornerRadius="8" Padding="10,4" Margin="0,7,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="实时网速" FontSize="9" Foreground="#8894A7" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock x:Name="NetworkDownload" Grid.Column="1" Text="↓ —" FontSize="10" Foreground="#239C88" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        <TextBlock x:Name="NetworkUpload" Grid.Column="2" Text="↑ —" FontSize="10" Foreground="#4A6CF7" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                    </Grid>
+                </Border>
             </Grid>
 
             <Grid x:Name="BrowserPanel" Grid.Row="2" Grid.RowSpan="2" Visibility="Collapsed" Margin="0,0,0,12">
@@ -284,7 +251,7 @@
                         <Button x:Name="FolderBackButton" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="返回（Alt + ←）" AutomationProperties.Name="返回" />
                         <Button x:Name="FolderUpButton" Style="{StaticResource IconButton}" Content="&#xE74A;" ToolTip="上一级（Alt + ↑）" AutomationProperties.Name="上一级" Margin="3,0" />
                     </StackPanel>
-                    <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{StaticResource Accent}" HorizontalAlignment="Left" ToolTip="回到常用和最近使用" />
+                    <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{StaticResource Accent}" HorizontalAlignment="Left" ToolTip="回到常用和电脑状态" />
                     <Button x:Name="FolderRefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="刷新当前文件夹" AutomationProperties.Name="刷新当前文件夹" />
                 </Grid>
                 <Border Grid.Row="1" Background="#F3F6FC" CornerRadius="11" Padding="12,11" Margin="0,0,0,9">
@@ -315,11 +282,11 @@
                              ItemContainerStyle="{StaticResource PlainItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Tag="{Binding}" Click="Item_Open" Style="{StaticResource QuietButton}" Padding="7,9" HorizontalContentAlignment="Stretch" ToolTip="{Binding Path}">
+                                <Button Tag="{Binding}" Click="Item_Open" Style="{StaticResource QuietButton}" Padding="7,9" HorizontalContentAlignment="Stretch" >
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <Border Width="29" Height="34" Background="#F0F3F9" CornerRadius="8" HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding IconGlyph}" Foreground="{Binding IconBrush}" FontFamily="Segoe UI" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <local:EntryThumbnail />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,9,0">
                                             <TextBlock Text="{Binding DisplayName}" Foreground="#36435A" FontSize="11.5" TextTrimming="CharacterEllipsis" />
@@ -334,15 +301,6 @@
                     <TextBlock x:Name="FolderEmptyText" Foreground="#8B96A8" TextWrapping="Wrap" TextAlignment="Center" Margin="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
                 </Grid>
             </Grid>
-
-            <Border x:Name="DropZone" Grid.Row="4" CornerRadius="10" Background="#F3F6FF" BorderBrush="#DCE4FF"
-                    BorderThickness="1" Padding="10,10" Margin="0,0,0,10">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="&#xE898;" FontFamily="Segoe MDL2 Assets" Foreground="#7890D3" FontSize="14"
-                               VerticalAlignment="Center" Margin="0,0,7,0" />
-                    <TextBlock Text="拖入文件或文件夹，添加到常用" FontSize="10.5" Foreground="#8495BE" VerticalAlignment="Center" />
-                </StackPanel>
-            </Border>
 
             <Grid Grid.Row="5">
                 <Grid.RowDefinitions>
@@ -359,3 +317,5 @@
         </Grid>
     </Border>
 </Window>
+
+

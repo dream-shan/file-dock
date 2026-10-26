@@ -31,8 +31,6 @@ public partial class MainWindow
             if (CurrentFolderPath != null) await NavigateToFolderAsync(CurrentFolderPath, false, true);
         };
         FolderFilterComboBox.SelectionChanged += (_, _) => ApplyFolderFilters();
-        IncludeSubfoldersCheckBox.Checked += (_, _) => { UpdateFolderSearchHint(); ApplyFolderFilters(); };
-        IncludeSubfoldersCheckBox.Unchecked += (_, _) => { UpdateFolderSearchHint(); ApplyFolderFilters(); };
         FolderList.ContextMenu = new ContextMenu();
         FolderList.ContextMenuOpening += Items_ContextMenuOpening;
     }
@@ -105,7 +103,7 @@ public partial class MainWindow
         if (CurrentFolderPath == null || FolderList == null) return;
         string query = SearchBox.Text.Trim();
         string filter = (FolderFilterComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "全部";
-        if (IncludeSubfoldersCheckBox.IsChecked == true && query.Length > 0 && !_folderLoading && !_folderFailed)
+        if (query.Length > 0 && !_folderLoading && !_folderFailed)
         {
             StartRecursiveFolderSearch(query);
             ShowRecursiveFolderSearch(filter);

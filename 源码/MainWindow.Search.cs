@@ -24,9 +24,8 @@ public partial class MainWindow
     private void UpdateFolderSearchHint()
     {
         if (CurrentFolderPath == null) return;
-        bool recursive = IncludeSubfoldersCheckBox.IsChecked == true;
-        SearchPlaceholder.Text = recursive ? "搜索此文件夹和子文件夹" : "搜索当前文件夹";
-        SearchBox.ToolTip = recursive ? "按名称搜索当前文件夹及其子文件夹；最多显示 1000 个结果。隐藏、系统项目和子目录链接中的内容不参与搜索。" : "按名称筛选当前文件夹这一层";
+        SearchPlaceholder.Text = "搜索当前文件夹及子文件夹";
+        SearchBox.ToolTip = "按名称搜索当前文件夹及其子文件夹；最多显示 1000 个结果。隐藏、系统项目和子目录链接中的内容不参与搜索。";
     }
 
     private void StartRecursiveFolderSearch(string query)
@@ -42,7 +41,7 @@ public partial class MainWindow
 
     private async Task RunRecursiveFolderSearchAsync(string root, string query, int version, CancellationToken token)
     {
-        bool IsCurrent() => !token.IsCancellationRequested && version == _recursiveSearchVersion && CurrentFolderPath == root && SearchBox.Text.Trim() == query && IncludeSubfoldersCheckBox.IsChecked == true && !_quitting;
+        bool IsCurrent() => !token.IsCancellationRequested && version == _recursiveSearchVersion && CurrentFolderPath == root && SearchBox.Text.Trim() == query && !_quitting;
         try
         {
             // A short pause avoids starting another disk scan for every keystroke.

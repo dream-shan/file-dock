@@ -107,8 +107,7 @@ internal static class DemoVerification
         EntryView[] FolderEntries() => window.FolderList.Items.Cast<EntryView>().ToArray();
         EntryView FolderEntry(string path) => FolderEntries().Single(e => FileService.NormalizeKey(e.Path) == FileService.NormalizeKey(path));
 
-        Check(window.IncludeSubfoldersCheckBox.IsChecked == true, "Folder search includes subfolders by default");
-        window.IncludeSubfoldersCheckBox.IsChecked = false;
+        Check(window.FindName("IncludeSubfoldersCheckBox") == null, "Folder search has no subfolder scope switch");
         await window.OpenEntryAsync(new EntryView { Path = project, DisplayName = "项目资料", Kind = "文档" });
         Check(AtFolder(project) && window.IsVisible && window.BrowserPanel.Visibility == Visibility.Visible && FolderEntries().Length == 6,
             "Opening a folder displays its immediate contents inside the visible panel");
@@ -116,9 +115,11 @@ internal static class DemoVerification
             "Directory names with dots and files without extensions use actual filesystem types");
 
         window.SearchBox.Text = "预算";
+        await window.WaitForFolderSearchAsync();
         Check(FolderEntries().Length == 1 && FolderEntry(browserBudget).Path == browserBudget, "Search matches Chinese filenames inside current folder");
         window.SearchBox.Text = "仅在子目录";
-        Check(FolderEntries().Length == 0 && window.FolderEmptyText.Visibility == Visibility.Visible, "Folder search stays within the current level");
+        await window.WaitForFolderSearchAsync();
+        Check(FolderEntries().Length == 1 && FolderEntry(childNote).Path == childNote, "Folder search automatically includes child folders without a scope switch");
         window.SearchBox.Text = "";
         window.FolderFilterComboBox.SelectedIndex = 2;
         Check(FolderEntries().Length == 1 && FolderEntry(browserBudget).Path == browserBudget, "Folder type filter selects spreadsheets");
@@ -198,7 +199,6 @@ internal static class DemoVerification
             await window.WaitForFolderSearchAsync();
         }
 
-        window.IncludeSubfoldersCheckBox.IsChecked = true;
         await window.NavigateToFolderAsync(searchRoot);
         await SearchTree("深层报告.txt");
         Check(FolderEntries().Length == 1 && FolderEntry(deepNote).Path == deepNote,
@@ -222,9 +222,9 @@ internal static class DemoVerification
         window.Width = 380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "search-small.png"));
-        Check(window.FolderList.ActualHeight > 80 && window.IncludeSubfoldersCheckBox.IsVisible &&
-            window.FolderList.ActualHeight > 40,
-            "Minimum window size preserves recursive results and search scope");
+        Check(window.FolderList.ActualHeight > 80 && window.FolderFilterComboBox.IsVisible &&
+            window.SearchPlaceholder.Text == "搜索当前文件夹及子文件夹",
+            "Minimum window size preserves recursive results, type filter, and search hint");
         window.Width = 430; window.Height = 650;
 
         window.SearchBox.Text = "共享预算";
@@ -236,14 +236,14 @@ internal static class DemoVerification
             "Rapid query replacement cancels the old search without restoring stale results");
 
         window.SearchBox.Text = "共享预算";
-        Task toggledSearch = window.WaitForFolderSearchAsync();
-        window.IncludeSubfoldersCheckBox.IsChecked = false;
-        await toggledSearch;
-        Check(FolderEntries().Length == 0 && window.CurrentFolderPath == searchRoot,
-            "Turning off subfolder search cancels pending results and restores current-level filtering");
-        window.IncludeSubfoldersCheckBox.IsChecked = true;
+        await window.NavigateToFolderAsync(branchA);
         await window.WaitForFolderSearchAsync();
-        Check(FolderEntries().Length == 2, "Turning subfolder search back on searches the existing query");
+        Check(AtFolder(branchA) && FolderEntries().All(e => FileService.NormalizeKey(Path.GetDirectoryName(e.Path)!) == FileService.NormalizeKey(branchA)),
+            "Switching folders cancels the old query and shows only the new current level");
+        await SearchTree("共享预算");
+        Check(FolderEntries().Length == 1 && FolderEntry(duplicateA).Path == duplicateA,
+            "A new folder search stays within the newly selected folder tree");
+        await window.NavigateToFolderAsync(searchRoot);
 
         window.SearchBox.Text = "深层报告";
         Task clearedSearch = window.WaitForFolderSearchAsync();

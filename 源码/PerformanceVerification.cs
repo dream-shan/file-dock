@@ -66,9 +66,9 @@ internal static class PerformanceVerification
         bool requireTemperature = Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_TEMPERATURE") == "1";
         if (requireTemperature)
             check(snapshot?.CpuTemperature is > 0 and <= 130, "Installed service returns a real CPU temperature to an unelevated UI");
-        int fastBaseline = window.PerformanceSamples;
+        int refreshBaseline = window.PerformanceSamples;
         await Task.Delay(2200);
-        check(window.PerformanceSamples - fastBaseline >= 3, "Visible metrics continuously refresh faster than once per second without blocking the UI");
+        check(window.PerformanceSamples - refreshBaseline is >= 2 and <= 3, "Visible metrics refresh once per second without blocking the UI");
         if (Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_GPU") == "1")
             check(window.LastPerformanceSnapshot is { GpuLoad: >= 0 and <= 100 } && window.LastPerformanceSnapshot.GpuUsageStatus.Contains("Windows GPU 最繁忙引擎"),
                 "Real GPU load comes from matched Windows engine counters");
@@ -92,7 +92,7 @@ internal static class PerformanceVerification
         window.GoHome(); await Task.Delay(2400);
         check(window.PerformanceActive && window.PerformanceSamples > paused, "Returning home resumes performance sampling");
         for (int i = 0; i < 200; i++) window.CpuCard.Set(i, "test", 50, true);
-        check(window.CpuCard.HistoryCount == PerformanceGraph.MaximumSamples, "Performance graph history stays bounded at one minute of half-second samples");
+        check(window.CpuCard.HistoryCount == PerformanceGraph.MaximumSamples, "Performance graph history stays bounded at one minute of one-second samples");
         window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(2500);
     }
 }

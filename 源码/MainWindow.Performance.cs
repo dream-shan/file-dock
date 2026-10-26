@@ -18,7 +18,7 @@ public partial class MainWindow
 
     private void InitializePerformance()
     {
-        _performanceTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(500) };
+        _performanceTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _performanceTimer.Tick += async (_, _) => await SamplePerformanceAsync();
         IsVisibleChanged += (_, _) => UpdatePerformanceActivity();
     }
@@ -56,7 +56,7 @@ public partial class MainWindow
             NetworkDownload.Text = "↓ " + FormatRate(snapshot.Download);
             NetworkUpload.Text = "↑ " + FormatRate(snapshot.Upload);
             NetworkBar.ToolTip = "活动物理网络接口实时收发：" + snapshot.NetworkName + "\n仅统计已有流量，不主动测速";
-            PerformanceHint.Text = "实时更新 · 0.5 秒";
+            PerformanceHint.Text = "实时更新 · 1 秒";
         }
         catch (Exception ex)
         {

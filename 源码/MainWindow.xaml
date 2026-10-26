@@ -217,7 +217,7 @@
                     <RowDefinition Height="35" />
                 </Grid.RowDefinitions>
                 <TextBlock Text="电脑状态" Style="{StaticResource SectionHeading}" />
-                <TextBlock x:Name="PerformanceHint" Text="实时更新 · 0.5 秒" FontSize="9" Foreground="#99A3B5" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                <TextBlock x:Name="PerformanceHint" Text="实时更新 · 1 秒" FontSize="9" Foreground="#99A3B5" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <Grid MinHeight="190">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

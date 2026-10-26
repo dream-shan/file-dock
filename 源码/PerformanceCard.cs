@@ -52,7 +52,7 @@ public sealed class PerformanceCard : Border
 
 internal sealed class PerformanceGraph : FrameworkElement
 {
-    internal const int MaximumSamples = 120;
+    internal const int MaximumSamples = 60;
     private readonly Queue<double?> _values = new();
     internal Brush Accent = Brushes.RoyalBlue;
     internal bool Trend;

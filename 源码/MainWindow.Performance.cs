@@ -18,7 +18,7 @@ public partial class MainWindow
 
     private void InitializePerformance()
     {
-        _performanceTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(2) };
+        _performanceTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(500) };
         _performanceTimer.Tick += async (_, _) => await SamplePerformanceAsync();
         IsVisibleChanged += (_, _) => UpdatePerformanceActivity();
     }
@@ -50,13 +50,13 @@ public partial class MainWindow
             CpuCard.Set(snapshot.CpuLoad, snapshot.CpuName, snapshot.CpuTemperature, true);
             CpuCard.ToolTip = snapshot.CpuName + "\n" + snapshot.TemperatureStatus;
             GpuCard.Set(snapshot.GpuLoad, snapshot.GpuName, snapshot.GpuTemperature, true);
-            GpuCard.ToolTip = snapshot.GpuName + "\nGPU 占用率来自 NVIDIA 驱动";
+            GpuCard.ToolTip = snapshot.GpuName + "\n" + snapshot.GpuUsageStatus;
             MemoryCard.Set(Percent(snapshot.MemoryUsed, snapshot.MemoryTotal), Capacity(snapshot.MemoryUsed, snapshot.MemoryTotal));
             VramCard.Set(Percent(snapshot.VramUsed, snapshot.VramTotal), Capacity(snapshot.VramUsed, snapshot.VramTotal));
             NetworkDownload.Text = "↓ " + FormatRate(snapshot.Download);
             NetworkUpload.Text = "↑ " + FormatRate(snapshot.Upload);
             NetworkBar.ToolTip = "活动物理网络接口实时收发：" + snapshot.NetworkName + "\n仅统计已有流量，不主动测速";
-            PerformanceHint.Text = "每 2 秒更新";
+            PerformanceHint.Text = "实时更新 · 0.5 秒";
         }
         catch (Exception ex)
         {

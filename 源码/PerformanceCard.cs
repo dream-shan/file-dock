@@ -52,11 +52,12 @@ public sealed class PerformanceCard : Border
 
 internal sealed class PerformanceGraph : FrameworkElement
 {
+    internal const int MaximumSamples = 120;
     private readonly Queue<double?> _values = new();
     internal Brush Accent = Brushes.RoyalBlue;
     internal bool Trend;
     internal int HistoryCount => _values.Count;
-    internal void Add(double? value) { _values.Enqueue(value); while (_values.Count > 30) _values.Dequeue(); InvalidateVisual(); }
+    internal void Add(double? value) { _values.Enqueue(value); while (_values.Count > MaximumSamples) _values.Dequeue(); InvalidateVisual(); }
     internal void Clear() { _values.Clear(); InvalidateVisual(); }
     protected override void OnRender(DrawingContext drawing)
     {
@@ -73,12 +74,12 @@ internal sealed class PerformanceGraph : FrameworkElement
         }
         drawing.DrawLine(new Pen(background, 1), new Point(0, h + 3), new Point(w, h + 3));
         var pen = new Pen(Accent, 1.5);
-        Point? previous = null; int index = 30 - _values.Count;
+        Point? previous = null; int index = MaximumSamples - _values.Count;
         foreach (var value in _values)
         {
             if (value.HasValue)
             {
-                var point = new Point(index * w / 29, 3 + h * (1 - Math.Clamp(value.Value, 0, 100) / 100));
+                var point = new Point(index * w / (MaximumSamples - 1), 3 + h * (1 - Math.Clamp(value.Value, 0, 100) / 100));
                 if (previous.HasValue) drawing.DrawLine(pen, previous.Value, point);
                 previous = point;
             }

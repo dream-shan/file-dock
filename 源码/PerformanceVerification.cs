@@ -19,6 +19,37 @@ internal static class PerformanceVerification
         check(PerformanceService.ValidTemperature(0) == null && PerformanceService.ValidTemperature(double.NaN) == null && PerformanceService.ValidTemperature(999) == null,
             "Invalid temperatures stay unavailable rather than showing fabricated readings");
         check(NetworkTraffic.IsPhysicalTrafficInterface(1, 71, 1) && !NetworkTraffic.IsPhysicalTrafficInterface(3, 71, 1) && !NetworkTraffic.IsPhysicalTrafficInterface(0, 6, 1), "Network counters exclude filter and virtual interfaces");
+        const string adapter = "luid_0x00000000_0x000108f9";
+        check(GpuEngineMetrics.IsPhysicalAddress(1, 0, 0) && !GpuEngineMetrics.IsPhysicalAddress(uint.MaxValue, 65535, 65535),
+            "Remote display aliases with a sentinel PCI address cannot impersonate the physical GPU");
+        string Instance(int pid, int engine, string type, string identity = adapter) => $"pid_{pid}_{identity}_phys_0_eng_{engine}_engtype_{type}";
+        var gpu = GpuEngineMetrics.Aggregate(new[] {
+            new GpuEngineMetrics.Reading(Instance(1, 0, "3D"), 12),
+            new GpuEngineMetrics.Reading(Instance(2, 0, "3D"), 13),
+            new GpuEngineMetrics.Reading(Instance(1, 6, "VideoEncode"), 88),
+            new GpuEngineMetrics.Reading(Instance(3, 1, "3D", "luid_0x00000000_0x000124f0"), 99)
+        }, adapter);
+        check(gpu.Percent == 88 && gpu.Engine == "VideoEncode", "GPU includes encoding engines, selects busiest engine, and excludes other adapters");
+        gpu = GpuEngineMetrics.Aggregate(new[] {
+            new GpuEngineMetrics.Reading(Instance(1, 0, "3D"), 35),
+            new GpuEngineMetrics.Reading(Instance(2, 0, "3D"), 40),
+            new GpuEngineMetrics.Reading(Instance(1, 6, "VideoEncode"), 30)
+        }, adapter);
+        check(gpu.Percent == 75, "GPU sums processes sharing an engine without summing independent engines");
+        gpu = GpuEngineMetrics.Aggregate(new[] {
+            new GpuEngineMetrics.Reading(Instance(1, 2, "Copy"), 60),
+            new GpuEngineMetrics.Reading(Instance(1, 3, "Copy"), 55)
+        }, adapter);
+        check(gpu.Percent == 60, "Distinct engines with the same type stay separate");
+        check(GpuEngineMetrics.Aggregate(new[] {new GpuEngineMetrics.Reading(Instance(1, 0, "3D"), 0)}, adapter).Percent == 0,
+            "A valid idle GPU remains zero rather than unavailable");
+        check(GpuEngineMetrics.Aggregate(new[] {
+            new GpuEngineMetrics.Reading(Instance(1, 0, "3D"), double.NaN),
+            new GpuEngineMetrics.Reading(Instance(2, 0, "3D"), -1),
+            new GpuEngineMetrics.Reading(Instance(3, 0, "3D"), 99, 0xc0000bc6)
+        }, adapter).Percent == null, "Missing or invalid GPU counters do not fabricate a reading or fall back to a different metric");
+        check(GpuEngineMetrics.Aggregate(new[] {new GpuEngineMetrics.Reading(Instance(1, 0, "3D"), 120, 1)}, adapter).Percent == 100,
+            "New valid GPU counter data is accepted and aggregate is bounded");
         string legacy = Path.Combine(root, "legacy-state"); Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, "state.json"), "{\"Version\":1,\"State\":{\"Pins\":[{\"Id\":\"kept\",\"Path\":\"C:\\\\example.txt\",\"DisplayName\":\"kept\",\"Order\":0}],\"History\":[],\"HiddenRecent\":[],\"DockSide\":\"Left\",\"DockTop\":120,\"KeepOpen\":true}}");
         var storage = new StorageService(legacy); var state = storage.Load(); storage.Save(state);
@@ -35,6 +66,12 @@ internal static class PerformanceVerification
         bool requireTemperature = Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_TEMPERATURE") == "1";
         if (requireTemperature)
             check(snapshot?.CpuTemperature is > 0 and <= 130, "Installed service returns a real CPU temperature to an unelevated UI");
+        int fastBaseline = window.PerformanceSamples;
+        await Task.Delay(2200);
+        check(window.PerformanceSamples - fastBaseline >= 3, "Visible metrics continuously refresh faster than once per second without blocking the UI");
+        if (Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_GPU") == "1")
+            check(window.LastPerformanceSnapshot is { GpuLoad: >= 0 and <= 100 } && window.LastPerformanceSnapshot.GpuUsageStatus.Contains("Windows GPU 最繁忙引擎"),
+                "Real GPU load comes from matched Windows engine counters");
         window.Width = 430; window.Height = 650; window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight + 1,
             "All four performance cards fit the default window without scrolling");
@@ -54,8 +91,8 @@ internal static class PerformanceVerification
         check(!window.PerformanceActive && paused == window.PerformanceSamples, "Folder browsing pauses performance sampling");
         window.GoHome(); await Task.Delay(2400);
         check(window.PerformanceActive && window.PerformanceSamples > paused, "Returning home resumes performance sampling");
-        for (int i = 0; i < 100; i++) window.CpuCard.Set(i, "test", 50, true);
-        check(window.CpuCard.HistoryCount == 30, "Performance graph history remains bounded at thirty samples");
+        for (int i = 0; i < 200; i++) window.CpuCard.Set(i, "test", 50, true);
+        check(window.CpuCard.HistoryCount == PerformanceGraph.MaximumSamples, "Performance graph history stays bounded at one minute of half-second samples");
         window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(2500);
     }
 }

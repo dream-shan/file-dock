@@ -398,7 +398,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(startup);
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; MessageBox.Show(this, "点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时可勾选包含子文件夹，搜索当前目录及所有子目录；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 2 秒更新，收起或浏览文件夹时暂停采集。\n固定项及设置保存在程序旁的 Data 文件夹。", "文件坞 Demo", MessageBoxButton.OK, MessageBoxImage.Information); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; MessageBox.Show(this, "点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时可勾选包含子文件夹，搜索当前目录及所有子目录；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 0.5 秒更新，CPU 温度每秒读取；收起或浏览文件夹时暂停采集。\n固定项及设置保存在程序旁的 Data 文件夹。", "文件坞 Demo", MessageBoxButton.OK, MessageBoxImage.Information); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }

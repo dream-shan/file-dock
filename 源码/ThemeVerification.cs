@@ -54,7 +54,9 @@ internal static class ThemeVerification
             window.SettingsButton.Focus();
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             var focusBorder = (Border)window.SettingsButton.Template.FindName("ButtonBorder",window.SettingsButton);
-            check(window.SettingsButton.IsKeyboardFocused && focusBorder.Background == ThemePalette.Brush("Hover"), "Focused settings button uses the dark hover palette rather than a fixed light fill");
+            check(window.SettingsButton.IsKeyboardFocused && focusBorder.Background is SolidColorBrush { Color.A: 0 }, "Focus alone leaves the settings button background transparent after a menu closes");
+            check(window.SettingsButton.FocusVisualStyle != null && window.KeepOpenButton.FocusVisualStyle == window.SettingsButton.FocusVisualStyle,
+                "Header buttons share a keyboard-navigation focus visual without changing their background");
             DemoVerification.SaveRender(window, Path.Combine(root,"theme-home-dark.png"));
             check(window.DockEntry.BackColor == System.Drawing.Color.FromArgb(48,53,62), "Dark edge entry receives the matching native background");
             using(var native = new System.Windows.Forms.ContextMenuStrip())

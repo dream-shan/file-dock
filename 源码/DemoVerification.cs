@@ -452,6 +452,7 @@ internal static class DemoVerification
             NativeMethods.GetForegroundWindow() == foreground, "Raising the edge entry does not steal foreground focus");
         dock.Hide();
 
+        IconVerification.Run(window, Check);
         await FeatureVerification.Run(window, directory, Check);
         await PerformanceVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);

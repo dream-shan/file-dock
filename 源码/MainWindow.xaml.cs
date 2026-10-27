@@ -115,6 +115,7 @@ public partial class MainWindow : Window
         _tray.ContextMenuStrip = menu;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Dispatcher.Invoke(ExpandPanel); };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += TrayPreferenceChanged;
         if (!App.IsSelfTest)
         {
             _foregroundCallback = (_, eventType, window, objectId, childId, _, _) =>
@@ -147,19 +148,6 @@ public partial class MainWindow : Window
             if (!NativeMethods.IsAboveForeground(handle)) NativeMethods.RaiseWithoutActivation(handle);
         }, DispatcherPriority.Background);
     }
-
-    private static System.Drawing.Icon CreateTrayIcon()
-    {
-        using var bmp = new System.Drawing.Bitmap(32, 32);
-        using var g = System.Drawing.Graphics.FromImage(bmp);
-        g.Clear(System.Drawing.Color.Transparent);
-        using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(45, 111, 236));
-        foreach (int x in new[] { 3, 18 }) foreach (int y in new[] { 3, 18 }) g.FillRectangle(brush, x, y, 11, 11);
-        IntPtr handle = bmp.GetHicon();
-        try { using var icon = System.Drawing.Icon.FromHandle(handle); return (System.Drawing.Icon)icon.Clone(); }
-        finally { DestroyIcon(handle); }
-    }
-    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr handle);
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -503,7 +491,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
     private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
-    private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); });
+    private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); });
     private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.Foreground = _keepOpen ? new SolidColorBrush(Color.FromRgb(41, 111, 235)) : Brushes.SlateGray; }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.Foreground = error ? Brushes.IndianRed : Brushes.SlateGray; StatusText.ToolTip = text; }
     internal bool Persist() { try { Storage.Save(State); _saveFailed = false; return true; } catch (Exception ex) { _saveFailed = true; SetStatus("配置保存失败：" + ex.Message, true); return false; } }
@@ -520,6 +508,7 @@ public partial class MainWindow : Window
         if (_captureKeyHook != IntPtr.Zero) { NativeMethods.UnhookWindowsHookEx(_captureKeyHook); _captureKeyHook = IntPtr.Zero; }
         if (_captureHook != IntPtr.Zero) NativeMethods.UnhookWinEvent(_captureHook);
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= TrayPreferenceChanged;
         if (_source != null) { NativeMethods.UnregisterHotKey(_source.Handle, NativeMethods.HotkeyId); _source.RemoveHook(WindowProc); }
         _tray?.Dispose(); _trayIcon?.Dispose(); _dock?.Close();
     }

@@ -2,9 +2,11 @@
 
 一个常驻 Windows 桌面的文件启动器 Demo。把常用文件和文件夹放到面板里，在面板内逐层浏览文件夹，点击文件后由系统默认应用打开。
 
-当前版本：0.6.3。使用 C#、.NET 10 和 WPF，支持 Windows x64。
+当前版本：0.6.4。使用 C#、.NET 10 和 WPF，支持 Windows x64。
 
 ## 功能
+
+- 程序、面板标题和系统托盘采用无底板的“折角文件＋停靠边”标志；托盘随系统深浅主题切换浅色或深灰色。
 
 - 点击“我的常用”旁的“＋ 添加”选择文件或文件夹；拖动常用卡片调整顺序。
 - 单击文件夹在面板内浏览，支持返回、上一级和路径导航。
@@ -63,6 +65,8 @@ CPU 温度使用 LibreHardwareMonitor 0.9.6 和官方签名 PawnIO 2.2.0 驱动�
 如需彻底卸载温度组件，可在管理员 PowerShell 中运行 Stop-Service FileDockTemperature 和 sc.exe delete FileDockTemperature，再删除上述服务安装目录。PawnIO 可从 Windows 已安装的应用中卸载；如果其他监控软件也使用它，应保留。
 
 ## 从源码构建
+
+图标母版为 `源码/Assets/FileDock.svg`，透明 PNG 和九尺寸 ICO 已包含在源码中。修改母版后，可用 `powershell -NoProfile -STA -File .\源码\Assets\Build-Icons.ps1` 重新生成图标。
 
 在 Windows 上安装 .NET 10 SDK，进入仓库目录后运行：
 

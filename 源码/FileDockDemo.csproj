@@ -11,11 +11,13 @@
     <AssemblyName>FileDockDemo</AssemblyName>
     <RootNamespace>FileDockDemo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.6.3</Version>
+    <Version>0.6.4</Version>
+    <ApplicationIcon>Assets\FileDock-dark.ico</ApplicationIcon>
     <DebugType>none</DebugType>
     <!-- WPF owns DPI configuration; WinForms supplies the tray and edge tab. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
   <ItemGroup><Compile Remove="TemperatureService\**\*.cs" /><None Remove="TemperatureService\bin\**;TemperatureService\obj\**" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets\*.ico;Assets\*.png" /></ItemGroup>
 </Project>
 

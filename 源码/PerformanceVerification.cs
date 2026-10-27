@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
@@ -75,8 +76,20 @@ internal static class PerformanceVerification
         window.Width = 430; window.Height = 650; window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight + 1,
             "All four performance cards fit the default window without scrolling");
+        check(window.CpuCard.Graph.ActualHeight is >= 18 and <= 60 && window.GpuCard.Graph.ActualHeight == window.CpuCard.Graph.ActualHeight,
+            "CPU and GPU use equally enlarged charts within the existing default card layout");
+        var savedPins=window.State.Pins;
+        window.State.Pins=savedPins.Take(2).ToList(); window.ApplyFilters(); window.UpdateLayout();
+        check(window.CpuCard.Graph.ActualHeight is >= 40 and <= 60 && window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight+1,
+            "One row of favorites gives the enlarged chart forty-to-sixty pixels without enlarging the window");
+        window.State.Pins=savedPins; window.ApplyFilters(); window.UpdateLayout();
+        check(window.CpuCard.DetailText == "最近 60 秒" && window.GpuCard.DetailText == "最近 60 秒" &&
+            !System.Windows.Automation.AutomationProperties.GetName(window.CpuCard).Contains(snapshot!.CpuName),
+            "CPU and GPU replace model text with a sixty-second caption and accessible readings");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-standard.png"));
         window.Width = 380; window.Height = 480; window.UpdateLayout();
+        check(window.CpuCard.Graph.ActualHeight >= 12 && window.GpuCard.Graph.ActualHeight >= 12 &&
+            window.MemoryCard.ValueText != "—", "Compact cards keep a visible chart and memory readout");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-small.png"));
         window.Width = 430; window.Height = 650;
 
@@ -93,7 +106,33 @@ internal static class PerformanceVerification
         check(window.PerformanceActive && window.PerformanceSamples > paused, "Returning home resumes performance sampling");
         for (int i = 0; i < 200; i++) window.CpuCard.Set(i, "test", 50, true);
         check(window.CpuCard.HistoryCount == PerformanceGraph.MaximumSamples, "Performance graph history stays bounded at one minute of one-second samples");
+        var graph = new PerformanceGraph { Trend=true, MetricLabel="CPU" };
+        graph.Add(10); graph.Add(null); graph.Add(70);
+        check(graph.HoverText(59,59).Contains("70%") && graph.HoverText(58,59).Contains("暂不可用") && graph.HoverText(0,59).Contains("暂无采样"),
+            "Hover maps historical slots to exact values, gaps and not-yet-sampled periods");
+        graph.Add(double.NaN); graph.Add(double.PositiveInfinity);
+        check(graph.HoverText(59,59).Contains("暂不可用"), "Non-finite samples create gaps rather than misleading chart points");
+        graph.Add(150); check(graph.HoverText(59,59).Contains("100%"), "Out-of-range graph samples are bounded to the percent scale");
+        check(PerformanceGraph.PlotY(0,60) == 57 && PerformanceGraph.PlotY(50,60) == 30 && PerformanceGraph.PlotY(100,60) == 3,
+            "Chart coordinates use a fixed zero-to-one-hundred scale");
+        graph.Clear(); check(graph.HistoryCount == 0 && graph.HoverText(59,59).Contains("暂无采样"), "Reset clears chart history and stale hover values");
         window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(2500);
+        string originalTheme=window.State.ThemeMode;
+        window.State.Pins=savedPins.Take(2).ToList(); window.ApplyFilters(); window.UpdateLayout();
+        window.CpuCard.Reset(); window.GpuCard.Reset();
+        for(int i=0;i<60;i++)
+        {
+            window.CpuCard.Set(12+7*Math.Sin(i*.35), "hidden model", 72,true);
+            window.GpuCard.Set(20+(i%20)*3.5,"hidden model",58,true);
+        }
+        foreach(string theme in new[]{"Light","Dark"})
+        {
+            window.SetThemeMode(theme); window.UpdateLayout();
+            DemoVerification.SaveRender(window,Path.Combine(root,"trends-"+theme.ToLowerInvariant()+".png"));
+        }
+        window.SetThemeMode(originalTheme);
+        window.State.Pins=savedPins; window.ApplyFilters();
+        window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(1200);
     }
 }
 

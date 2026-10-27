@@ -47,10 +47,10 @@ public partial class MainWindow
             var snapshot = await _performanceWorker;
             if (!_performanceActive || _performanceDisposed || generation != _performanceGeneration) return;
             LastPerformanceSnapshot = snapshot;
-            CpuCard.Set(snapshot.CpuLoad, snapshot.CpuName, snapshot.CpuTemperature, true);
-            CpuCard.ToolTip = snapshot.CpuName + "\n" + snapshot.TemperatureStatus;
-            GpuCard.Set(snapshot.GpuLoad, snapshot.GpuName, snapshot.GpuTemperature, true);
-            GpuCard.ToolTip = snapshot.GpuName + "\n" + snapshot.GpuUsageStatus;
+            CpuCard.Set(snapshot.CpuLoad, "", snapshot.CpuTemperature, true);
+            CpuCard.ToolTip = snapshot.TemperatureStatus;
+            GpuCard.Set(snapshot.GpuLoad, "", snapshot.GpuTemperature, true);
+            GpuCard.ToolTip = snapshot.GpuUsageStatus;
             MemoryCard.Set(Percent(snapshot.MemoryUsed, snapshot.MemoryTotal), Capacity(snapshot.MemoryUsed, snapshot.MemoryTotal));
             VramCard.Set(Percent(snapshot.VramUsed, snapshot.VramTotal), Capacity(snapshot.VramUsed, snapshot.VramTotal));
             NetworkDownload.Text = "↓ " + FormatRate(snapshot.Download);

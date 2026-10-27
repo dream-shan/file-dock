@@ -61,6 +61,52 @@ internal static class FeatureVerification
         await window.NavigateToFolderAsync(folder);
         check(window.SelectedFileCount == 0, "Folder navigation clears prior selection");
         var dock = window.DockEntry;
+        string originalSide = window.State.DockSide;
+        double originalTop = window.State.DockTop;
+        var area = System.Windows.Forms.Screen.FromHandle(dock.Handle).WorkingArea;
+        double scale = dock.ScaleFactor;
+        double left = area.Left / scale, right = area.Right / scale - dock.Width;
+        double top = area.Top / scale + 100;
+        double ArrowOffset(string name)
+        {
+            using var bitmap = new System.Drawing.Bitmap(dock.ClientSize.Width,dock.ClientSize.Height);
+            dock.DrawToBitmap(bitmap,new System.Drawing.Rectangle(System.Drawing.Point.Empty,bitmap.Size));
+            bitmap.Save(Path.Combine(root,name+".png"));
+            double weightedX=0, weight=0, center=bitmap.Width/2d;
+            for(int y=bitmap.Height/2-1;y<=bitmap.Height/2+1;y++)
+                for(int x=Math.Max(0,(int)(center-6*scale));x<Math.Min(bitmap.Width,center+6*scale);x++)
+                {
+                    var pixel=bitmap.GetPixel(x,y); double blue=Math.Max(0,pixel.B-pixel.R-30);
+                    weightedX+=x*blue; weight+=blue;
+                }
+            return weight > 0 ? weightedX/weight-center : double.NaN;
+        }
+        try
+        {
+            window.DockMoved(right,top); dock.Show();
+            check(window.State.DockSide == "Right" && ArrowOffset("entry-right") < -scale,
+                "Right-docked entry paints an inward left-pointing arrow");
+            window.DockMoved(left,top);
+            check(window.State.DockSide == "Left" && ArrowOffset("entry-left") > scale,
+                "Dragging the entry left paints an inward right-pointing arrow");
+            // No coordinate change: only an explicit repaint can invalidate this update.
+            int invalidations=0;
+            System.Windows.Forms.InvalidateEventHandler onInvalidated=(_,_)=>invalidations++;
+            dock.Invalidated+=onInvalidated;
+            try { window.DockMoved(left,top); }
+            finally { dock.Invalidated-=onInvalidated; }
+            check(invalidations > 0, "Dock positioning invalidates the cached entry surface even without a size or position change");
+            check(window.Storage.Load().DockSide == "Left", "Dragging to the left persists its side for restart");
+            window.DockMoved(right,top);
+            check(window.Storage.Load().DockSide == "Right" && ArrowOffset("entry-right-restored") < -scale,
+                "Dragging back right restores the arrow and saves the new side");
+        }
+        finally
+        {
+            window.State.DockSide=originalSide; window.State.DockTop=originalTop;
+            window.DockMoved(originalSide == "Left" ? left : right, originalTop < 0 ? top : originalTop);
+            window.State.DockTop=originalTop; window.Persist(); dock.Hide();
+        }
         check(NativeMethods.GetWindowDisplayAffinity(dock.Handle, out uint affinity) && affinity == 0, "Edge remains capturable for remote desktop visibility");
         check(NativeMethods.GetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, out uint panelAffinity) && panelAffinity == 0, "Deliberately expanded panel remains capturable");
         window.ExpandPanel(); window.BeginCaptureShortcut();

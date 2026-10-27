@@ -468,6 +468,7 @@ public partial class MainWindow : Window
         Rect area = new Rect(bounds.Left / scale, bounds.Top / scale, bounds.Width / scale, bounds.Height / scale);
         _dock.Left = State.DockSide == "Left" ? area.Left : area.Right - _dock.Width;
         _dock.Top = Math.Clamp(State.DockTop < 0 ? area.Top + area.Height / 2 - _dock.Height / 2 : State.DockTop, area.Top, Math.Max(area.Top, area.Bottom - _dock.Height));
+        _dock.Invalidate();
     }
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

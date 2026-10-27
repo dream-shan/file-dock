@@ -70,10 +70,13 @@ public partial class MainWindow : Window
         State = Storage.Load();
         _keepOpen = State.KeepOpen;
         _screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+        State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
+        ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
         InitializeFolderBrowser();
         InitializeTransfers();
         InitializePerformance();
+        ApplyTheme();
         SizeChanged += (_, _) => PinsList.MaxHeight = ActualHeight < 560 ? 82 : 158;
         SearchBox.TextChanged += (_, _) => ApplyFilters();
         KeepOpenButton.Click += (_, _) => { _keepOpen = !_keepOpen; State.KeepOpen = _keepOpen; UpdateKeepOpen(); Persist(); };
@@ -113,6 +116,7 @@ public partial class MainWindow : Window
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(Quit));
         _tray.ContextMenuStrip = menu;
+        ApplyNativeTheme();
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Dispatcher.Invoke(ExpandPanel); };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += TrayPreferenceChanged;
@@ -152,6 +156,7 @@ public partial class MainWindow : Window
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { if (IsVisible) CollapsePanel(); else ExpandPanel(); handled = true; }
+        if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x02E0) Dispatcher.BeginInvoke(() => PositionPanel());
         return IntPtr.Zero;
     }
@@ -347,7 +352,8 @@ public partial class MainWindow : Window
             var input = new TextBox { Text = entry.DisplayName, Margin = new Thickness(18), Padding = new Thickness(8), FontSize = 14 };
             var ok = new Button { Content = "保存", Width = 90, Height = 32, Margin = new Thickness(18, 0, 18, 18), HorizontalAlignment = HorizontalAlignment.Right, IsDefault = true };
             var panel = new StackPanel(); panel.Children.Add(input); panel.Children.Add(ok);
-            var dialog = new Window { Title = "修改显示名称", Content = panel, Width = 340, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, Owner = this, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Background = Brushes.White };
+            var dialog = new Window { Title = "修改显示名称", Content = panel, Width = 340, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, Owner = this, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
+            dialog.SetResourceReference(BackgroundProperty, "Surface"); dialog.SetResourceReference(ForegroundProperty, "Ink");
             ok.Click += (_, _) => dialog.DialogResult = true;
             dialog.Loaded += (_, _) => { input.Focus(); input.SelectAll(); };
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(input.Text)) { State.Pins.First(p => p.Id == entry.Id).DisplayName = input.Text.Trim(); Persist(); ApplyFilters(); }
@@ -367,9 +373,11 @@ public partial class MainWindow : Window
         finally { _inDialog = false; }
     }
 
-    private void OpenSettings()
+    internal void OpenSettings()
     {
         var menu = new ContextMenu();
+        menu.Items.Add(CreateAppearanceMenu());
+        menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
         AddMenu(menu, "贴到左侧", () => { State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
         AddMenu(menu, "贴到右侧", () => { State.DockSide = "Right"; PositionPanel(); PositionDock(); Persist(); });
@@ -386,7 +394,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(startup);
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; MessageBox.Show(this, "点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 1 秒更新，CPU 温度每秒读取；收起或浏览文件夹时暂停采集。\n固定项及设置保存在程序旁的 Data 文件夹。", "文件坞 Demo", MessageBoxButton.OK, MessageBoxImage.Information); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 1 秒更新，CPU 温度每秒读取；收起或浏览文件夹时暂停采集。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }
@@ -492,8 +500,8 @@ public partial class MainWindow : Window
     }
     private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); });
-    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.Foreground = _keepOpen ? new SolidColorBrush(Color.FromRgb(41, 111, 235)) : Brushes.SlateGray; }
-    internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.Foreground = error ? Brushes.IndianRed : Brushes.SlateGray; StatusText.ToolTip = text; }
+    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Muted"); }
+    internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
     internal bool Persist() { try { Storage.Save(State); _saveFailed = false; return true; } catch (Exception ex) { _saveFailed = true; SetStatus("配置保存失败：" + ex.Message, true); return false; } }
     public void Quit() { _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()

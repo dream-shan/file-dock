@@ -100,7 +100,7 @@ public sealed class EntryThumbnail : Grid
     {
         Release();
         if (DataContext is not EntryView entry) return;
-        _glyph.Text = entry.IconGlyph; _glyph.Foreground = entry.IconBrush; _glyph.Visibility = Visibility.Visible;
+        _glyph.Text = entry.IconGlyph; _glyph.SetResourceReference(TextBlock.ForegroundProperty, entry.Kind switch { "文件夹" => "FolderStroke", "图片" => "GpuAccent", "表格" => "MemoryAccent", _ => "Muted" }); _glyph.Visibility = Visibility.Visible;
         if (!IsVisible) return;
         _row = null;
         for (DependencyObject? p = this; p != null; p = VisualTreeHelper.GetParent(p))
@@ -110,7 +110,7 @@ public sealed class EntryThumbnail : Grid
             _row.ToolTip = entry.Path;
             if (entry.Kind == "图片")
             {
-                _tip = new ToolTip { Padding = new Thickness(10), Background = Brushes.White, BorderBrush = Brushes.LightSlateGray, MaxWidth = 390,
+                _tip = new ToolTip { Padding = new Thickness(10), MaxWidth = 390,
                     PlacementTarget = _row, Placement = Window.GetWindow(this) is MainWindow owner && owner.State.DockSide == "Left" ? PlacementMode.Right : PlacementMode.Left };
                 _tip.Opened += async (_, _) =>
                 {

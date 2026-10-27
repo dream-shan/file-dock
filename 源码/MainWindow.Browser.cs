@@ -179,7 +179,7 @@ public partial class MainWindow
             };
             button.Click += async (_, _) => await NavigateToFolderAsync(target);
             Breadcrumbs.Children.Add(button);
-            if (ancestors.Count > 0) Breadcrumbs.Children.Add(new TextBlock { Text = "›", Foreground = System.Windows.Media.Brushes.LightSlateGray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) });
+            if (ancestors.Count > 0) { var separator = new TextBlock { Text = "›", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) }; separator.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); Breadcrumbs.Children.Add(separator); }
         }
         Dispatcher.BeginInvoke(() => BreadcrumbScroll.ScrollToRightEnd(), System.Windows.Threading.DispatcherPriority.Loaded);
     }

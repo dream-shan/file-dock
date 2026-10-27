@@ -26,7 +26,7 @@ public partial class MainWindow
 
     private void TrayPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(UpdateTrayIcon);
+        QueueThemeRefresh();
     }
 
     private void UpdateTrayIcon()

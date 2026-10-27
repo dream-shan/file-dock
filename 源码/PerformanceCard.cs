@@ -16,6 +16,14 @@ public sealed class PerformanceCard : Border
     public string ValueText => _value.Text;
     public string TemperatureText => _temperature.Text;
     internal int HistoryCount => _graph.HistoryCount;
+    internal void ApplyTheme(Brush accent)
+    {
+        SetResourceReference(BackgroundProperty, "Card");
+        _label.SetResourceReference(TextBlock.ForegroundProperty, "Ink");
+        _temperature.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        _detail.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        Accent = accent; _graph.Track = ThemePalette.Brush("Track"); _graph.InvalidateVisual();
+    }
 
     public PerformanceCard()
     {
@@ -55,6 +63,7 @@ internal sealed class PerformanceGraph : FrameworkElement
     internal const int MaximumSamples = 60;
     private readonly Queue<double?> _values = new();
     internal Brush Accent = Brushes.RoyalBlue;
+    internal Brush Track = new SolidColorBrush(Color.FromRgb(224, 231, 242));
     internal bool Trend;
     internal int HistoryCount => _values.Count;
     internal void Add(double? value) { _values.Enqueue(value); while (_values.Count > MaximumSamples) _values.Dequeue(); InvalidateVisual(); }
@@ -64,7 +73,7 @@ internal sealed class PerformanceGraph : FrameworkElement
         base.OnRender(drawing);
         double w = ActualWidth, h = ActualHeight - 6;
         if (w <= 0 || h <= 0) return;
-        var background = new SolidColorBrush(Color.FromRgb(224, 231, 242));
+        var background = Track;
         if (!Trend)
         {
             drawing.DrawRoundedRectangle(background, null, new Rect(0, h / 2, w, 4), 2, 2);

@@ -11,6 +11,14 @@ internal sealed class DockTabWindow : Form
     private readonly MainWindow _owner;
     private Point _start;
     private bool _moved;
+    private bool _dark;
+    internal void ApplyTheme(bool dark)
+    {
+        _dark = dark;
+        BackColor = dark ? Color.FromArgb(48, 53, 62) : Color.White;
+        if (ContextMenuStrip != null) ThemeMenus.Apply(ContextMenuStrip, dark);
+        Invalidate();
+    }
     internal bool IsVisible => Visible;
     internal double ScaleFactor => NativeMethods.WindowDpi(Handle) / 96d;
     internal new double Width => 20;
@@ -57,9 +65,9 @@ internal sealed class DockTabWindow : Form
     {
         base.OnPaint(e); float scale = (float)ScaleFactor;
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using var border = new Pen(Color.FromArgb(180, 197, 220), scale);
+        using var border = new Pen(_dark ? Color.FromArgb(149, 162, 181) : Color.FromArgb(180, 197, 220), scale);
         e.Graphics.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
-        using var pen = new Pen(Color.FromArgb(41, 111, 235), 1.5f * scale);
+        using var pen = new Pen(_dark ? Color.FromArgb(130, 179, 255) : Color.FromArgb(41, 111, 235), 1.5f * scale);
         float center = ClientSize.Width / 2f, y = ClientSize.Height / 2f;
         float direction = _owner.State.DockSide == "Left" ? -1 : 1;
         e.Graphics.DrawLines(pen, new[] { new PointF(center + direction * 2 * scale, y - 4 * scale), new PointF(center - direction * 2 * scale, y), new PointF(center + direction * 2 * scale, y + 4 * scale) });

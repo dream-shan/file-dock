@@ -17,4 +17,5 @@ public sealed class AppState
     public string DockSide { get; set; } = "Right";
     public double DockTop { get; set; } = -1;
     public bool KeepOpen { get; set; }
+    public string ThemeMode { get; set; } = "System";
 }

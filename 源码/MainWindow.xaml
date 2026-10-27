@@ -225,8 +225,8 @@
                         <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <local:PerformanceCard x:Name="CpuCard" Label="CPU" Trend="True" Accent="#4A6CF7" Margin="0,0,4,4" MinHeight="91" />
                         <local:PerformanceCard x:Name="GpuCard" Label="GPU" Trend="True" Accent="#8B68D8" Grid.Column="1" Margin="4,0,0,4" MinHeight="91" />
-                        <local:PerformanceCard x:Name="MemoryCard" Label="内存" Accent="#239C88" Grid.Row="1" Margin="0,4,4,0" MinHeight="91" />
-                        <local:PerformanceCard x:Name="VramCard" Label="显存" Accent="#C38A3A" Grid.Row="1" Grid.Column="1" Margin="4,4,0,0" MinHeight="91" />
+                        <local:PerformanceCard x:Name="MemoryCard" Label="内存" Ring="True" Accent="#239C88" Grid.Row="1" Margin="0,4,4,0" MinHeight="91" />
+                        <local:PerformanceCard x:Name="VramCard" Label="显存" Ring="True" Accent="#C38A3A" Grid.Row="1" Grid.Column="1" Margin="4,4,0,0" MinHeight="91" />
                     </Grid>
                 </ScrollViewer>
                 <Border x:Name="NetworkBar" Grid.Row="2" Background="{DynamicResource Card}" CornerRadius="8" Padding="10,4" Margin="0,7,0,0">

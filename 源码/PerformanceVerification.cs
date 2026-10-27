@@ -76,6 +76,10 @@ internal static class PerformanceVerification
         window.Width = 430; window.Height = 650; window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight + 1,
             "All four performance cards fit the default window without scrolling");
+        check(window.MemoryCard.Ring && window.VramCard.Ring && !window.CpuCard.Ring && !window.GpuCard.Ring,
+            "Only memory and VRAM use the ring layout; CPU and GPU retain their trend cards");
+        check(window.MemoryCard.RingChart.Percent is >= 0 and <= 100 && window.MemoryCard.DetailText.Contains("GB") && window.MemoryCard.CapacityFits && window.VramCard.CapacityFits,
+            "Memory ring receives real utilization and both capacity labels fit the default card width");
         check(window.CpuCard.Graph.ActualHeight is >= 18 and <= 60 && window.GpuCard.Graph.ActualHeight == window.CpuCard.Graph.ActualHeight,
             "CPU and GPU use equally enlarged charts within the existing default card layout");
         var savedPins=window.State.Pins;
@@ -90,6 +94,8 @@ internal static class PerformanceVerification
         window.Width = 380; window.Height = 480; window.UpdateLayout();
         check(window.CpuCard.Graph.ActualHeight >= 12 && window.GpuCard.Graph.ActualHeight >= 12 &&
             window.MemoryCard.ValueText != "—", "Compact cards keep a visible chart and memory readout");
+        check(window.MemoryCard.CapacityFits && window.VramCard.CapacityFits && window.MemoryCard.RingChart.ActualWidth <= 50,
+            "Compact ring cards keep their complete capacity text without expanding the cards");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-small.png"));
         window.Width = 430; window.Height = 650;
 
@@ -116,6 +122,26 @@ internal static class PerformanceVerification
         check(PerformanceGraph.PlotY(0,60) == 57 && PerformanceGraph.PlotY(50,60) == 30 && PerformanceGraph.PlotY(100,60) == 3,
             "Chart coordinates use a fixed zero-to-one-hundred scale");
         graph.Clear(); check(graph.HistoryCount == 0 && graph.HoverText(59,59).Contains("暂无采样"), "Reset clears chart history and stale hover values");
+        var ring = new PerformanceRing { Width=50,Height=50,Accent=System.Windows.Media.Brushes.Red,Track=System.Windows.Media.Brushes.Blue };
+        ring.Measure(new Size(50,50)); ring.Arrange(new Rect(0,0,50,50));
+        byte[] RingPixels(double? percent)
+        {
+            ring.Set(percent); ring.UpdateLayout();
+            var image=new System.Windows.Media.Imaging.RenderTargetBitmap(50,50,96,96,System.Windows.Media.PixelFormats.Pbgra32);
+            image.Render(ring); var pixels=new byte[50*50*4]; image.CopyPixels(pixels,50*4,0); return pixels;
+        }
+        bool IsRed(byte[] pixels,int x,int y) {int p=(y*50+x)*4; return pixels[p+2]>180 && pixels[p]<50;}
+        var quarter=RingPixels(25);
+        check(IsRed(quarter,25,3) && IsRed(quarter,47,25) && !IsRed(quarter,25,47) && !IsRed(quarter,3,25),
+            "Quarter ring starts at the top and advances clockwise to the right");
+        var empty=RingPixels(0); var full=RingPixels(100);
+        check(!IsRed(empty,25,3) && IsRed(full,25,3) && IsRed(full,25,47) && IsRed(full,3,25),
+            "Zero utilization has no accent arc and full utilization draws a complete circle");
+        ring.Set(double.NaN); check(ring.Percent == null && PerformanceRing.Normalize(double.PositiveInfinity) == null,
+            "Unavailable ring values remain unknown instead of displaying a false zero");
+        var unavailable=new PerformanceCard { Ring=true }; unavailable.Set(null,"暂不可用");
+        check(unavailable.ValueText == "—" && unavailable.RingChart.Percent == null && unavailable.DetailText == "暂不可用",
+            "Missing memory data keeps the dash and unavailable capacity text");
         window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(2500);
         string originalTheme=window.State.ThemeMode;
         window.State.Pins=savedPins.Take(2).ToList(); window.ApplyFilters(); window.UpdateLayout();

@@ -13,14 +13,50 @@ public sealed class PerformanceCard : Border
     private readonly TextBlock _label, _value, _detail, _temperature;
     private readonly PerformanceGraph _graph;
     private readonly Grid _grid;
+    private readonly PerformanceRing _ring;
+    private bool _ringMode;
     public string Label { get => _label.Text; set { _label.Text = value; _graph.MetricLabel = value; } }
-    public Brush Accent { get => _graph.Accent; set { _graph.Accent = value; _value.Foreground = value; } }
+    public Brush Accent { get => _graph.Accent; set { _graph.Accent = value; _value.Foreground = value; _ring.Accent = value; _ring.InvalidateVisual(); } }
+    public bool Ring
+    {
+        get => _ringMode;
+        set
+        {
+            if (_ringMode == value) return;
+            _ringMode = value;
+            _grid.RowDefinitions.Clear(); _grid.ColumnDefinitions.Clear();
+            _grid.VerticalAlignment = value ? VerticalAlignment.Center : VerticalAlignment.Stretch;
+            _ring.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+            _graph.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            _temperature.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            foreach (var text in new[] { _label, _value, _detail }) Grid.SetColumn(text, value ? 1 : 0);
+            _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _grid.RowDefinitions.Add(new RowDefinition { Height = value ? GridLength.Auto : new GridLength(1, GridUnitType.Star) });
+            _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            if (value)
+            {
+                _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetRow(_label,0); Grid.SetRow(_value,1); Grid.SetRow(_detail,2);
+                Grid.SetRowSpan(_ring,3); UpdateRingSize();
+            }
+            else { _grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) }); Trend = Trend; }
+        }
+    }
+    private void UpdateRingSize()
+    {
+        if (!Ring) return;
+        bool compact = _grid.ActualWidth > 0 && _grid.ActualWidth < 145;
+        _ring.Width = _ring.Height = compact ? 40 : 50;
+        _ring.Margin = new Thickness(0,0,compact ? 8 : 10,0);
+    }
     public bool Trend
     {
         get => _graph.Trend;
         set
         {
             _graph.Trend = value;
+            if (Ring) return;
             _grid.RowDefinitions[1].Height = value ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
             _grid.RowDefinitions[2].Height = value ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
             _grid.RowDefinitions[3].Height = value ? GridLength.Auto : new GridLength(18);
@@ -37,6 +73,11 @@ public sealed class PerformanceCard : Border
     internal int HistoryCount => _graph.HistoryCount;
     internal PerformanceGraph Graph => _graph;
     internal string DetailText => _detail.Text;
+    internal PerformanceRing RingChart => _ring;
+    internal bool CapacityFits => _detail.ActualWidth >= new FormattedText(_detail.Text,
+        System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        new Typeface(_detail.FontFamily,_detail.FontStyle,_detail.FontWeight,_detail.FontStretch),
+        _detail.FontSize,_detail.Foreground,VisualTreeHelper.GetDpi(this).PixelsPerDip).WidthIncludingTrailingWhitespace;
     internal void ApplyTheme(Brush accent)
     {
         SetResourceReference(BackgroundProperty, "Card");
@@ -44,6 +85,7 @@ public sealed class PerformanceCard : Border
         _temperature.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         _detail.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         Accent = accent; _graph.Track = ThemePalette.Brush("Track"); _graph.InvalidateVisual();
+        _ring.Track = ThemePalette.Brush("Track"); _ring.InvalidateVisual();
     }
 
     public PerformanceCard()
@@ -59,23 +101,57 @@ public sealed class PerformanceCard : Border
         _value = new TextBlock { Text = "—", FontSize = 25, FontFamily = new FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         _detail = new TextBlock { Text = "正在读取…", FontSize = 9, Foreground = Brushes.SlateGray, TextTrimming = TextTrimming.CharacterEllipsis };
         _graph = new PerformanceGraph();
+        _ring = new PerformanceRing { Width=50,Height=50,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed };
         Grid.SetRow(_value, 1); Grid.SetRow(_detail, 2); Grid.SetRow(_graph, 3);
         grid.Children.Add(_label); grid.Children.Add(_temperature); grid.Children.Add(_value); grid.Children.Add(_detail); grid.Children.Add(_graph);
+        grid.Children.Add(_ring); grid.SizeChanged += (_,_) => UpdateRingSize();
         Child = grid; Accent = new SolidColorBrush(Color.FromRgb(74, 108, 247));
         System.Windows.Automation.AutomationProperties.SetName(this, "性能指标");
     }
     internal void Set(double? percent, string detail, double? temperature = null, bool showTemperature = false)
     {
+        if (Ring) percent = PerformanceRing.Normalize(percent);
         _value.Text = percent.HasValue ? $"{Math.Clamp(percent.Value, 0, 100):0}%" : "—";
         _detail.Text = Trend ? "最近 60 秒" : detail;
         _temperature.Text = showTemperature ? temperature.HasValue ? $"{temperature:0}°C" : "温度 —" : "";
-        _graph.Add(percent);
+        if (Ring) _ring.Set(percent); else _graph.Add(percent);
         System.Windows.Automation.AutomationProperties.SetName(this, $"{Label} {_value.Text} {_temperature.Text} {_detail.Text}");
     }
     internal void Reset()
     {
         _graph.Clear(); _value.Text = "—"; _detail.Text = Trend ? "最近 60 秒" : "正在读取…";
+        _ring.Set(null);
         if (_temperature.Text.Length > 0) _temperature.Text = "温度 —";
+    }
+}
+
+internal sealed class PerformanceRing : FrameworkElement
+{
+    internal Brush Accent = Brushes.Teal;
+    internal Brush Track = Brushes.LightGray;
+    internal double? Percent { get; private set; }
+    internal static double? Normalize(double? value) => value.HasValue && double.IsFinite(value.Value) ? Math.Clamp(value.Value,0,100) : null;
+    internal void Set(double? value) { Percent=Normalize(value); InvalidateVisual(); }
+    protected override void OnRender(DrawingContext drawing)
+    {
+        base.OnRender(drawing);
+        double size=Math.Min(ActualWidth,ActualHeight);
+        if(size < 8) return;
+        double thickness=size*.12, radius=(size-thickness)/2;
+        var center=new Point(ActualWidth/2,ActualHeight/2);
+        drawing.DrawEllipse(null,new Pen(Track,thickness),center,radius,radius);
+        if(Percent is not > 0) return;
+        var pen=new Pen(Accent,thickness) { StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round };
+        if(Percent >= 100) { drawing.DrawEllipse(null,pen,center,radius,radius); return; }
+        double angle=Percent.Value*Math.PI/50;
+        var geometry=new StreamGeometry();
+        using(var context=geometry.Open())
+        {
+            context.BeginFigure(new Point(center.X,center.Y-radius),false,false);
+            context.ArcTo(new Point(center.X+radius*Math.Sin(angle),center.Y-radius*Math.Cos(angle)),
+                new Size(radius,radius),0,Percent>50,SweepDirection.Clockwise,true,false);
+        }
+        geometry.Freeze(); drawing.DrawGeometry(null,pen,geometry);
     }
 }
 

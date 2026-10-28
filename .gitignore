@@ -21,3 +21,10 @@
 /work/
 /verify*/
 /test-results/
+
+# Local secrets and signing certificates
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12

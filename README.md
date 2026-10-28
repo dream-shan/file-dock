@@ -2,7 +2,7 @@
 
 一个常驻 Windows 桌面的文件启动器 Demo。把常用文件和文件夹放到面板里，在面板内逐层浏览文件夹，点击文件后由系统默认应用打开。
 
-当前版本：0.7.4。使用 C#、.NET 10 和 WPF，支持 Windows x64。
+当前版本：0.8.0-rc.1（开源准备第一轮，预发布）。使用 C#、.NET 10 和 WPF，支持 Windows x64。
 
 ## 外观主题
 
@@ -72,7 +72,7 @@ CPU 温度使用 LibreHardwareMonitor 0.9.6 和官方签名 PawnIO 2.2.0 驱动�
 .\TemperatureService\Install.ps1 -SourceDirectory .\TemperatureService
 ```
 
-从源码构建时，服务安装脚本在 `源码\TemperatureService\Install.ps1`，默认使用 `重建输出\温度服务` 中的构建结果。安装后，正常启动文件坞不再请求管理员权限。服务异常或硬件不支持时显示“温度 —”，CPU 占用和其他文件操作不受影响。
+从源码构建时，运行 `源码\TemperatureService\Install.ps1 -SourceDirectory .\重建输出\TemperatureService` 安装刚构建的服务。安装后，正常启动文件坞不再请求管理员权限。服务异常或硬件不支持时显示“温度 —”，CPU 占用和其他文件操作不受影响。
 
 如需彻底卸载温度组件，可在管理员 PowerShell 中运行 Stop-Service FileDockTemperature 和 sc.exe delete FileDockTemperature，再删除上述服务安装目录。PawnIO 可从 Windows 已安装的应用中卸载；如果其他监控软件也使用它，应保留。
 
@@ -80,13 +80,31 @@ CPU 温度使用 LibreHardwareMonitor 0.9.6 和官方签名 PawnIO 2.2.0 驱动�
 
 图标母版为 `源码/Assets/FileDock.svg`，透明 PNG 和九尺寸 ICO 已包含在源码中。修改母版后，可用 `powershell -NoProfile -STA -File .\源码\Assets\Build-Icons.ps1` 重新生成图标。
 
-在 Windows 上安装 .NET 10 SDK，进入仓库目录后运行：
+在 Windows x64 上安装 `global.json` 指定的 **.NET SDK 10.0.403**，进入仓库目录后运行。运行下载版不需要 SDK；构建会从官方 NuGet 下载 .NET Framework 4.8 引用程序集，无需预先安装 Visual Studio 或温度服务。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Build.ps1
 ```
 
-构建需要从官方 NuGet 源下载运行时包和服务依赖，结果在 `重建输出` 目录。主程序为包含 Windows x64 运行时的单文件；温度服务在其 `温度服务` 子目录，需要 .NET Framework 4.8。服务依赖及许可证见 `源码/TemperatureService/第三方许可.txt`。
+结果在 `重建输出` 目录；为防止混入旧文件，输出目录必须不存在或为空。再次构建可通过 `-OutputDirectory` 指定新目录。主程序是自包含单文件；温度服务在 `TemperatureService` 子目录，运行需要 .NET Framework 4.8。主程序运行时锁定为 10.0.14；两个项目启用 NuGet 锁文件和 locked restore，禁止构建时静默改变依赖。SDK 不匹配或依赖锁不一致时构建失败。
+
+依赖升级须有意修改项目版本，使用 `dotnet restore ... -p:RestoreLockedMode=false --force-evaluate` 重新生成对应锁文件，审查差异及第三方许可后再提交。不要为解决还原失败直接删除锁文件。
+
+## 发布打包
+
+提交本轮源码后，在**干净 Git 检出**中执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
+```
+
+脚本依次执行锁定还原、主程序与温度服务构建、现有集成自测、白名单收集和压缩包完整性检查。结果在 `artifacts/<版本>/`：可分发成果只有 `FileDock-<版本>-win-x64.zip` 和 `SHA256SUMS.txt`，其余为构建及检查中间文件。输出目录已存在时不会覆盖，可指定新的 `-OutputDirectory`。
+
+ZIP 包内 `build-info.json` 记录源码提交、SDK/运行时版本及每个文件的 SHA256，不记录本机用户名、构建路径或时间。压缩项时间固定且有序；这使同一环境重复构建可比较，但不保证不同操作系统/压缩库下 ZIP 字节完全一致。运行时许可来自实际还原包；温度服务完全从本次源码构建，不从已安装服务目录复制。
+
+GitHub Actions 在 PR/main 上构建、自测并保存 ZIP 和校验文件；推送与项目版本一致的 `v*` 标签后，独立发布任务将已验证的同一份产物放入预发布 Release。构建任务只有读取权限，发布任务仅在标签触发时取得写权限。不上传原始自测截图或机器性能采样记录。
+
+下载后可用 `Get-FileHash .\FileDock-<版本>-win-x64.zip -Algorithm SHA256` 与 `SHA256SUMS.txt` 比较。源码检出中还可执行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证包结构和逐文件哈希。校验和用于检查完整性，不等同于 Windows 代码签名。
 
 ## 验证
 
@@ -96,7 +114,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Build.ps1
 .\重建输出\FileDockDemo.exe --self-test "$env:TEMP\FileDock-check-unique"
 ```
 
-测试会在指定目录创建样例文件、配置、验证结果和界面截图。应更换为尚不存在的测试目录，完成后可自行删除。当前集成自测覆盖保存与恢复、搜索与筛选、文件夹导航、快捷方式启动及小窗口布局；窗口能否在实际用户桌面显示需另外验证。
+推荐使用 `源码\Test.ps1 -Executable .\重建输出\FileDockDemo.exe -ResultDirectory <新的测试目录>`，它会检查退出码、超时和结果完整性。测试会创建样例文件、配置、验证结果、性能采样和界面渲染图，完成后可删除测试目录，切勿作为公开附件直接上传。自测覆盖保存与恢复、搜索与筛选、文件夹导航、快捷方式启动及小窗口布局；真实鼠标拖放、截图隐藏和全屏唤出仍需交互桌面验证。无 GPU/温度驱动的 CI 不强制硬件读数，不能将 CI 通过视为所有硬件已兼容。
+
+## 本地数据与许可
+
+文件坞没有账号、遥测上报或远程文件索引。常用入口及主题/停靠设置保存在程序旁的 `Data`，删除程序不会自动删除原文件。复制、拖放、默认程序打开会按你的操作把文件交给目标应用；目标应用的上传行为由其自身负责。温度服务使用本机命名管道提供只读采样，不连接网络。源码构建及依赖审计会访问 NuGet，CI 和下载页面由 GitHub 提供。
+
+个人配置、恢复备份、测试样例/截图、构建目录不入 Git 或下载包。公开问题反馈前请检查日志、截图、文件路径和硬件信息；不要附上整个 `Data`。Git 提交署名和历史 Release 也会随仓库公开，请维护者在切换可见性前单独确认。
+
+文件坞自身许可见 `LICENSE`；第三方库仍遵循原许可，完整清单、源码链接及分发说明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 ## 新功能兼容范围
 

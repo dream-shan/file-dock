@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$SourceDirectory = (Join-Path $PSScriptRoot '..\..\重建输出\温度服务'),
+    [string]$SourceDirectory = (Join-Path $PSScriptRoot '..\..\重建输出\TemperatureService'),
     [string]$ResultPath
 )
 $ErrorActionPreference = 'Stop'

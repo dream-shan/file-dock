@@ -11,7 +11,8 @@
     <AssemblyName>FileDockDemo</AssemblyName>
     <RootNamespace>FileDockDemo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.7.4</Version>
+    <Version>0.8.0-rc.1</Version>
+    <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
     <ApplicationIcon>Assets\FileDock-dark.ico</ApplicationIcon>
     <DebugType>none</DebugType>
     <!-- WPF owns DPI configuration; WinForms supplies the tray and edge tab. -->

@@ -1,0 +1,61 @@
+name: Windows build and package
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+      - name: Build, self-test and verify release package
+        shell: pwsh
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+          DOTNET_NOLOGO: '1'
+        run: |
+          ./源码/Verify-Repository.ps1
+          ./源码/Release.ps1 -OutputDirectory "$env:RUNNER_TEMP/filedock-release"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FileDock-win-x64
+          path: |
+            ${{ runner.temp }}/filedock-release/*.zip
+            ${{ runner.temp }}/filedock-release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: windows-2025
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download verified workflow artifact and publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          gh run download $env:RUN_ID --name FileDock-win-x64 --dir package
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed.' }
+          $line = (Get-Content package/SHA256SUMS.txt -Raw).Trim() -split '\s+', 2
+          $archive = Join-Path package $line[1]
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ine $line[0]) { throw 'Artifact checksum mismatch.' }
+          gh release create $env:RELEASE_TAG $archive package/SHA256SUMS.txt --verify-tag --prerelease --title "File Dock $env:RELEASE_TAG" --notes 'Windows x64 prerelease. Built and tested from the tagged commit. See README for compatibility, temperature service setup and third-party licenses. SHA256SUMS.txt verifies the ZIP; build-info.json records the commit and per-file hashes.'
+          if ($LASTEXITCODE -ne 0) { throw 'Release publish failed; no existing release assets were overwritten.' }

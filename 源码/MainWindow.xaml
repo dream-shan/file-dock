@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:FileDockDemo"
         Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="430" Height="650" MinWidth="380" MinHeight="480"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStyle="None" AllowsTransparency="False" Background="{DynamicResource Surface}" PreviewMouseLeftButtonDown="MovePanelFromSurface"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="False" Topmost="True"
         FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12" Foreground="{DynamicResource Ink}"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
@@ -93,10 +93,7 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="PanelSurface" Margin="6" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
-        <Border.Effect>
-            <DropShadowEffect Color="#526584" BlurRadius="14" ShadowDepth="2" Opacity="0.16" />
-        </Border.Effect>
+    <Border x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
         <Grid Margin="19,17,19,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -107,7 +104,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="Header_MouseLeftButtonDown" Margin="0,0,0,17">
+            <Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag" Margin="0,0,0,17">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -169,7 +166,7 @@
                     <RowDefinition Height="32" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <TextBlock Text="我的常用" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
                         HorizontalAlignment="Right" ToolTip="添加常用文件或文件夹" />
                 <Grid Grid.Row="1">
@@ -217,7 +214,7 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="35" />
                 </Grid.RowDefinitions>
-                <TextBlock Text="电脑状态" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
                 <TextBlock x:Name="PerformanceHint" Text="实时更新 · 1 秒" FontSize="9" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <Grid MinHeight="190">

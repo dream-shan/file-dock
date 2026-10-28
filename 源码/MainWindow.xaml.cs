@@ -69,10 +69,11 @@ public partial class MainWindow : Window
         Storage = new StorageService(dataDirectory);
         State = Storage.Load();
         _keepOpen = State.KeepOpen;
-        _screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+        _screen = Forms.Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == State.PanelScreen) ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
+        InitializeMovement();
         InitializeFolderBrowser();
         InitializeTransfers();
         InitializePerformance();
@@ -99,7 +100,7 @@ public partial class MainWindow : Window
 
     private void InitializeNative()
     {
-        NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle);
+        NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle); ApplyNativeCorners(new WindowInteropHelper(this).Handle);
         _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         _source?.AddHook(WindowProc);
         if (!NativeMethods.RegisterHotKey(_source!.Handle, NativeMethods.HotkeyId, 0x4003, 0x20))
@@ -157,7 +158,7 @@ public partial class MainWindow : Window
     {
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { if (IsVisible) CollapsePanel(); else ExpandPanel(); handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
-        if (msg == 0x02E0) Dispatcher.BeginInvoke(() => PositionPanel());
+        if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
         return IntPtr.Zero;
     }
 
@@ -387,8 +388,8 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
-        AddMenu(menu, "贴到左侧", () => { State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
-        AddMenu(menu, "贴到右侧", () => { State.DockSide = "Right"; PositionPanel(); PositionDock(); Persist(); });
+        AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
+        AddMenu(menu, "贴到右侧", () => { State.PanelLeft = State.PanelTop = null; State.DockSide = "Right"; PositionPanel(); PositionDock(); Persist(); });
         var startup = new MenuItem { Header = "开机启动", IsCheckable = true, IsChecked = StartupEnabled() };
         startup.Click += (_, _) =>
         {
@@ -452,11 +453,11 @@ public partial class MainWindow : Window
         double scale = _dock!.ScaleFactor;
         _screen = Forms.Screen.FromHandle(_dock!.Handle);
         State.DockSide = left * scale < _screen.WorkingArea.Left + _screen.WorkingArea.Width / 2 ? "Left" : "Right";
-        State.DockTop = top; PositionDock(); Persist();
+        State.PanelLeft = State.PanelTop = null; State.PanelScreen = _screen.DeviceName; State.DockTop = top; PositionDock(); Persist();
     }
     private Rect WorkArea(Visual? target = null)
     {
-        if (!Forms.Screen.AllScreens.Any(s => s.DeviceName == _screen.DeviceName)) _screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+        if (!Forms.Screen.AllScreens.Any(s => s.DeviceName == _screen.DeviceName)) _screen = Forms.Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == State.PanelScreen) ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         var bounds = _screen.WorkingArea;
         var dpi = VisualTreeHelper.GetDpi(target ?? this);
         return new Rect(bounds.Left / dpi.DpiScaleX, bounds.Top / dpi.DpiScaleY, bounds.Width / dpi.DpiScaleX, bounds.Height / dpi.DpiScaleY);
@@ -468,6 +469,7 @@ public partial class MainWindow : Window
         MaxHeight = Math.Max(480, area.Height - 20); Height = Math.Min(Height, MaxHeight);
         Left = State.DockSide == "Left" ? area.Left + 10 : Math.Max(area.Left, area.Right - Width - 10);
         Top = Math.Clamp(State.DockTop < 0 ? area.Top + (area.Height - Height) / 2 : State.DockTop - 30, area.Top + 6, Math.Max(area.Top + 6, area.Bottom - Height - 6));
+        if (State.PanelLeft is double left && State.PanelTop is double top) { var saved = ConstrainPanel(new Rect(left, top, Width, Height), area); Left = saved.Left; Top = saved.Top; }
     }
     private void PositionDock()
     {
@@ -477,18 +479,6 @@ public partial class MainWindow : Window
         _dock.Left = State.DockSide == "Left" ? area.Left : area.Right - _dock.Width;
         _dock.Top = Math.Clamp(State.DockTop < 0 ? area.Top + area.Height / 2 - _dock.Height / 2 : State.DockTop, area.Top, Math.Max(area.Top, area.Bottom - _dock.Height));
         _dock.Invalidate();
-    }
-    private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.OriginalSource is not DependencyObject source || FindButton(source) != null) return;
-        if (e.ButtonState == MouseButtonState.Pressed)
-        {
-            try { DragMove(); } catch (InvalidOperationException) { }
-            _screen = Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
-            State.DockTop = Top + 30;
-            Rect area = WorkArea(); State.DockSide = Left + Width / 2 < area.Left + area.Width / 2 ? "Left" : "Right";
-            Persist();
-        }
     }
     private static Button? FindButton(DependencyObject? source)
     {

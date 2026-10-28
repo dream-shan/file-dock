@@ -112,6 +112,7 @@ public sealed class StorageService
         if (state.Pins.Any(entry => entry is null || string.IsNullOrWhiteSpace(entry.Path) ||
                                     string.IsNullOrWhiteSpace(entry.Id) || entry.DisplayName is null))
             throw new InvalidDataException("配置文件中的文件记录无效。");
+        if ((state.PanelLeft.HasValue != state.PanelTop.HasValue) || (state.PanelLeft.HasValue && (!double.IsFinite(state.PanelLeft.Value) || !double.IsFinite(state.PanelTop!.Value)))) throw new InvalidDataException("窗口展开位置无效。");
         if (state.DockSide is not ("Left" or "Right") || !double.IsFinite(state.DockTop))
             throw new InvalidDataException("配置文件中的窗口位置无效。");
     }

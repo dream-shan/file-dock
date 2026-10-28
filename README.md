@@ -2,11 +2,11 @@
 
 常驻 Windows 桌面的文件启动器与电脑状态面板。把常用文件夹放在屏幕边缘，在面板内浏览、搜索、预览图片，再将文件拖到需要的应用中。
 
-**当前版本：0.8.0-rc.3 · 开源候选版**。C# / .NET 10 / WPF，Windows x64。项目代码采用 [MIT](LICENSE)，第三方组件保留各自许可。
+**当前版本：0.8.0-rc.4 · 开源候选版**。C# / .NET 10 / WPF，Windows x64。项目代码采用 [MIT](LICENSE)，第三方组件保留各自许可。
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.3-win-x64.zip` 和 `SHA256SUMS.txt`。仓库私有期间需要仓库访问权限。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.4-win-x64.zip` 和 `SHA256SUMS.txt`。仓库私有期间需要仓库访问权限。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -17,12 +17,10 @@
 
 ## 本候选版变化
 
-- 对外统一使用“文件坞 File Dock”，启动文件从 `FileDockDemo.exe` 更名为 `FileDock.exe`；界面 `DEMO` 改为带版本提示的 `RC`。
-- 保留旧配置与单实例兼容；首次启动迁移指向同目录旧 exe 的开机启动项，不开启原本关闭的开机启动，不改动其他目录或带自定义参数的启动项。
-- 使用说明按当前功能重整，补充首次使用、升级回退、温度组件和已知限制，移除过时的操作描述。
-- 延续上一轮配置降级保护和失效文件类型缓存清理；发布流程验证命名、版本、文档、包清单和文件哈希。
-
-这是用于开源前验收的预发布版本，尚非正式稳定版。真实网页拖放、截图工具和硬件兼容仍应按目标环境验证。
+- 主面板改用原生无边框窗口合成和系统圆角，移除透明分层窗口及应用绘制的阴影，减少移动时合成负担。
+- 顶部、分区标题及内侧空白支持移动；按钮、搜索、列表和图表保持原操作，移动时暂停悬停提示。
+- 保存展开位置及显示器，收起再展开保持原位置；屏幕变化时限制在可见工作区。拖动贴边入口或选择贴边方向会重置展开位置。
+- 不同显示器、远程画面和拍摄条件下的残影需分别观察，本版本不承诺消除显示器或拍摄造成的拖影。
 
 ## 文件与桌面操作
 
@@ -127,7 +125,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.3-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.4-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

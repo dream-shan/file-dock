@@ -440,6 +440,7 @@ internal static class DemoVerification
         await ThemeVerification.Run(window, directory, Check);
         await StabilityVerification.Run(window, directory, Check);
         ReleaseVerification.Run(window, Check);
+        MovementVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }

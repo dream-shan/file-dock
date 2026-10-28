@@ -1,4 +1,4 @@
-文件坞 File Dock · 0.8.0-rc.3 开源候选版
+文件坞 File Dock · 0.8.0-rc.4 开源候选版
 Windows x64 · 启动文件：FileDock.exe
 
 首次使用
@@ -50,3 +50,5 @@ CPU 温度需另外安装官方 PawnIO 驱动和包内 TemperatureService 服务
 项目：https://github.com/dream-shan/file-dock
 下载及校验文件：https://github.com/dream-shan/file-dock/releases
 源码采用 MIT；第三方组件许可见 LICENSE、THIRD-PARTY-NOTICES.md 及运行时许可目录。
+
+窗口移动：可拖动顶部、分区标题及内侧空白；按钮、搜索、列表、图表维持原操作。展开位置自动记忆，收起后再展开恢复。拖动贴边入口或选择贴边方向会重置展开位置。

@@ -12,7 +12,7 @@ internal static class ReleaseVerification
             typeof(App).Assembly.GetName().Name == "FileDock", "Candidate executable and assembly use the FileDock name");
         check(typeof(App).Assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product == "文件坞 File Dock",
             "Executable metadata identifies the public product");
-        check(window.ReleaseBadge.Text == "RC" && App.VersionLabel.Contains("0.8.0-rc.3"),
+        check(window.ReleaseBadge.Text == "RC" && App.VersionLabel.Contains("0.8.0-rc.4"),
             "Candidate badge identifies the actual release version");
         string exe = @"C:\File Dock\FileDock.exe";
         check(StartupRegistration.UpdatedCommand(null, exe) is null, "Upgrade does not enable disabled startup");

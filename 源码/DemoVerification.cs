@@ -56,16 +56,7 @@ internal static class DemoVerification
         window.Storage.Save(recovered);
         Check(window.Storage.Load().Pins.Count == 4, "Save after backup recovery");
         string shortcut = Path.Combine(fixture, "启动参数验证.lnk"), marker = Path.Combine(fixture, "launch-result.txt");
-        object shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
-        object link = ((dynamic)shell).CreateShortcut(shortcut);
-        try
-        {
-            ((dynamic)link).TargetPath = Environment.ProcessPath!;
-            ((dynamic)link).Arguments = "--launch-probe \"" + marker + "\"";
-            ((dynamic)link).WorkingDirectory = fixture;
-            ((dynamic)link).Save();
-        }
-        finally { Marshal.FinalReleaseComObject(link); Marshal.FinalReleaseComObject(shell); }
+        CreateProbeShortcut(shortcut, marker, fixture);
         FileService.Open(shortcut);
         for (int i = 0; i < 60 && !File.Exists(marker); i++) await Task.Delay(100);
         Check(File.Exists(marker) && FileService.NormalizeKey(File.ReadAllText(marker)) == FileService.NormalizeKey(fixture), "Shell opens shortcut preserving arguments and working directory");
@@ -93,16 +84,7 @@ internal static class DemoVerification
         File.WriteAllText(extensionless, "这是无扩展名的文件。");
         string browserShortcut = Path.Combine(project, "启动验证.lnk");
         string browserMarker = Path.Combine(fixture, "browser-launch-result.txt");
-        object browserShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
-        object browserLink = ((dynamic)browserShell).CreateShortcut(browserShortcut);
-        try
-        {
-            ((dynamic)browserLink).TargetPath = Environment.ProcessPath!;
-            ((dynamic)browserLink).Arguments = "--launch-probe \"" + browserMarker + "\"";
-            ((dynamic)browserLink).WorkingDirectory = project;
-            ((dynamic)browserLink).Save();
-        }
-        finally { Marshal.FinalReleaseComObject(browserLink); Marshal.FinalReleaseComObject(browserShell); }
+        CreateProbeShortcut(browserShortcut, browserMarker, project);
         bool AtFolder(string path) => window.CurrentFolderPath != null && FileService.NormalizeKey(window.CurrentFolderPath) == FileService.NormalizeKey(path);
         EntryView[] FolderEntries() => window.FolderList.Items.Cast<EntryView>().ToArray();
         EntryView FolderEntry(string path) => FolderEntries().Single(e => FileService.NormalizeKey(e.Path) == FileService.NormalizeKey(path));
@@ -458,6 +440,45 @@ internal static class DemoVerification
         await ThemeVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
+    }
+
+    // WScript.Shell saves through the system ANSI code page on some Windows images.
+    // Use the Unicode shell interface so Chinese fixtures are also valid on English CI.
+    private static void CreateProbeShortcut(string path, string marker, string workingDirectory)
+    {
+        object instance = Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"))!)!;
+        try
+        {
+            var link = (IShellLinkW)instance;
+            link.SetPath(Environment.ProcessPath!);
+            link.SetArguments("--launch-probe \"" + marker + "\"");
+            link.SetWorkingDirectory(workingDirectory);
+            ((System.Runtime.InteropServices.ComTypes.IPersistFile)instance).Save(path, true);
+        }
+        finally { Marshal.FinalReleaseComObject(instance); }
+    }
+
+    [ComImport, Guid("000214F9-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellLinkW
+    {
+        void GetPath(IntPtr buffer, int size, IntPtr findData, uint flags);
+        void GetIDList(out IntPtr idList);
+        void SetIDList(IntPtr idList);
+        void GetDescription(IntPtr buffer, int size);
+        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string text);
+        void GetWorkingDirectory(IntPtr buffer, int size);
+        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string directory);
+        void GetArguments(IntPtr buffer, int size);
+        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string arguments);
+        void GetHotkey(out short hotkey);
+        void SetHotkey(short hotkey);
+        void GetShowCmd(out int command);
+        void SetShowCmd(int command);
+        void GetIconLocation(IntPtr buffer, int size, out int index);
+        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string path, int index);
+        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string path, uint reserved);
+        void Resolve(IntPtr window, uint flags);
+        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string path);
     }
 
     internal static void SaveRender(Window window, string path)

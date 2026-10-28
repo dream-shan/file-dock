@@ -16,9 +16,12 @@ try {
     if ($process.ExitCode -ne 0) {
         $failure = Join-Path $result 'failure.txt'
         if ($env:GITHUB_ACTIONS -eq 'true' -and (Test-Path -LiteralPath $failure)) {
-            # Log only our fixed assertion label; do not upload samples or raw exception paths.
-            $label = [regex]::Match([IO.File]::ReadAllText($failure), '(?m)^System.InvalidOperationException: (FAIL: [^\r\n]+)')
-            if ($label.Success) { Write-Host $label.Groups[1].Value }
+            # Hosted CI uses generated fixtures. Redact runner paths and omit samples/screenshots.
+            $diagnostic = [IO.File]::ReadAllText($failure)
+            foreach ($path in @($result,$env:GITHUB_WORKSPACE,$env:USERPROFILE)) {
+                if ($path) { $diagnostic = $diagnostic.Replace($path,'<test-path>') }
+            }
+            Write-Host $diagnostic.Substring(0,[Math]::Min(6000,$diagnostic.Length))
         }
         throw "Self-test failed (exit $($process.ExitCode)). Inspect $result/failure.txt locally."
     }

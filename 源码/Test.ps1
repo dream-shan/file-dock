@@ -13,7 +13,15 @@ try {
         $process.Kill()
         throw 'Self-test timed out after 180 seconds.'
     }
-    if ($process.ExitCode -ne 0) { throw "Self-test failed (exit $($process.ExitCode)). Inspect $result/failure.txt locally." }
+    if ($process.ExitCode -ne 0) {
+        $failure = Join-Path $result 'failure.txt'
+        if ($env:GITHUB_ACTIONS -eq 'true' -and (Test-Path -LiteralPath $failure)) {
+            # Log only our fixed assertion label; do not upload samples or raw exception paths.
+            $label = [regex]::Match([IO.File]::ReadAllText($failure), '(?m)^System.InvalidOperationException: (FAIL: [^\r\n]+)')
+            if ($label.Success) { Write-Host $label.Groups[1].Value }
+        }
+        throw "Self-test failed (exit $($process.ExitCode)). Inspect $result/failure.txt locally."
+    }
     $report = Join-Path $result 'verification.txt'
     if (!(Test-Path -LiteralPath $report)) { throw 'Self-test returned no verification report.' }
     $checks = @(Get-Content -LiteralPath $report | Where-Object { $_ -like 'PASS:*' })

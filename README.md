@@ -10,7 +10,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 | 常用入口与电脑状态 | 文件夹内浏览 |
 | --- | --- |
-| <img src="docs/images/home-dark.png" width="360" alt="文件坞深色主页，包含常用入口与电脑状态卡片"> | <img src="docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
+| <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/home-dark.png" width="360" alt="文件坞深色主页，包含常用入口与电脑状态卡片"> | <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
 
 截图由实际程序渲染，使用内置验证样例与示例读数，不包含维护者的私人文件；图中数值不代表日常资源占用或硬件测试结果。界面支持跟随系统、浅色和深色主题。
 

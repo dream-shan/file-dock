@@ -438,6 +438,7 @@ internal static class DemoVerification
         await FeatureVerification.Run(window, directory, Check);
         await PerformanceVerification.Run(window, directory, Check);
         await ThemeVerification.Run(window, directory, Check);
+        await StabilityVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }

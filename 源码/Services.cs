@@ -96,6 +96,8 @@ public sealed class StorageService
         using var stream = File.OpenRead(path);
         var envelope = JsonSerializer.Deserialize<StateEnvelope>(stream, JsonOptions)
                        ?? throw new InvalidDataException("配置文件为空。");
+        if (envelope.Version > CurrentVersion)
+            throw new NotSupportedException($"配置版本 {envelope.Version} 比当前程序支持的版本新。请使用较新版本的文件坞；原配置和备份均已保留。");
         if (envelope.Version != CurrentVersion)
             throw new InvalidDataException($"无法读取版本为 {envelope.Version} 的配置文件。");
         var state = envelope.State ?? throw new InvalidDataException("配置文件缺少应用状态。");

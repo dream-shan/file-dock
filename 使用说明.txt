@@ -1,4 +1,4 @@
-文件坞 Demo 0.8.0-rc.1 · Windows x64
+文件坞 Demo 0.8.0-rc.2 · Windows x64
 
 启动：双击 FileDockDemo.exe。程序已包含运行时，无需另装 .NET。
 

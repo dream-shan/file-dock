@@ -239,8 +239,9 @@ public partial class MainWindow : Window
         return new EntryView { Id = id, Path = path, DisplayName = string.IsNullOrEmpty(name) ? FileName(path) : name, Subtitle = parent, TimeLabel = time, IconGlyph = glyph, IconBrush = iconBrush, Kind = kind, IsPinned = pinned };
     }
 
-    private async Task LoadKindsAsync(string[] paths)
+    internal async Task LoadKindsAsync(string[] paths)
     {
+        PruneDirectoryKinds();
         var pending = paths.Distinct(StringComparer.OrdinalIgnoreCase).Where(p => !_directoryKinds.ContainsKey(p)).ToArray();
         if (pending.Length == 0) return;
         var found = await Task.Run(() => pending.Select(p => (Path: p, IsDirectory: Directory.Exists(p))).ToArray());
@@ -248,6 +249,13 @@ public partial class MainWindow : Window
         foreach (string stale in _directoryKinds.Keys.Where(p => !active.Contains(p)).ToArray()) _directoryKinds.Remove(stale);
         foreach (var item in found) if (active.Contains(item.Path)) _directoryKinds[item.Path] = item.IsDirectory;
         ApplyFilters();
+    }
+
+    private void PruneDirectoryKinds()
+    {
+        if (_directoryKinds.Count == 0) return;
+        var active = State.Pins.Select(p => p.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string stale in _directoryKinds.Keys.Where(p => !active.Contains(p)).ToArray()) _directoryKinds.Remove(stale);
     }
 
     private static Task<T> RunSta<T>(Func<T> action)
@@ -368,7 +376,7 @@ public partial class MainWindow : Window
             string? path = null;
             if (entry.Kind == "文件夹") { var d = new OpenFolderDialog { Title = "重新选择文件夹" }; if (d.ShowDialog(this) == true) path = d.FolderName; }
             else { var d = new OpenFileDialog { Title = "重新选择文件" }; if (d.ShowDialog(this) == true) path = d.FileName; }
-            if (path != null) { State.Pins.First(p => p.Id == entry.Id).Path = path; Persist(); ApplyFilters(); }
+            if (path != null) { State.Pins.First(p => p.Id == entry.Id).Path = path; PruneDirectoryKinds(); Persist(); ApplyFilters(); _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray()); }
         }
         finally { _inDialog = false; }
     }
@@ -425,7 +433,7 @@ public partial class MainWindow : Window
         int index = targetId == null ? State.Pins.Count : State.Pins.FindIndex(p => p.Id == targetId);
         State.Pins.Insert(index < 0 ? State.Pins.Count : index, pin); ReorderAndSave();
     }
-    private void ReorderAndSave() { for (int i = 0; i < State.Pins.Count; i++) State.Pins[i].Order = i; Persist(); ApplyFilters(); }
+    private void ReorderAndSave() { PruneDirectoryKinds(); for (int i = 0; i < State.Pins.Count; i++) State.Pins[i].Order = i; Persist(); ApplyFilters(); }
 
     public void ExpandPanel()
     {

@@ -11,6 +11,11 @@ try {
     & (Join-Path $PSScriptRoot 'Verify-Repository.ps1')
     [xml]$project = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'FileDockDemo.csproj')
     $version = [string]$project.Project.PropertyGroup.Version
+    if ([string]$project.Project.PropertyGroup.AssemblyName -ne 'FileDock') { throw 'Unexpected public executable name.' }
+    $readme = [IO.File]::ReadAllText((Join-Path $repo 'README.md'))
+    $guide = [IO.File]::ReadAllText((Join-Path $repo '使用说明.txt'))
+    if (!$readme.Contains("当前版本：$version ") -or !$guide.StartsWith("文件坞 File Dock · $version ")) { throw 'Release documents and project version differ.' }
+    if (!$readme.Contains('## 本候选版变化') -or !$guide.Contains('FileDock.exe')) { throw 'Missing candidate notes or launch instructions.' }
     if ($env:GITHUB_REF -like 'refs/tags/*' -and $env:GITHUB_REF -ne "refs/tags/v$version") { throw 'Release tag does not match the project version.' }
     if (!$OutputDirectory) { $OutputDirectory = Join-Path $repo "artifacts\$version" }
     $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -18,10 +23,12 @@ try {
     New-Item -ItemType Directory -Path $output | Out-Null
     $build = Join-Path $output 'build'
     & (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $build
-    & (Join-Path $PSScriptRoot 'Test.ps1') -Executable (Join-Path $build 'FileDockDemo.exe') -ResultDirectory (Join-Path $output 'checks')
+    $metadata = (Get-Item -LiteralPath (Join-Path $build 'FileDock.exe')).VersionInfo
+    if ($metadata.ProductVersion.Split('+')[0] -ne $version -or $metadata.ProductName -ne '文件坞 File Dock') { throw 'Executable branding or version differs from release metadata.' }
+    & (Join-Path $PSScriptRoot 'Test.ps1') -Executable (Join-Path $build 'FileDock.exe') -ResultDirectory (Join-Path $output 'checks')
     $stage = Join-Path $output 'package'
     New-Item -ItemType Directory -Path $stage | Out-Null
-    Copy-Item -LiteralPath (Join-Path $build 'FileDockDemo.exe') -Destination $stage
+    Copy-Item -LiteralPath (Join-Path $build 'FileDock.exe') -Destination $stage
     foreach ($name in @('README.md','使用说明.txt','LICENSE','THIRD-PARTY-NOTICES.md')) {
         $source = Join-Path $repo $name
         if (!(Test-Path -LiteralPath $source) -or (Get-Item -LiteralPath $source).Length -eq 0) { throw "Missing release document: $name" }
@@ -67,7 +74,7 @@ try {
     } finally { $archive.Dispose();$stream.Dispose() }
     $hash=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
     [IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), "$hash  $([IO.Path]::GetFileName($zip))`n", $utf8)
-    & (Join-Path $PSScriptRoot 'Verify-Package.ps1') -Archive $zip -ExpectedCommit $revision.Trim()
+    & (Join-Path $PSScriptRoot 'Verify-Package.ps1') -Archive $zip -ExpectedCommit $revision.Trim() -ExpectedVersion $version
     $currentRevision = & git rev-parse HEAD
     $changed = & git status --porcelain --untracked-files=normal
     if ($LASTEXITCODE -ne 0 -or $changed -or $currentRevision -ne $revision) { throw 'Source changed during packaging; discard this output and rebuild from a clean checkout.' }

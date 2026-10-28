@@ -28,6 +28,6 @@ try {
     $report = Join-Path $result 'verification.txt'
     if (!(Test-Path -LiteralPath $report)) { throw 'Self-test returned no verification report.' }
     $checks = @(Get-Content -LiteralPath $report | Where-Object { $_ -like 'PASS:*' })
-    if ($checks.Count -lt 150) { throw 'Self-test did not complete the expected checks.' }
+    if ($checks.Count -lt 170) { throw 'Self-test did not complete the expected checks.' }
     Write-Host "Self-test: $($checks.Count) checks passed. Desktop capture/drag tests require a separate interactive session."
 } finally { $process.Dispose() }

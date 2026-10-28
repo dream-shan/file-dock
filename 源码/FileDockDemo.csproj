@@ -8,10 +8,13 @@
     <StartupObject>FileDockDemo.App</StartupObject>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <AssemblyName>FileDockDemo</AssemblyName>
+    <AssemblyName>FileDock</AssemblyName>
+    <Title>文件坞 File Dock</Title>
+    <Product>文件坞 File Dock</Product>
+    <Description>常驻 Windows 桌面的文件启动器与电脑状态面板</Description>
     <RootNamespace>FileDockDemo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0-rc.2</Version>
+    <Version>0.8.0-rc.3</Version>
     <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
     <ApplicationIcon>Assets\FileDock-dark.ico</ApplicationIcon>
     <DebugType>none</DebugType>

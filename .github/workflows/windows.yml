@@ -57,5 +57,23 @@ jobs:
           $line = (Get-Content package/SHA256SUMS.txt -Raw).Trim() -split '\s+', 2
           $archive = Join-Path package $line[1]
           if ((Get-FileHash $archive -Algorithm SHA256).Hash -ine $line[0]) { throw 'Artifact checksum mismatch.' }
-          gh release create $env:RELEASE_TAG $archive package/SHA256SUMS.txt --verify-tag --prerelease --title "File Dock $env:RELEASE_TAG" --notes 'Windows x64 prerelease. Built and tested from the tagged commit. See README for compatibility, temperature service setup and third-party licenses. SHA256SUMS.txt verifies the ZIP; build-info.json records the commit and per-file hashes.'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $archive).Path)
+          try {
+            $reader = [IO.StreamReader]::new($zip.GetEntry('build-info.json').Open())
+            try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            if ("v$($manifest.version)" -ne $env:RELEASE_TAG) { throw 'Release version mismatch.' }
+            $reader = [IO.StreamReader]::new($zip.GetEntry('README.md').Open())
+            try { $readme = $reader.ReadToEnd() } finally { $reader.Dispose() }
+          } finally { $zip.Dispose() }
+          $changes = [regex]::Match($readme, '(?ms)^## 本候选版变化\r?\n(.*?)(?=^## |\z)').Groups[1].Value.Trim()
+          if (!$changes) { throw 'Candidate release notes missing from verified package.' }
+          $body = @("# 文件坞 File Dock $env:RELEASE_TAG", '', $changes, '',
+            'Windows x64：解压完整 ZIP 后运行 FileDock.exe；无需另装 .NET。',
+            'CPU 温度组件需另行安装，步骤见包内 README.md；已有正常运行的服务本次无需重装。',
+            '升级前退出旧版并备份 Data；旧 FileDockDemo.exe 改名和启动项迁移说明见 README.md。',
+            '使用 SHA256SUMS.txt 核对 ZIP。主程序未作 Windows 代码签名，校验和不等同于签名。',
+            "源码提交：$($manifest.commit)。build-info.json 包含逐文件哈希。") -join "`n"
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $body, [Text.UTF8Encoding]::new($false))
+          gh release create $env:RELEASE_TAG $archive package/SHA256SUMS.txt --verify-tag --prerelease --title "文件坞 File Dock $env:RELEASE_TAG" --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'Release publish failed; no existing release assets were overwritten.' }

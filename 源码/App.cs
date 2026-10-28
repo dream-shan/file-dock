@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Windows;
 
@@ -11,6 +12,8 @@ public sealed class App : Application
     private EventWaitHandle? _showEvent;
     private RegisteredWaitHandle? _showRegistration;
     public static bool IsSelfTest { get; private set; }
+    public static string VersionLabel => "文件坞 " +
+        (typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "未知版本") + " · 开源候选版";
 
     [STAThread]
     public static int Main(string[] args)
@@ -53,6 +56,9 @@ public sealed class App : Application
         }
         else
         {
+            // Preserve legacy singleton names so renamed releases cannot run alongside older versions.
+            if (!StartupRegistration.MigrateLegacyPath())
+                window.SetStatus("旧开机启动路径未能更新，请在设置中重新开启开机启动。");
             app._showRegistration = ThreadPool.RegisterWaitForSingleObject(app._showEvent!, (_, _) => app.Dispatcher.BeginInvoke(window.ExpandPanel), null, -1, false);
             app.Startup += (_, _) => window.Show();
         }

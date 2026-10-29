@@ -67,6 +67,9 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")] internal static extern bool UnhookWinEvent(IntPtr hook);
     // HWND_TOPMOST, NOSIZE | NOMOVE | NOACTIVATE. Restore z-order without
     // stealing focus from the foreground application or polling every second.
+    [DllImport("user32.dll")] internal static extern bool EnableWindow(IntPtr window, bool enabled);
+    [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr window);
+    internal static bool SetCaptureTopmost(IntPtr window,bool topmost) => SetWindowPos(window,new IntPtr(topmost ? -1 : -2),0,0,0,0,0x0013);
     internal static bool RaiseWithoutActivation(IntPtr window) =>
         SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, 0x0013);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);

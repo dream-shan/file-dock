@@ -111,6 +111,7 @@ internal static class FeatureVerification
         check(NativeMethods.GetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, out uint panelAffinity) && panelAffinity == 0, "Deliberately expanded panel remains capturable");
         window.ExpandPanel(); window.BeginCaptureShortcut();
         check(window.IsVisible, "Screenshot shortcut preserves the deliberately expanded panel");
+        window.CancelCaptureShortcutPending();
         window.CollapsePanel(); window.BeginCaptureShortcut();
         check(!dock.IsVisible && window.UpdateCaptureVisibility(), "Screenshot shortcut hides entry before capture starts");
         await Task.Delay(1650);

@@ -28,6 +28,8 @@ public sealed class PerformanceCard : Border
             Grid.SetRow(_actionHintText,3); Grid.SetColumn(_actionHintText,1); if(value) Grid.SetRowSpan(_ring,4);
         }
     }
+    internal void CancelPendingAction() => _actionMouseDown=false;
+    protected override void OnMouseLeave(MouseEventArgs e) { base.OnMouseLeave(e); CancelPendingAction(); }
     internal void RequestAction() { if(IsAction && ActionAvailable) ActionRequested?.Invoke(this,EventArgs.Empty); }
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) {
         base.OnMouseLeftButtonDown(e); if(!IsAction)return; _actionMouseDown=true; Focus(); e.Handled=true;
@@ -161,10 +163,26 @@ public sealed class PerformanceCard : Border
 internal sealed class PerformanceRing : FrameworkElement
 {
     internal Brush Accent = Brushes.Teal;
+    private static readonly DependencyProperty DisplayPercentProperty=DependencyProperty.Register(nameof(DisplayPercent),typeof(double),typeof(PerformanceRing),new FrameworkPropertyMetadata(0d,FrameworkPropertyMetadataOptions.AffectsRender));
+    internal double DisplayPercent { get=>(double)GetValue(DisplayPercentProperty); private set=>SetValue(DisplayPercentProperty,value); }
+    internal bool OperationActive { get; private set; }
+    private async System.Threading.Tasks.Task AnimateAsync(double target,int milliseconds,System.Threading.CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var animation=new System.Windows.Media.Animation.DoubleAnimation(DisplayPercent,target,TimeSpan.FromMilliseconds(milliseconds)) { FillBehavior=System.Windows.Media.Animation.FillBehavior.Stop };
+        DisplayPercent=target; BeginAnimation(DisplayPercentProperty,animation);
+        try { await System.Threading.Tasks.Task.Delay(milliseconds,token); }
+        finally { BeginAnimation(DisplayPercentProperty,null); DisplayPercent=target; }
+    }
+    internal async System.Threading.Tasks.Task BeginOperationAsync(System.Threading.CancellationToken token)
+    { OperationActive=true; await AnimateAsync(0,250,token); }
+    internal async System.Threading.Tasks.Task FinishOperationAsync(System.Threading.CancellationToken token)
+    { try { await AnimateAsync(Percent??0,500,token); } finally { AbortOperation(); } }
+    internal void AbortOperation() { OperationActive=false;BeginAnimation(DisplayPercentProperty,null);DisplayPercent=Percent??0; }
     internal Brush Track = Brushes.LightGray;
     internal double? Percent { get; private set; }
     internal static double? Normalize(double? value) => value.HasValue && double.IsFinite(value.Value) ? Math.Clamp(value.Value,0,100) : null;
-    internal void Set(double? value) { Percent=Normalize(value); InvalidateVisual(); }
+    internal void Set(double? value) { Percent=Normalize(value); if(!OperationActive)DisplayPercent=Percent??0; InvalidateVisual(); }
     protected override void OnRender(DrawingContext drawing)
     {
         base.OnRender(drawing);
@@ -173,16 +191,17 @@ internal sealed class PerformanceRing : FrameworkElement
         double thickness=size*.12, radius=(size-thickness)/2;
         var center=new Point(ActualWidth/2,ActualHeight/2);
         drawing.DrawEllipse(null,new Pen(Track,thickness),center,radius,radius);
-        if(Percent is not > 0) return;
+        double shown=DisplayPercent;
+        if(shown<=0) return;
         var pen=new Pen(Accent,thickness) { StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round };
-        if(Percent >= 100) { drawing.DrawEllipse(null,pen,center,radius,radius); return; }
-        double angle=Percent.Value*Math.PI/50;
+        if(shown >= 100) { drawing.DrawEllipse(null,pen,center,radius,radius); return; }
+        double angle=shown*Math.PI/50;
         var geometry=new StreamGeometry();
         using(var context=geometry.Open())
         {
             context.BeginFigure(new Point(center.X,center.Y-radius),false,false);
             context.ArcTo(new Point(center.X+radius*Math.Sin(angle),center.Y-radius*Math.Cos(angle)),
-                new Size(radius,radius),0,Percent>50,SweepDirection.Clockwise,true,false);
+                new Size(radius,radius),0,shown>50,SweepDirection.Clockwise,true,false);
         }
         geometry.Freeze(); drawing.DrawGeometry(null,pen,geometry);
     }

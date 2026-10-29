@@ -34,11 +34,9 @@ internal static class MemoryPressure
 
 internal sealed class MemoryActionGate
 {
-    private long _until;
     internal bool Busy { get; private set; }
-    internal int Remaining(long now) => (int)Math.Clamp(Math.Ceiling((_until - now) / 1000d), 0, 10);
-    internal bool TryStart(long now) { if (Busy || Remaining(now) > 0) return false; Busy = true; return true; }
-    internal void Complete(long now) { Busy = false; _until = now + 10000; }
+    internal bool TryStart() { if (Busy) return false; Busy = true; return true; }
+    internal void Complete() { Busy = false; }
 }
 
 internal readonly record struct MemoryCleanupResult(MemoryReading Before, MemoryReading After, int Trimmed, int Skipped);

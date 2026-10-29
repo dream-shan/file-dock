@@ -12,7 +12,7 @@ namespace FileDockDemo;
 
 public partial class MainWindow
 {
-    private DispatcherTimer? _memoryTimer, _memoryCooldownTimer;
+    private DispatcherTimer? _memoryTimer;
     private bool _memorySessionLocked, _memoryDisconnected, _memorySuspended, _memoryDisposed, _memoryTestEnabled;
     private readonly MemoryActionGate _memoryAction = new();
     private readonly CancellationTokenSource _memoryCleanupCancellation = new();
@@ -32,11 +32,6 @@ public partial class MainWindow
         MemoryCard.ActionRequested += async (_,_) => await OrganizeMemoryAsync();
         _memoryTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval=TimeSpan.FromSeconds(2) };
         _memoryTimer.Tick += (_,_) => ReadMemoryOnly();
-        _memoryCooldownTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval=TimeSpan.FromSeconds(1) };
-        _memoryCooldownTimer.Tick += (_,_) => {
-            UpdateMemoryActionHint();
-            if (_memoryAction.Remaining(Environment.TickCount64)==0) _memoryCooldownTimer.Stop();
-        };
         if (!App.IsSelfTest)
         {
             SystemEvents.SessionSwitch += MemorySessionSwitch;
@@ -93,7 +88,7 @@ public partial class MainWindow
             Color current=_memoryBrush.Color;
             _memoryBrush.BeginAnimation(SolidColorBrush.ColorProperty,null);
             _memoryBrush.Color=next;
-            if (animate && IsVisible) _memoryBrush.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(current,next,TimeSpan.FromMilliseconds(300)) { FillBehavior=FillBehavior.Stop });
+            if (animate && MemoryCard.IsVisible) _memoryBrush.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(current,next,TimeSpan.FromMilliseconds(300)) { FillBehavior=FillBehavior.Stop });
         }
         MemoryCard.Accent=_memoryBrush;
         MemoryCard.Notice=_memoryWarning ? "占用偏高" : "";
@@ -102,9 +97,8 @@ public partial class MainWindow
     }
     private void UpdateMemoryActionHint()
     {
-        int remaining=_memoryAction.Remaining(Environment.TickCount64);
-        MemoryCard.ActionAvailable=!_memoryAction.Busy && remaining==0 && !MemoryPaused && !_quitting;
-        MemoryCard.ActionHint=_memoryAction.Busy ? "正在整理…" : remaining>0 ? $"{remaining} 秒后可再次整理" : "点击整理内存";
+        MemoryCard.ActionAvailable=!_memoryAction.Busy && !MemoryPaused && !_quitting && !_captureActive;
+        MemoryCard.ActionHint=_memoryAction.Busy ? "正在整理…" : "点击整理内存";
         MemoryCard.ToolTip=MemoryCard.ActionHint+"\n清理图片缓存并尝试整理当前用户后台应用工作集。\n可能短暂变慢，实际占用可能回升；不会关闭应用。";
     }
     internal bool HandleMemoryActionKey(KeyEventArgs e)
@@ -119,10 +113,11 @@ public partial class MainWindow
     }
     internal async Task OrganizeMemoryAsync()
     {
-        if (_quitting || _memoryDisposed || MemoryPaused || !_memoryAction.TryStart(Environment.TickCount64)) return;
+        if (_quitting || _memoryDisposed || MemoryPaused || _captureActive || !_memoryAction.TryStart()) return;
         UpdateMemoryActionHint(); SetStatus("正在整理内存…");
         try
         {
+            await MemoryCard.RingChart.BeginOperationAsync(_memoryCleanupCancellation.Token);
             ImageLoader.InvalidateThumbnails();
             uint protectedPid=_memoryProtectedPid;
             var result = MemoryCleanupForVerification!=null ? await MemoryCleanupForVerification() :
@@ -137,13 +132,17 @@ public partial class MainWindow
         catch (Exception ex) { DiagnosticLog.Error("memory-organize-error",ex); if (!_memoryDisposed) SetStatus("内存整理未完成，可稍后重试。",true); }
         finally
         {
-            _memoryAction.Complete(Environment.TickCount64);
-            if (!_memoryDisposed) { UpdateMemoryActionHint(); _memoryCooldownTimer?.Start(); }
+            try {
+                if (!_memoryDisposed) await MemoryCard.RingChart.FinishOperationAsync(_memoryCleanupCancellation.Token);
+                else MemoryCard.RingChart.AbortOperation();
+            }
+            catch (OperationCanceledException) { MemoryCard.RingChart.AbortOperation(); }
+            finally { _memoryAction.Complete(); if (!_memoryDisposed) UpdateMemoryActionHint(); }
         }
     }
     private void DisposeMemory()
     {
-        _memoryDisposed=true; _memoryTimer?.Stop(); _memoryCooldownTimer?.Stop();
+        _memoryDisposed=true; _memoryTimer?.Stop();
         _memoryCleanupCancellation.Cancel();
         SystemEvents.SessionSwitch-=MemorySessionSwitch; SystemEvents.PowerModeChanged-=MemoryPowerChanged;
     }

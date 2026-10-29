@@ -23,10 +23,10 @@ internal static class MemoryVerification
         check(new MemoryReading(0,0).Percent==null && new MemoryReading(50,100).Percent==50 && !MemoryPressure.Warning(true,null),
             "Unavailable memory remains unknown and clears stale warnings");
         var gate=new MemoryActionGate();
-        check(gate.TryStart(1000) && !gate.TryStart(2000),"Memory action cannot overlap another active request");
-        gate.Complete(3000);
-        check(gate.Remaining(3000)==10 && gate.Remaining(12999)==1 && !gate.TryStart(12999),"Cooldown starts after completion and lasts ten seconds");
-        check(gate.TryStart(13000),"A new manual memory action becomes available at the cooldown boundary");
+        check(gate.TryStart() && !gate.TryStart(),"Memory action cannot overlap another active request");
+        check(gate.Busy,"Memory action remains gated while operation feedback is running");
+        gate.Complete();
+        check(gate.TryStart(),"A new manual memory action is available immediately after completion");
         int other=Environment.ProcessId+1000000;
         bool Allowed(bool user=true,bool elevated=false,bool critical=false,bool system=false,int session=3,uint saved=0,uint foreground=0) => MemoryTools.Eligible(other,session,3,user,elevated,critical,system,saved,foreground);
         check(Allowed() && !Allowed(user:false) && !Allowed(elevated:true) && !Allowed(critical:true) && !Allowed(system:true) && !Allowed(session:4),
@@ -81,9 +81,20 @@ internal static class MemoryVerification
         var finish=new TaskCompletionSource<MemoryCleanupResult>();int calls=0;
         window.MemoryCleanupForVerification=()=>{calls++;return finish.Task;};
         Task first=window.OrganizeMemoryAsync();await window.OrganizeMemoryAsync();
+        for(int i=0;i<30 && calls==0;i++)await Task.Delay(25);
         check(calls==1 && !window.MemoryCard.ActionAvailable && window.MemoryCard.ActionHint=="正在整理…","Repeated clicks produce one asynchronous cleanup operation");
-        finish.SetResult(new(new(85,100),new(79,100),1,0));await first;
-        check(!window.MemoryCard.ActionAvailable && window.MemoryCard.ActionHint.Contains("秒后"),"Completed cleanup displays a short cooldown and actual memory readings");
+        check(window.MemoryCard.RingChart.OperationActive && window.MemoryCard.RingChart.DisplayPercent==0 && window.MemoryCard.ValueText!="0%",
+            "Cleanup feedback reaches an empty ring while numerical memory readings remain real");
+        finish.SetResult(new(new(85,100),new(79,100),1,0));
+        await Task.Delay(100);
+        check(!window.MemoryCard.ActionAvailable && window.MemoryCard.RingChart.OperationActive,
+            "Cleanup action remains gated during the return animation");
+        await first;
+        check(window.MemoryCard.ActionAvailable && !window.MemoryCard.RingChart.OperationActive && window.MemoryCard.RingChart.DisplayPercent==window.MemoryCard.RingChart.Percent && !window.MemoryCard.ActionHint.Contains("秒"),
+            "Cleanup ring returns to the latest actual reading and immediately unlocks without a countdown");
+        window.MemoryCleanupForVerification=()=>Task.FromException<MemoryCleanupResult>(new InvalidOperationException("fixture"));
+        await window.OrganizeMemoryAsync();
+        check(window.MemoryCard.ActionAvailable && !window.MemoryCard.RingChart.OperationActive,"Failed cleanup restores the ring and permits retry without a cooldown");
         var peer=UIElementAutomationPeer.CreatePeerForElement(window.MemoryCard);
         check(peer?.GetPattern(PatternInterface.Invoke) is IInvokeProvider && window.MemoryCard.Focusable && !MainWindow.IsMovementSurface(window.MemoryCard),
             "Memory action supports keyboard and automation without starting a window drag");

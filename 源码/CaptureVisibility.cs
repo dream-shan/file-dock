@@ -81,7 +81,7 @@ public partial class MainWindow
             if (code >= 0 && (message == (IntPtr)0x100 || message == (IntPtr)0x104) && !_quitting)
             {
                 int key = Marshal.ReadInt32(data);
-                if (key == 0x1B) _capturePendingUntil = 0;
+                if (key == 0x1B) CancelCaptureShortcutPending();
                 else if (NativeMethods.IsCaptureShortcut(key)) BeginCaptureShortcut();
             }
             // Never consume or simulate the user's keystroke.
@@ -106,10 +106,11 @@ public partial class MainWindow
     }
     internal void BeginCaptureShortcut()
     {
-        if (!_isCollapsed || _dock == null || _captureActive) return;
+        if (_quitting || _dock == null || _captureActive) return;
         _capturePendingUntil = Environment.TickCount64 + 1500;
         _captureActive = true;
         RecordDiagnosticState("capture-shortcut");
+        HoldCaptureInteraction();
         _dock.Hide();
         _captureRecovery?.Start();
         // Finish hiding before passing the shortcut to the screenshot tool,
@@ -127,8 +128,8 @@ public partial class MainWindow
         bool wasActive = _captureActive;
         _captureActive = active;
         if (active != wasActive) RecordDiagnosticState("capture-state-changed");
-        if (active) { _dock?.Hide(); _captureRecovery?.Start(); }
-        else { _captureRecovery?.Stop(); if (wasActive && _isCollapsed) QueueDockRaise(); }
+        if (active) { HoldCaptureInteraction(); _dock?.Hide(); _captureRecovery?.Start(); }
+        else { RestoreCaptureInteraction(); _captureRecovery?.Stop(); if (wasActive && _isCollapsed) QueueDockRaise(); }
         return active;
     }
 }

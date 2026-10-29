@@ -14,7 +14,7 @@
     <Description>常驻 Windows 桌面的文件启动器与电脑状态面板</Description>
     <RootNamespace>FileDockDemo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0-rc.9</Version>
+    <Version>0.8.0-rc.10</Version>
     <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
     <ApplicationIcon>Assets\FileDock-dark.ico</ApplicationIcon>
     <DebugType>none</DebugType>

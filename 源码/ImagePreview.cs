@@ -16,10 +16,13 @@ internal static class ImageLoader
     private record Cached(string Key, BitmapSource? Image);
     private static readonly LinkedList<Cached> Cache = new();
     private static readonly SemaphoreSlim Workers = new(2);
+    private static int _cacheGeneration;
+    internal static void InvalidateThumbnails() { lock (Cache) { Cache.Clear(); ++_cacheGeneration; } }
     internal static int CacheCount { get { lock (Cache) return Cache.Count; } }
 
     internal static async Task<BitmapSource?> LoadAsync(string path, bool preview, CancellationToken token)
     {
+        int generation; lock (Cache) generation = _cacheGeneration;
         await Workers.WaitAsync(token);
         try
         {
@@ -55,7 +58,7 @@ internal static class ImageLoader
                     }
                     catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or System.Runtime.InteropServices.COMException or InvalidOperationException) { }
                     token.ThrowIfCancellationRequested();
-                    if (!preview) lock (Cache) { Cache.AddFirst(new Cached(key, result)); while (Cache.Count > 64) Cache.RemoveLast(); }
+                    if (!preview) lock (Cache) { if (generation != _cacheGeneration) return result; Cache.AddFirst(new Cached(key, result)); while (Cache.Count > 64) Cache.RemoveLast(); }
                     return result;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }

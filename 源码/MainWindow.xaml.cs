@@ -75,6 +75,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         InitializeMovement();
         InitializeFolderBrowser();
+        InitializeLiveFolder();
         InitializeTransfers();
         InitializePerformance();
         ApplyTheme();
@@ -505,6 +506,7 @@ public partial class MainWindow : Window
     public void Quit() { _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()
     {
+        StopFolderWatcher();
         DisposePerformance();
         CancelFolderLoad();
         _copyRequest?.Cancel(); _copyRequest?.Dispose();

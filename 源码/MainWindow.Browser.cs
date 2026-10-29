@@ -40,6 +40,7 @@ public partial class MainWindow
         string fullPath;
         try { fullPath = Path.GetFullPath(path); }
         catch (Exception ex) { SetStatus("无法浏览此路径：" + ex.Message, true); return; }
+        StopFolderWatcher();
         ClearFileSelection();
         ++_openRequestVersion;
         CancelFolderLoad();
@@ -62,6 +63,7 @@ public partial class MainWindow
         FolderRefreshButton.IsEnabled = false;
         BuildBreadcrumbs(fullPath);
         if (!preserveSearch) { SearchBox.Clear(); FolderFilterComboBox.SelectedIndex = 0; }
+        UpdateFolderWatcher();
         ApplyFolderFilters();
         SetStatus("正在读取文件夹内容…");
         try
@@ -135,6 +137,7 @@ public partial class MainWindow
     internal void GoHome()
     {
         if (CurrentFolderPath == null) return;
+        StopFolderWatcher();
         ClearFileSelection();
         ++_openRequestVersion;
         CancelFolderLoad();

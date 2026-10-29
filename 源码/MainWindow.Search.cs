@@ -80,6 +80,7 @@ public partial class MainWindow
 
     private void ShowRecursiveFolderSearch(string filter)
     {
+        if (_recursiveSearchPending && _keepFolderResultsDuringRefresh) { FolderCountText.Text = "正在同步搜索结果…"; return; }
         var visible = _recursiveSearchEntries.Where(e => filter == "全部" || e.Kind == filter).ToList();
         FolderList.ItemsSource = visible;
         ReconcileFileSelection();

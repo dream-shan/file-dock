@@ -18,6 +18,7 @@ public partial class MainWindow
 
     private void InitializePerformance()
     {
+        InitializeMemory();
         _performanceTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _performanceTimer.Tick += async (_, _) => await SamplePerformanceAsync();
         IsVisibleChanged += (_, _) => UpdatePerformanceActivity();
@@ -26,9 +27,10 @@ public partial class MainWindow
     internal void UpdatePerformanceActivity()
     {
         if (_performanceTimer == null || _performanceDisposed) return;
-        bool active = IsVisible && CurrentFolderPath == null && !_quitting && (!App.IsSelfTest || _testPerformanceEnabled);
-        if (_performanceActive == active) return;
+        bool active = IsVisible && CurrentFolderPath == null && !_quitting && !MemoryPaused && (!App.IsSelfTest || _testPerformanceEnabled);
+        if (_performanceActive == active) { UpdateMemoryActivity(); return; }
         _performanceActive = active; ++_performanceGeneration;
+        UpdateMemoryActivity();
         if (!active) { _performanceTimer.Stop(); return; }
         _resetPerformanceBaseline = true;
         CpuCard.Reset(); GpuCard.Reset(); MemoryCard.Reset(); VramCard.Reset();
@@ -51,7 +53,7 @@ public partial class MainWindow
             CpuCard.ToolTip = snapshot.TemperatureStatus;
             GpuCard.Set(snapshot.GpuLoad, "", snapshot.GpuTemperature, true);
             GpuCard.ToolTip = snapshot.GpuUsageStatus;
-            MemoryCard.Set(Percent(snapshot.MemoryUsed, snapshot.MemoryTotal), Capacity(snapshot.MemoryUsed, snapshot.MemoryTotal));
+            ApplyMemoryReading(new MemoryReading(snapshot.MemoryUsed,snapshot.MemoryTotal));
             VramCard.Set(Percent(snapshot.VramUsed, snapshot.VramTotal), Capacity(snapshot.VramUsed, snapshot.VramTotal));
             NetworkDownload.Text = "↓ " + FormatRate(snapshot.Download);
             NetworkUpload.Text = "↑ " + FormatRate(snapshot.Upload);
@@ -76,6 +78,7 @@ public partial class MainWindow
     private void DisposePerformance()
     {
         if (_performanceDisposed) return;
+        DisposeMemory();
         _performanceDisposed = true; _performanceActive = false; ++_performanceGeneration;
         _performanceTimer?.Stop();
         // Close native handles only after the single in-flight sample completes.

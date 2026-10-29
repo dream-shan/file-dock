@@ -47,6 +47,7 @@ internal static class ThemeVerification
             check(PostMessage(new WindowInteropHelper(window).Handle, 0x031A, IntPtr.Zero, IntPtr.Zero), "System theme notification posts to the live window handle");
             for(int i=0;i<30 && window.IsDarkTheme;i++) await Task.Delay(50);
             check(!window.IsDarkTheme, "Real window theme-change messages update system mode without a restart or polling");
+            window.DockEntry.SetMemoryPressure(null,false);
             check(window.DockEntry.BackColor == System.Drawing.Color.White && window.DockEntry.Width == 20 && window.DockEntry.Opacity == .38, "Light edge entry keeps its compact size and idle opacity");
             await Task.Delay(1200);
             DemoVerification.SaveRender(window, Path.Combine(root,"theme-home-light.png"));
@@ -58,6 +59,7 @@ internal static class ThemeVerification
             check(window.SettingsButton.FocusVisualStyle != null && window.KeepOpenButton.FocusVisualStyle == window.SettingsButton.FocusVisualStyle,
                 "Header buttons share a keyboard-navigation focus visual without changing their background");
             DemoVerification.SaveRender(window, Path.Combine(root,"theme-home-dark.png"));
+            window.DockEntry.SetMemoryPressure(null,false);
             check(window.DockEntry.BackColor == System.Drawing.Color.FromArgb(48,53,62), "Dark edge entry receives the matching native background");
             using(var native = new System.Windows.Forms.ContextMenuStrip())
             {

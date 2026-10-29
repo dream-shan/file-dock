@@ -19,6 +19,7 @@ public sealed class App : Application
     public static int Main(string[] args)
     {
         if (args.Length == 2 && args[0] == "--launch-probe") { File.WriteAllText(args[1], Environment.CurrentDirectory); return 0; }
+        if (args.Length == 2 && args[0] == "--memory-trim-probe") return MemoryTools.RunProbe(args[1]);
         IsSelfTest = args.Length > 0 && args[0] == "--self-test";
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) =>

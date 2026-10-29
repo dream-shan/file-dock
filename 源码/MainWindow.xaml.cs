@@ -136,6 +136,7 @@ public partial class MainWindow : Window
                 SetStatus("窗口变化通知不可用，仍可通过 Ctrl + Alt + Space 唤出。", true);
             WatchCaptureWindows();
         }
+        _dock.SetMemoryPressure(_memoryPercent,false);
         InitializeDiagnostics();
     }
 
@@ -405,7 +406,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(startup);
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 1 秒更新，CPU 温度每秒读取；收起或浏览文件夹时暂停采集。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n首页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n首页展开时每 1 秒更新，CPU 温度每秒读取；收起或浏览文件夹时每 2 秒只检查内存，其他指标暂停。\n内存卡片可点击整理，完成后冷却 10 秒；占用过高时入口变红。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }
@@ -440,6 +441,7 @@ public partial class MainWindow : Window
 
     public void ExpandPanel()
     {
+        RememberMemoryForeground();
         RecordDiagnosticState("expand-request");
         _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); SearchBox.Focus();
         NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
@@ -495,7 +497,7 @@ public partial class MainWindow : Window
     private bool AnyMenuOpen() => _menuOpen || AddButton.ContextMenu?.IsOpen == true;
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (HandleTransferKey(e) || HandleBrowserKey(e)) return;
+        if (HandleMemoryActionKey(e) || HandleTransferKey(e) || HandleBrowserKey(e)) return;
         if (e.Key == Key.Escape) { if (Environment.TickCount64 >= _ignoreDragEscapeUntil) CollapsePanel(); e.Handled = true; }
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; }
         if (e.Key == Key.Enter) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }

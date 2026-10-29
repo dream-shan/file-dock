@@ -15,7 +15,39 @@ public sealed class PerformanceCard : Border
     private readonly Grid _grid;
     private readonly PerformanceRing _ring;
     private bool _ringMode;
-    public string Label { get => _label.Text; set { _label.Text = value; _graph.MetricLabel = value; } }
+    private readonly TextBlock _actionHintText=new() { FontSize=8, Margin=new Thickness(0,2,0,0), TextTrimming=TextTrimming.CharacterEllipsis, Visibility=Visibility.Collapsed };
+    private bool _isAction, _actionMouseDown;
+    internal event EventHandler? ActionRequested;
+    internal bool ActionAvailable { get; set; }=true;
+    internal string ActionHint { get=>_actionHintText.Text; set=>_actionHintText.Text=value; }
+    internal bool IsAction {
+        get=>_isAction;
+        set { _isAction=value; Focusable=value; Cursor=value ? Cursors.Hand : null;
+            _actionHintText.Visibility=value ? Visibility.Visible : Visibility.Collapsed;
+            if(value && Ring && _grid.RowDefinitions.Count==3) _grid.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
+            Grid.SetRow(_actionHintText,3); Grid.SetColumn(_actionHintText,1); if(value) Grid.SetRowSpan(_ring,4);
+        }
+    }
+    internal void RequestAction() { if(IsAction && ActionAvailable) ActionRequested?.Invoke(this,EventArgs.Empty); }
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) {
+        base.OnMouseLeftButtonDown(e); if(!IsAction)return; _actionMouseDown=true; Focus(); e.Handled=true;
+    }
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) {
+        base.OnMouseLeftButtonUp(e); if(!IsAction)return;
+        bool click=_actionMouseDown && IsMouseOver; _actionMouseDown=false; e.Handled=true; if(click)RequestAction();
+    }
+    protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer() => new MemoryActionPeer(this);
+    private sealed class MemoryActionPeer : System.Windows.Automation.Peers.FrameworkElementAutomationPeer, System.Windows.Automation.Provider.IInvokeProvider {
+        internal MemoryActionPeer(PerformanceCard owner):base(owner){}
+        private PerformanceCard Card=>(PerformanceCard)Owner;
+        protected override System.Windows.Automation.Peers.AutomationControlType GetAutomationControlTypeCore()=>Card.IsAction ? System.Windows.Automation.Peers.AutomationControlType.Button : System.Windows.Automation.Peers.AutomationControlType.Group;
+        public override object? GetPattern(System.Windows.Automation.Peers.PatternInterface patternInterface)=>Card.IsAction && patternInterface==System.Windows.Automation.Peers.PatternInterface.Invoke ? this : base.GetPattern(patternInterface);
+        public void Invoke(){ if(!Card.ActionAvailable)throw new System.Windows.Automation.ElementNotEnabledException(); Card.Dispatcher.BeginInvoke(Card.RequestAction); }
+    }
+    private string _baseLabel="", _notice="";
+    public string Label { get => _baseLabel; set { _baseLabel=value; UpdateNotice(); _graph.MetricLabel=value; } }
+    internal string Notice { get=>_notice; set { _notice=value; UpdateNotice(); } }
+    private void UpdateNotice() { _label.Text=_baseLabel+(_notice.Length>0 ? " · "+_notice : ""); }
     public Brush Accent { get => _graph.Accent; set { _graph.Accent = value; _value.Foreground = value; _ring.Accent = value; _ring.InvalidateVisual(); } }
     public bool Ring
     {
@@ -84,6 +116,7 @@ public sealed class PerformanceCard : Border
         _label.SetResourceReference(TextBlock.ForegroundProperty, "Ink");
         _temperature.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         _detail.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        _actionHintText.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
         Accent = accent; _graph.Track = ThemePalette.Brush("Track"); _graph.InvalidateVisual();
         _ring.Track = ThemePalette.Brush("Track"); _ring.InvalidateVisual();
     }
@@ -104,7 +137,7 @@ public sealed class PerformanceCard : Border
         _ring = new PerformanceRing { Width=50,Height=50,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed };
         Grid.SetRow(_value, 1); Grid.SetRow(_detail, 2); Grid.SetRow(_graph, 3);
         grid.Children.Add(_label); grid.Children.Add(_temperature); grid.Children.Add(_value); grid.Children.Add(_detail); grid.Children.Add(_graph);
-        grid.Children.Add(_ring); grid.SizeChanged += (_,_) => UpdateRingSize();
+        grid.Children.Add(_ring); grid.Children.Add(_actionHintText); grid.SizeChanged += (_,_) => UpdateRingSize();
         Child = grid; Accent = new SolidColorBrush(Color.FromRgb(74, 108, 247));
         System.Windows.Automation.AutomationProperties.SetName(this, "性能指标");
     }

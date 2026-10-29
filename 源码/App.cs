@@ -23,6 +23,7 @@ public sealed class App : Application
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) =>
         {
+            DiagnosticLog.Error("dispatcher-exception", e.Exception);
             if (IsSelfTest) return;
             MessageBox.Show("文件坞遇到问题：\n" + e.Exception.Message, "文件坞", MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;
@@ -34,15 +35,26 @@ public sealed class App : Application
             if (!first) { app._showEvent.Set(); app._showEvent.Dispose(); app._instanceMutex.Dispose(); return 0; }
         }
         string dataDirectory = IsSelfTest && args.Length > 1 ? Path.Combine(Path.GetFullPath(args[1]), "data") : Path.Combine(AppContext.BaseDirectory, "Data");
+        bool diagnosticReady = DiagnosticLog.Initialize(dataDirectory);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => {
+            DiagnosticLog.Write("fatal-state", $"terminating={e.IsTerminating}");
+            DiagnosticLog.Error("unhandled-exception", e.ExceptionObject as Exception);
+        };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => DiagnosticLog.Write("process-exit", $"exitCode={Environment.ExitCode}");
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => DiagnosticLog.Error("unobserved-task-exception", e.Exception);
+        app.SessionEnding += (_, e) => DiagnosticLog.Write("session-ending", e.ReasonSessionEnding.ToString());
+        app.Exit += (_, e) => DiagnosticLog.Write("application-exit", $"exitCode={e.ApplicationExitCode}");
         MainWindow window;
         try { window = new MainWindow(dataDirectory); }
         catch (Exception ex)
         {
+            DiagnosticLog.Error("startup-failure", ex);
             if (IsSelfTest) File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString());
             else MessageBox.Show("无法启动文件坞：" + ex.Message + "\n\n请检查此目录中的配置及写入权限：\n" + dataDirectory, "文件坞", MessageBoxButton.OK, MessageBoxImage.Warning);
             return 1;
         }
         app.MainWindow = window;
+        if (!diagnosticReady) window.SetStatus("本地诊断记录暂不可写，其他功能仍可使用。", true);
         if (IsSelfTest)
         {
             window.ShowActivated = false;
@@ -59,10 +71,11 @@ public sealed class App : Application
             // Preserve legacy singleton names so renamed releases cannot run alongside older versions.
             if (!StartupRegistration.MigrateLegacyPath())
                 window.SetStatus("旧开机启动路径未能更新，请在设置中重新开启开机启动。");
-            app._showRegistration = ThreadPool.RegisterWaitForSingleObject(app._showEvent!, (_, _) => app.Dispatcher.BeginInvoke(window.ExpandPanel), null, -1, false);
+            app._showRegistration = ThreadPool.RegisterWaitForSingleObject(app._showEvent!, (_, _) => app.Dispatcher.BeginInvoke(() => { DiagnosticLog.Write("existing-instance-activation"); window.ExpandPanel(); }), null, -1, false);
             app.Startup += (_, _) => window.Show();
         }
         int result = app.Run();
+        DiagnosticLog.Write("message-loop-return", $"exitCode={result}");
         window.DisposeResources();
         app._showRegistration?.Unregister(null);
         app._showEvent?.Dispose();

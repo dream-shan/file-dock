@@ -442,6 +442,7 @@ internal static class DemoVerification
         ReleaseVerification.Run(window, Check);
         MovementVerification.Run(window, directory, Check);
         await LiveFolderVerification.Run(window, directory, Check);
+        DiagnosticVerification.Run(window, directory, Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }

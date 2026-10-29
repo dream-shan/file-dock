@@ -109,6 +109,7 @@ public partial class MainWindow
         if (!_isCollapsed || _dock == null || _captureActive) return;
         _capturePendingUntil = Environment.TickCount64 + 1500;
         _captureActive = true;
+        RecordDiagnosticState("capture-shortcut");
         _dock.Hide();
         _captureRecovery?.Start();
         // Finish hiding before passing the shortcut to the screenshot tool,
@@ -125,6 +126,7 @@ public partial class MainWindow
         bool active = _captureSurfaces.Count > 0 || Environment.TickCount64 < _capturePendingUntil;
         bool wasActive = _captureActive;
         _captureActive = active;
+        if (active != wasActive) RecordDiagnosticState("capture-state-changed");
         if (active) { _dock?.Hide(); _captureRecovery?.Start(); }
         else { _captureRecovery?.Stop(); if (wasActive && _isCollapsed) QueueDockRaise(); }
         return active;

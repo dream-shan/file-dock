@@ -136,6 +136,7 @@ public partial class MainWindow : Window
                 SetStatus("窗口变化通知不可用，仍可通过 Ctrl + Alt + Space 唤出。", true);
             WatchCaptureWindows();
         }
+        InitializeDiagnostics();
     }
 
     private void QueueDockRaise()
@@ -157,7 +158,7 @@ public partial class MainWindow : Window
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { if (IsVisible) CollapsePanel(); else ExpandPanel(); handled = true; }
+        if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (IsVisible) CollapsePanel(); else ExpandPanel(); handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
         return IntPtr.Zero;
@@ -439,12 +440,14 @@ public partial class MainWindow : Window
 
     public void ExpandPanel()
     {
+        RecordDiagnosticState("expand-request");
         _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); SearchBox.Focus();
         NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
         UpdatePerformanceActivity();
     }
     internal void CollapsePanel()
     {
+        RecordDiagnosticState("collapse-request");
         if (App.IsSelfTest) { _isCollapsed = true; Hide(); return; }
         _isCollapsed = true; Hide(); PositionDock(); if (_captureActive) return; _dock?.Show();
         if (_dock != null) NativeMethods.RaiseWithoutActivation(_dock.Handle);
@@ -499,13 +502,17 @@ public partial class MainWindow : Window
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
     private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
-    private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); });
+    private void DisplaySettingsChanged(object? sender, EventArgs e) {
+        DiagnosticLog.Write("display-settings-changed");
+        Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); RecordDiagnosticState("display-state"); });
+    }
     private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Muted"); }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
     internal bool Persist() { try { Storage.Save(State); _saveFailed = false; return true; } catch (Exception ex) { _saveFailed = true; SetStatus("配置保存失败：" + ex.Message, true); return false; } }
-    public void Quit() { _quitting = true; Persist(); Application.Current.Shutdown(); }
+    public void Quit() { RecordDiagnosticState("user-exit-request"); _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()
     {
+        DisposeDiagnostics();
         StopFolderWatcher();
         DisposePerformance();
         CancelFolderLoad();

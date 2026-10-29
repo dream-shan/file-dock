@@ -1,4 +1,4 @@
-文件坞 File Dock · 0.8.0-rc.8 开源候选版
+文件坞 File Dock · 0.8.0-rc.9 开源候选版
 Windows x64 · 启动文件：FileDock.exe
 
 首次使用

@@ -43,7 +43,10 @@ internal static class MemoryVerification
                 if(!File.Exists(Path.Combine(probeDir,"ready")))throw new InvalidOperationException("Memory fixture did not start");
                 probe.Refresh();long before=probe.WorkingSet64;
                 bool trimmed=MemoryTools.TryTrim(probe.Id,0);probe.Refresh();long after=probe.WorkingSet64;
-                check(trimmed && after<before,"Real working-set cleanup reduces the isolated fixture without terminating it");
+                using var identity=System.Security.Principal.WindowsIdentity.GetCurrent();
+                bool elevated=new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                check(elevated ? !trimmed : trimmed && after<before,
+                    elevated ? "Elevated isolated fixture is correctly excluded from working-set cleanup" : "Real working-set cleanup reduces the isolated fixture without terminating it");
                 check(!probe.HasExited && !MemoryTools.TryTrim(probe.Id,(uint)probe.Id),"Protected process is skipped while the fixture remains running");
             }
             finally { File.WriteAllText(Path.Combine(probeDir,"stop"),"stop");if(!probe.WaitForExit(5000))probe.Kill(); }

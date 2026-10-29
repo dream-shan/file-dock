@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace FileDockDemo;
 internal static class LiveFolderVerification
@@ -35,6 +37,21 @@ internal static class LiveFolderVerification
             File.WriteAllBytes(renamed,new byte[2048]);
             await Until(()=>Rows().Single(e=>e.Path==renamed).Subtitle.StartsWith("2 KB"));
             check(true,"Saving over a file updates its displayed metadata");
+            string image=Path.Combine(root,"图片.png");
+            void WriteImage(byte blue,byte red)
+            {
+                var encoder=new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(1,1,96,96,PixelFormats.Bgra32,null,new byte[]{blue,0,red,255},4)));
+                using var stream=File.Create(image);encoder.Save(stream);
+            }
+            WriteImage(0,255);await Until(()=>Rows().Any(e=>e.Path==image));
+            _=await ImageLoader.LoadAsync(image,false,default);
+            var stamp=File.GetLastWriteTimeUtc(image);int imageRefresh=window.LiveFolderRefreshCount;
+            WriteImage(255,0);File.SetLastWriteTimeUtc(image,stamp);
+            await Until(()=>window.LiveFolderRefreshCount>imageRefresh);
+            var updated=await ImageLoader.LoadAsync(image,false,default);
+            var converted=new FormatConvertedBitmap(updated!,PixelFormats.Bgra32,null,0);var pixel=new byte[4];converted.CopyPixels(pixel,4,0);
+            check(pixel[0]>pixel[2],"Overwriting an image invalidates the thumbnail even when its timestamp is preserved");
             window.SearchBox.Text="匹配";await window.WaitForFolderSearchAsync();
             string nested=Path.Combine(child,"匹配.txt");File.WriteAllText(nested,"nested");
             await Until(()=>Rows().Any(e=>e.Path==nested));

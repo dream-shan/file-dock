@@ -33,6 +33,7 @@ public partial class MainWindow
     private void StopFolderWatcher()
     {
         ++_watchGeneration;
+        Interlocked.Exchange(ref _watchNotificationQueued,0);
         _folderWatcher?.Dispose(); _folderWatcher = null;
         _folderRefreshTimer?.Stop(); _liveDirty = false;
         _liveRefreshCancellation?.Cancel();
@@ -119,7 +120,7 @@ public partial class MainWindow
             else { ApplyFolderFilters(); SetStatus($"{items.Count} 个项目 · 已同步文件夹变化"); }
             if (!Current()) return;
             LiveFolderRefreshCount++;
-            Dispatcher.BeginInvoke(() => { if (Current()) scroll?.ScrollToVerticalOffset(offset); },DispatcherPriority.Loaded);
+            _ = Dispatcher.BeginInvoke(() => { if (Current()) scroll?.ScrollToVerticalOffset(offset); },DispatcherPriority.Loaded);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

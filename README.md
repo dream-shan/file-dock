@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.10 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.11 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.10) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.11) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -18,13 +18,13 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 - **快速访问文件**：从屏幕边缘唤出，添加常用文件夹，在面板内逐层浏览，单击打开文件。
 - **找到并使用文件**：递归搜索当前文件夹及子目录，预览图片，Ctrl 多选后整组拖放或复制到支持接收的应用。
-- **查看电脑状态**：显示 CPU/GPU 占用与温度、内存/显存及实际网速；首页展开时每秒刷新，收起后暂停采样。
+- **查看电脑状态**：显示 CPU/GPU 占用与温度、内存/显存及实际网速；首页展开时每秒刷新，收起后仅保留低频内存提醒。
 
 下载版解压后运行，无需另装 .NET。CPU 温度依赖额外驱动和温度服务，安装步骤见下文；未安装这些组件时仍可使用文件功能。当前为预发布候选版，兼容范围和限制见后文。
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.10-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.11-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -106,7 +106,7 @@ sc.exe delete FileDockTemperature
 
 ## 已知兼容限制
 
-- **截图隐藏**：在运行文件坞的电脑上，Snipaste 默认 F1 / Ctrl+F1、PrintScreen 或 Win+Shift+S 触发时临时隐藏入口，结束后恢复；未启动截图时约 1.5 秒恢复。展开面板保留画面，同时临时停止鼠标交互和置顶，让截图层接管；结束或取消后恢复原状态且不抢焦点。其他工具、自定义热键、菜单启动和远程控制端截图不保证提前隐藏。入口不持续排除屏幕采集，以便远程/投屏画面中可见。
+- **截图隐藏**：在运行文件坞的电脑上，Snipaste 默认 F1 / Ctrl+F1、PrintScreen 或 Win+Shift+S 触发时临时隐藏入口，结束后恢复；未启动截图时约 1.5 秒恢复。展开面板保留画面，同时临时停止鼠标交互和置顶，让截图层接管；结束或取消后恢复原状态且不抢焦点。其他工具、自定义热键、菜单启动和远程控制端截图不保证提前隐藏。入口不持续排除屏幕采集，以便远程/投屏画面中可见。Snipaste 中鼠标移到面板顶部空白处可自动识别整个窗口；若启用了界面元素检测，指向按钮可能选中按钮，可按 Tab 切换窗口/元素检测。
 - **全屏与桌面**：适用于普通窗口、最大化和无边框全屏；独占全屏游戏、安全桌面及其他虚拟桌面不保证覆盖。多屏缩放切换和实际登录后的开机启动仍需环境验证。
 - **拖放**：目标应用必须接收相应格式，权限级别也会影响拖放；不能保证所有网页支持。复制文件不等于自动上传。
 - **图片**：PNG/JPEG/BMP/GIF（首帧）使用系统解码器，WebP 等依赖解码支持；不支持时保留文件打开和拖拽。超过 100 MB 或 2 亿像素跳过预览；超过 3200 万像素的图片复制时仅提供原文件。缩略图缓存最多 64 项，按可见区域加载。
@@ -121,6 +121,7 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
+- 截图时保留原生窗口可识别状态，仅暂停输入和置顶，修复 Snipaste 自动识别展开面板受阻的问题；结束或取消后恢复交互。
 - 修复展开面板抢占截图鼠标的问题：截图时暂时让出置顶和输入，保留可截图画面，结束后恢复。
 - 内存整理改为圆环归零并回到实测值的动态反馈；移除读秒及 10 秒冷却，动画完成即可再次点击。
 - 数字读数继续保持真实；执行及动画期间阻止重复整理，失败后可立即重试。
@@ -150,7 +151,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.10-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.11-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

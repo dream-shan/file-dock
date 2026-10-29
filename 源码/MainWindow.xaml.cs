@@ -159,6 +159,7 @@ public partial class MainWindow : Window
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
@@ -499,6 +500,7 @@ public partial class MainWindow : Window
     private bool AnyMenuOpen() => _menuOpen || AddButton.ContextMenu?.IsOpen == true;
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (_captureInteractionHeld) { e.Handled = true; return; }
         if (HandleMemoryActionKey(e) || HandleTransferKey(e) || HandleBrowserKey(e)) return;
         if (e.Key == Key.Escape) { if (Environment.TickCount64 >= _ignoreDragEscapeUntil) CollapsePanel(); e.Handled = true; }
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; }

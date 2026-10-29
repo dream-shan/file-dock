@@ -55,7 +55,7 @@ public partial class MainWindow
 
     private void MovePanelFromSurface(object sender, MouseButtonEventArgs e)
     {
-        if (_movingPanel || e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed ||
+        if (_captureInteractionHeld || _movingPanel || e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed ||
             !IsMovementSurface(e.OriginalSource as DependencyObject)) return;
         var enabled = VisualChildren(this).OfType<FrameworkElement>()
             .Where(element => ToolTipService.GetIsEnabled(element)).ToArray();

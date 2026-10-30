@@ -83,6 +83,6 @@ public partial class MainWindow
         State.DockTop = Top + 30;
         Rect area = WorkArea();
         State.DockSide = Left + Width / 2 < area.Left + area.Width / 2 ? "Left" : "Right";
-        PositionDock(); Persist();
+        PositionDock(); Persist(); QueueDesktopPresence();
     }
 }

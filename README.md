@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.11 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.12 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.11) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.12) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -24,12 +24,14 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.11-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.12-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
 
 顶部 `RC` 表示候选版，悬停查看版本。首次运行默认添加程序目录、桌面和文档入口，可自行移除。入口、主题与停靠设置保存在程序旁的 `Data`；添加或移除入口不搬动、不删除原文件。
+
+桌面自动模式默认开启，可在设置中关闭。面板所在位置无遮挡时自动显示；其他应用盖住该位置时收起。图钉开启后保持展开，手动收起仍优先。自动展开不抢焦点；主动唤出才临时置顶。
 
 目前完成过 Windows 11 x64 本地验证及 Windows Server 2025 CI 验证；这不是所有 Windows 版本或硬件的兼容保证。CPU 温度的额外组件见下文，未安装时仍可使用文件功能。主程序尚未进行 Windows 代码签名；SHA256 校验和用于验证完整性，不等同于签名。
 
@@ -121,10 +123,11 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
-- 截图时保留原生窗口可识别状态，仅暂停输入和置顶，修复 Snipaste 自动识别展开面板受阻的问题；结束或取消后恢复交互。
-- 修复展开面板抢占截图鼠标的问题：截图时暂时让出置顶和输入，保留可截图画面，结束后恢复。
-- 内存整理改为圆环归零并回到实测值的动态反馈；移除读秒及 10 秒冷却，动画完成即可再次点击。
-- 数字读数继续保持真实；执行及动画期间阻止重复整理，失败后可立即重试。
+- 默认开启“桌面自动展开，遮挡时收起”：只在上方窗口与面板实际重叠时收起，窗口移开、关闭或最小化后恢复，不抢焦点。
+- 主动点击侧边入口或使用快捷键可临时浮到应用上方；返回其他应用后重新判断遮挡。图钉“保持展开”优先。
+- 手动收起不会立即弹回；切换到其他应用后再返回桌面，或主动唤出，才恢复显示。
+- 截图、菜单、文件对话框、拖放、移动及内存整理期间暂停自动切换；窗口事件合并处理，无空闲轮询。
+- 设置中可以关闭自动模式，恢复原有手动唤出行为。保留原有固定项、位置、主题和图钉设置。
 
 ## 构建与发布验收
 
@@ -151,7 +154,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.11-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.12-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

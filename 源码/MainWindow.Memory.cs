@@ -46,12 +46,14 @@ public partial class MainWindow
         if (e.Reason is SessionSwitchReason.RemoteDisconnect or SessionSwitchReason.ConsoleDisconnect or SessionSwitchReason.SessionLogoff) _memoryDisconnected=true;
         if (e.Reason is SessionSwitchReason.RemoteConnect or SessionSwitchReason.ConsoleConnect or SessionSwitchReason.SessionLogon) _memoryDisconnected=false;
         UpdatePerformanceActivity();
+        QueueDesktopPresence();
     });
     private void MemoryPowerChanged(object sender, PowerModeChangedEventArgs e) => Dispatcher.BeginInvoke(() => {
         if (_memoryDisposed) return;
         if (e.Mode == PowerModes.Suspend) _memorySuspended=true;
         if (e.Mode == PowerModes.Resume) _memorySuspended=false;
         UpdatePerformanceActivity();
+        QueueDesktopPresence();
     });
     internal void SetMemoryPauseForVerification(bool paused)
     {
@@ -137,7 +139,7 @@ public partial class MainWindow
                 else MemoryCard.RingChart.AbortOperation();
             }
             catch (OperationCanceledException) { MemoryCard.RingChart.AbortOperation(); }
-            finally { _memoryAction.Complete(); if (!_memoryDisposed) UpdateMemoryActionHint(); }
+            finally { _memoryAction.Complete(); QueueDesktopPresence(); if (!_memoryDisposed) UpdateMemoryActionHint(); }
         }
     }
     private void DisposeMemory()

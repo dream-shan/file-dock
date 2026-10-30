@@ -100,7 +100,7 @@ public partial class MainWindow
             if (result == DragDropEffects.None) _ignoreDragEscapeUntil = Environment.TickCount64 + 400;
             if (_dragHidden) { if (result == DragDropEffects.None) ExpandPanel(); else CollapsePanel(); }
             _dragHidden = false;
-            Dispatcher.BeginInvoke(() => _dragging = false, DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(() => { _dragging = false; QueueDesktopPresence(); }, DispatcherPriority.Background);
         }
         e.Handled = true;
     }

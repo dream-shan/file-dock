@@ -445,6 +445,7 @@ internal static class DemoVerification
         DiagnosticVerification.Run(window, directory, Check);
         await MemoryVerification.Run(window,directory,Check);
         await CaptureInteractionVerification.Run(window,Check);
+        await DesktopPresenceVerification.Run(window,directory,Check);
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }

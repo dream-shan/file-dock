@@ -129,7 +129,7 @@ public partial class MainWindow
         _captureActive = active;
         if (active != wasActive) RecordDiagnosticState("capture-state-changed");
         if (active) { HoldCaptureInteraction(); _dock?.Hide(); _captureRecovery?.Start(); }
-        else { RestoreCaptureInteraction(); _captureRecovery?.Stop(); if (wasActive && _isCollapsed) QueueDockRaise(); }
+        else { RestoreCaptureInteraction(); _captureRecovery?.Stop(); if (wasActive) { if (_isCollapsed) QueueDockRaise(); QueueDesktopPresence(); } }
         return active;
     }
 }

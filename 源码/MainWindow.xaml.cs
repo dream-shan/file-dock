@@ -74,14 +74,17 @@ public partial class MainWindow : Window
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
         InitializeMovement();
+        InitializeDesktopPresence();
+        Activated += PanelActivatedForDesktop;
+        LocationChanged += (_, _) => QueueDesktopPresence();
         InitializeFolderBrowser();
         InitializeLiveFolder();
         InitializeTransfers();
         InitializePerformance();
         ApplyTheme();
-        SizeChanged += (_, _) => PinsList.MaxHeight = ActualHeight < 560 ? 82 : 158;
+        SizeChanged += (_, _) => { PinsList.MaxHeight = ActualHeight < 560 ? 82 : 158; QueueDesktopPresence(); };
         SearchBox.TextChanged += (_, _) => ApplyFilters();
-        KeepOpenButton.Click += (_, _) => { _keepOpen = !_keepOpen; State.KeepOpen = _keepOpen; UpdateKeepOpen(); Persist(); };
+        KeepOpenButton.Click += (_, _) => { _keepOpen = !_keepOpen; State.KeepOpen = _keepOpen; UpdateKeepOpen(); Persist(); QueueDesktopPresence(); };
         CollapseButton.Click += (_, _) => CollapsePanel();
         SettingsButton.Click += (_, _) => OpenSettings();
         PinsList.ContextMenuOpening += Items_ContextMenuOpening;
@@ -94,7 +97,7 @@ public partial class MainWindow : Window
         AddButton.ContextMenu = addMenu;
         AddButton.Click += (_, _) => { addMenu.PlacementTarget = AddButton; addMenu.IsOpen = true; };
         addMenu.Opened += (_, _) => _menuOpen = true;
-        addMenu.Closed += (_, _) => _menuOpen = false;
+        addMenu.Closed += (_, _) => { _menuOpen = false; QueueAfterPanelInteraction(); };
         SourceInitialized += (_, _) => InitializeNative();
         ApplyFilters();
     }
@@ -126,6 +129,7 @@ public partial class MainWindow : Window
         {
             _foregroundCallback = (_, eventType, window, objectId, childId, _, _) =>
             {
+                if (eventType == 3 || (objectId == 0 && childId == 0 && (eventType == 0x8001 || NativeMethods.IsTopLevelDesktopEvent(window)))) QueueDesktopPresence();
                 if (eventType == 3 || (objectId == 0 && childId == 0 &&
                     (eventType == 0x8004 || window == NativeMethods.GetForegroundWindow()))) QueueDockRaise();
             };
@@ -135,6 +139,7 @@ public partial class MainWindow : Window
             if (_foregroundHook == IntPtr.Zero || _locationHook == IntPtr.Zero || _reorderHook == IntPtr.Zero)
                 SetStatus("窗口变化通知不可用，仍可通过 Ctrl + Alt + Space 唤出。", true);
             WatchCaptureWindows();
+            WatchDesktopPresence();
         }
         _dock.SetMemoryPressure(_memoryPercent,false);
         InitializeDiagnostics();
@@ -180,6 +185,7 @@ public partial class MainWindow : Window
                 File.WriteAllText(System.IO.Path.Combine(_dataDirectory, "initialized"), "1");
             }
             PositionPanel();
+            QueueDesktopPresence();
             _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray());
             UpdatePerformanceActivity();
         }
@@ -341,7 +347,7 @@ public partial class MainWindow : Window
     private void ShowMenu(ContextMenu menu, UIElement? target)
     {
         menu.PlacementTarget = target; _menuOpen = true;
-        menu.Closed += (_, _) => { _menuOpen = false; Dispatcher.BeginInvoke(() => { if (!_keepOpen && !_inDialog && !IsActive && !App.IsSelfTest) CollapsePanel(); }); };
+        menu.Closed += (_, _) => { _menuOpen = false; Dispatcher.BeginInvoke(QueueAfterPanelInteraction); };
         menu.IsOpen = true;
     }
 
@@ -349,13 +355,13 @@ public partial class MainWindow : Window
     {
         _inDialog = true;
         try { var dialog = new OpenFileDialog { Multiselect = true, Title = "选择要固定的文件", CheckFileExists = true }; if (dialog.ShowDialog(this) == true) AddPins(dialog.FileNames); }
-        finally { _inDialog = false; Activate(); }
+        finally { _inDialog = false; Activate(); QueueDesktopPresence(); }
     }
     private void AddFolderDialog()
     {
         _inDialog = true;
         try { var dialog = new OpenFolderDialog { Title = "选择要固定的文件夹", Multiselect = true }; if (dialog.ShowDialog(this) == true) AddPins(dialog.FolderNames); }
-        finally { _inDialog = false; Activate(); }
+        finally { _inDialog = false; Activate(); QueueDesktopPresence(); }
     }
     private void RenameEntry(EntryView entry)
     {
@@ -371,7 +377,7 @@ public partial class MainWindow : Window
             dialog.Loaded += (_, _) => { input.Focus(); input.SelectAll(); };
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(input.Text)) { State.Pins.First(p => p.Id == entry.Id).DisplayName = input.Text.Trim(); Persist(); ApplyFilters(); }
         }
-        finally { _inDialog = false; }
+        finally { _inDialog = false; QueueDesktopPresence(); }
     }
     private void RelocateEntry(EntryView entry)
     {
@@ -383,13 +389,16 @@ public partial class MainWindow : Window
             else { var d = new OpenFileDialog { Title = "重新选择文件" }; if (d.ShowDialog(this) == true) path = d.FileName; }
             if (path != null) { State.Pins.First(p => p.Id == entry.Id).Path = path; PruneDirectoryKinds(); Persist(); ApplyFilters(); _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray()); }
         }
-        finally { _inDialog = false; }
+        finally { _inDialog = false; QueueDesktopPresence(); }
     }
 
     internal void OpenSettings()
     {
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
+        var autoDesktop = new MenuItem { Header = "桌面自动展开，遮挡时收起", IsCheckable = true, IsChecked = State.AutoDesktop };
+        autoDesktop.Click += (_, _) => SetAutoDesktop(autoDesktop.IsChecked);
+        menu.Items.Add(autoDesktop);
         menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
         AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
@@ -443,16 +452,23 @@ public partial class MainWindow : Window
     public void ExpandPanel()
     {
         if (UpdateCaptureVisibility()) return;
+        _desktopPresence.Reveal();
         RememberMemoryForeground();
         RecordDiagnosticState("expand-request");
         _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); SearchBox.Focus();
         NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
         UpdatePerformanceActivity();
     }
-    internal void CollapsePanel()
+    internal void CollapsePanel() => CollapsePanelCore(manual: true);
+    private void CollapsePanelCore(bool manual)
     {
         if (!_quitting && UpdateCaptureVisibility()) return;
-        RecordDiagnosticState("collapse-request");
+        if (manual)
+        {
+            IntPtr foreground = NativeMethods.GetForegroundWindow();
+            _desktopPresence.Dismiss(!NativeMethods.IsDesktopSurface(foreground) && !NativeMethods.IsOwnDesktopWindow(foreground));
+        }
+        RecordDiagnosticState(manual ? "collapse-request" : "desktop-auto-collapsed");
         if (App.IsSelfTest) { _isCollapsed = true; Hide(); return; }
         _isCollapsed = true; Hide(); PositionDock(); if (_captureActive) return; _dock?.Show();
         if (_dock != null) NativeMethods.RaiseWithoutActivation(_dock.Handle);
@@ -462,7 +478,7 @@ public partial class MainWindow : Window
         double scale = _dock!.ScaleFactor;
         _screen = Forms.Screen.FromHandle(_dock!.Handle);
         State.DockSide = left * scale < _screen.WorkingArea.Left + _screen.WorkingArea.Width / 2 ? "Left" : "Right";
-        State.PanelLeft = State.PanelTop = null; State.PanelScreen = _screen.DeviceName; State.DockTop = top; PositionDock(); Persist();
+        State.PanelLeft = State.PanelTop = null; State.PanelScreen = _screen.DeviceName; State.DockTop = top; PositionDock(); PositionPanel(); Persist(); QueueDesktopPresence();
     }
     private Rect WorkArea(Visual? target = null)
     {
@@ -495,7 +511,7 @@ public partial class MainWindow : Window
     }
     private void Window_Deactivated(object sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => { if (!_keepOpen && !_inDialog && !_dragging && !UpdateCaptureVisibility() && !IsActive && !AnyMenuOpen() && !App.IsSelfTest) CollapsePanel(); }, DispatcherPriority.Background);
+        Dispatcher.BeginInvoke(QueueAfterPanelInteraction, DispatcherPriority.Background);
     }
     private bool AnyMenuOpen() => _menuOpen || AddButton.ContextMenu?.IsOpen == true;
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -510,7 +526,7 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) {
         DiagnosticLog.Write("display-settings-changed");
-        Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); RecordDiagnosticState("display-state"); });
+        Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });
     }
     private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Muted"); }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
@@ -524,6 +540,7 @@ public partial class MainWindow : Window
         DisposePerformance();
         CancelFolderLoad();
         _copyRequest?.Cancel(); _copyRequest?.Dispose();
+        DisposeDesktopPresence();
         if (_foregroundHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_foregroundHook); _foregroundHook = IntPtr.Zero; }
         if (_locationHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_locationHook); _locationHook = IntPtr.Zero; }
         if (_reorderHook != IntPtr.Zero) { NativeMethods.UnhookWinEvent(_reorderHook); _reorderHook = IntPtr.Zero; }

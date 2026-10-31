@@ -82,6 +82,7 @@ internal static partial class NativeMethods
         var region = CreateRoundRectRgn(0, 0, (int)Math.Ceiling(width * scale) + 1, (int)Math.Ceiling(height * scale) + 1, (int)(16 * scale), (int)(16 * scale));
         if (region != IntPtr.Zero && SetWindowRgn(window, region, true) == 0) DeleteObject(region);
     }
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
     [DllImport("gdi32.dll")] private static extern int CombineRgn(IntPtr target,IntPtr first,IntPtr second,int mode);
     internal static void ShapePagePanel(IntPtr window,double width,double height,bool tabsRight,bool filesSelected)
     {
@@ -96,7 +97,14 @@ internal static partial class NativeMethods
                 bool selected=top==90 ? filesSelected : !filesSelected;
                 var tab=CreateRoundRectRgn(P(tabsRight ? width-34 : selected ? 0 : 4),P(top),P(tabsRight ? width-(selected ? 0 : 4) : 34)+1,P(top+44)+1,P(16),P(16));
                 if(tab==IntPtr.Zero)return;
-                try{if(CombineRgn(body,body,tab,2)==0)return;}finally{DeleteObject(tab);}
+                try
+                {
+                    var join=CreateRectRgn(P(tabsRight ? width-34 : 24),P(top),P(tabsRight ? width-24 : 34)+1,P(top+44)+1);
+                    if(join==IntPtr.Zero)return;
+                    try{if(CombineRgn(tab,tab,join,2)==0 || CombineRgn(body,body,tab,2)==0)return;}
+                    finally{DeleteObject(join);}
+                }
+                finally{DeleteObject(tab);}
             }
             if(SetWindowRgn(window,body,true)!=0)body=IntPtr.Zero;
         }

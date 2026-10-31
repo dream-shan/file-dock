@@ -328,7 +328,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True"><Setter Property="Width" Value="32" /><Setter Property="Background" Value="{DynamicResource Surface}" /><Setter Property="Foreground" Value="{DynamicResource Accent}" /><Setter TargetName="TabSurface" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Hover}" /></Trigger>
+                            <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsMouseOver" Value="True" /><Condition Property="IsChecked" Value="False" /></MultiTrigger.Conditions><Setter Property="Background" Value="{DynamicResource Hover}" /></MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate></Setter.Value></Setter>
                 </Style>
@@ -336,6 +336,7 @@
             <ToggleButton x:Name="FilesPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE8B7;" Tag="Files" Click="PageTab_Click" ToolTip="文件：常用、浏览和搜索" AutomationProperties.Name="文件页" />
             <ToggleButton x:Name="PerformancePageTab" Style="{StaticResource PageTabStyle}" Content="&#xE9D9;" Tag="Performance" Click="PageTab_Click" ToolTip="性能：电脑状态" AutomationProperties.Name="性能页" />
         </StackPanel>
+        <Border x:Name="PageJoin" Width="4" Height="44" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="-2,142,0,0" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Accent}" BorderThickness="0,1,0,1" IsHitTestVisible="False" />
         <Thumb x:Name="PanelResizeGrip" Grid.Column="1" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6" Cursor="SizeNWSE" DragDelta="PanelResizeGrip_DragDelta" ToolTip="调整大小">
             <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="Transparent"><Path Data="M 4,12 L 12,4 M 8,12 L 12,8" Stroke="{DynamicResource Muted}" StrokeThickness="1" /></Grid></ControlTemplate></Thumb.Template>
         </Thumb>

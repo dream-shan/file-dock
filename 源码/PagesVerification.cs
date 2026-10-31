@@ -12,6 +12,7 @@ using System.Windows.Media;
 namespace FileDockDemo;
 internal static class PagesVerification
 {
+    [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window,int attribute,out int value,int size);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int a,int b,int c,int d);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
     [DllImport("gdi32.dll")] private static extern bool PtInRegion(IntPtr region,int x,int y);
@@ -73,6 +74,12 @@ internal static class PagesVerification
                 $"Side tabs mirror on {nextSide} dock without narrowing the original content");
             window.SelectPage("Files",false);window.UpdateLayout();window.UpdatePageRail();
             IntPtr region=CreateRectRgn(0,0,0,0);IntPtr handle=new WindowInteropHelper(window).Handle;double scale=NativeMethods.WindowDpi(handle)/96d;
+            await Task.Delay(100);
+            int borderStatus=DwmGetWindowAttribute(handle,34,out int borderColor,sizeof(int));
+            check(borderStatus<0 || borderColor==unchecked((int)0xFFFFFFFE),"Supported DWM border rendering stays suppressed after layout settles");
+            check(Grid.GetColumn(window.PageJoin)==Grid.GetColumn(window.PanelSurface) && !window.PageJoin.IsHitTestVisible && window.PageJoin.Height==44,"Selected tab joins the body without an interactive seam overlay");
+            var tabBorder=(Border)window.FilesPageTab.Template.FindName("TabSurface",window.FilesPageTab);
+            check(right ? tabBorder.CornerRadius.TopLeft==0 && tabBorder.CornerRadius.TopRight==8 : tabBorder.CornerRadius.TopRight==0 && tabBorder.CornerRadius.TopLeft==8,"Tab connection has square inner corners and rounded outer corners");
             int P(double p)=>(int)Math.Round(p*scale);int x=P(right ? window.ActualWidth-2:2);
             try{check(GetWindowRgn(handle,region)>0 && PtInRegion(region,x,P(112)) && !PtInRegion(region,x,P(70)) && !PtInRegion(region,x,P(200)),
                 $"Native window shape includes side tabs and excludes empty gaps on {nextSide} dock");}finally{DeleteObject(region);}

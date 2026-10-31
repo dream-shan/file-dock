@@ -67,7 +67,17 @@ public partial class MainWindow
         PageRoot.ColumnDefinitions[1].Width = right ? new GridLength(32) : new GridLength(1,GridUnitType.Star);
         Grid.SetColumn(PanelSurface,right ? 0 : 1); Grid.SetColumn(PanelResizeGrip,right ? 0 : 1); Grid.SetColumn(PageRail,right ? 1 : 0);
         FilesPageTab.HorizontalAlignment = PerformancePageTab.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        Grid.SetColumn(PageJoin,right ? 0 : 1);
+        PageJoin.HorizontalAlignment=right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        PageJoin.Margin=right ? new Thickness(0,IsFilesPage ? 90 : 142,-2,0) : new Thickness(-2,IsFilesPage ? 90 : 142,0,0);
+        foreach(var tab in new[]{FilesPageTab,PerformancePageTab})
+        {
+            tab.ApplyTemplate();
+            if(tab.Template.FindName("TabSurface",tab) is Border border)
+                border.CornerRadius=right ? new CornerRadius(0,8,8,0) : new CornerRadius(8,0,0,8);
+        }
         IntPtr handle = new WindowInteropHelper(this).Handle;
+        if(handle!=IntPtr.Zero)ApplyNativeCorners(handle);
         if (handle != IntPtr.Zero) NativeMethods.ShapePagePanel(handle,ActualWidth > 0 ? ActualWidth : Width,ActualHeight > 0 ? ActualHeight : Height,right,IsFilesPage);
     }
     private void PanelResizeGrip_DragDelta(object sender,DragDeltaEventArgs e)

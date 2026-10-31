@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         InitializeMovement();
         InitializeDesktopPresence();
         Activated += PanelActivatedForDesktop;
+        Activated += (_, _) => UpdatePageRail();
         LocationChanged += (_, _) => QueueDesktopPresence();
         InitializeFolderBrowser();
         InitializeLiveFolder();
@@ -168,6 +169,7 @@ public partial class MainWindow : Window
         if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
+        if (msg == 0x031E || msg == 0x031A) Dispatcher.BeginInvoke(UpdatePageRail);
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
         return IntPtr.Zero;
     }

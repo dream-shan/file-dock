@@ -27,7 +27,10 @@ public partial class MainWindow
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     private void ApplyNativeCorners(IntPtr handle)
     {
-        int round = 2;
+        // The custom region owns the complete silhouette, including tab cutouts.
+        int round = 1, noBorder = unchecked((int)0xFFFFFFFE), noFrame = 1;
+        _ = DwmSetWindowAttribute(handle, 2, ref noFrame, sizeof(int));
+        _ = DwmSetWindowAttribute(handle, 34, ref noBorder, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 33, ref round, sizeof(int)); // Older Windows may ignore this preference.
     }
 

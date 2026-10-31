@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:FileDockDemo"
-        Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="430" Height="650" MinWidth="380" MinHeight="480"
+        Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="462" Height="650" MinWidth="412" MinHeight="480"
         WindowStyle="None" AllowsTransparency="False" Background="{DynamicResource Surface}" PreviewMouseLeftButtonDown="MovePanelFromSurface"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="False" Topmost="True"
         FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12" Foreground="{DynamicResource Ink}"
@@ -93,8 +93,9 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
-        <Grid Margin="19,17,19,14">
+    <Grid x:Name="PageRoot"><Grid.ColumnDefinitions><ColumnDefinition Width="32" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <Border Grid.Column="1" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
+        <Grid x:Name="ContentGrid" Margin="19,17,19,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -127,7 +128,7 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Row="1" Background="{DynamicResource Input}" CornerRadius="11" BorderBrush="{DynamicResource Border}" BorderThickness="1"
+            <Border x:Name="FileSearchSurface" Grid.Row="1" Background="{DynamicResource Input}" CornerRadius="11" BorderBrush="{DynamicResource Border}" BorderThickness="1"
                     Padding="12,0" Height="42" Margin="0,0,0,13">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -161,10 +162,10 @@
                 </Grid>
             </Border>
 
-            <Grid x:Name="PinsSection" Grid.Row="2" Margin="0,0,0,12">
+            <Grid x:Name="PinsSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="32" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
@@ -172,7 +173,7 @@
                 <Grid Grid.Row="1">
                     <TextBlock x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="{DynamicResource Muted}"
                                FontSize="11" TextAlignment="Center" TextWrapping="Wrap" Margin="10,17" Visibility="Visible" />
-                    <ListBox x:Name="PinsList" Background="Transparent" BorderThickness="0" Padding="0" MaxHeight="158"
+                    <ListBox x:Name="PinsList" Background="Transparent" BorderThickness="0" Padding="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
                              ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
                              ItemContainerStyle="{StaticResource PlainItem}">
@@ -208,7 +209,7 @@
                 </Grid>
             </Grid>
 
-            <Grid x:Name="PerformanceSection" Grid.Row="3" Margin="0,0,0,10">
+            <Grid x:Name="PerformanceSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="30" />
                     <RowDefinition Height="*" />
@@ -249,7 +250,7 @@
                         <Button x:Name="FolderBackButton" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="返回（Alt + ←）" AutomationProperties.Name="返回" />
                         <Button x:Name="FolderUpButton" Style="{StaticResource IconButton}" Content="&#xE74A;" ToolTip="上一级（Alt + ↑）" AutomationProperties.Name="上一级" Margin="3,0" />
                     </StackPanel>
-                    <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" ToolTip="回到常用和电脑状态" />
+                    <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" ToolTip="回到我的常用" />
                     <Button x:Name="FolderRefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="刷新当前文件夹" AutomationProperties.Name="刷新当前文件夹" />
                 </Grid>
                 <Border Grid.Row="1" Background="{DynamicResource Card}" CornerRadius="11" Padding="12,11" Margin="0,0,0,9">
@@ -313,6 +314,32 @@
             </Grid>
         </Grid>
     </Border>
+        <StackPanel x:Name="PageRail" Grid.Column="0" VerticalAlignment="Top" Margin="0,90,0,0">
+            <StackPanel.Resources>
+                <Style x:Key="PageTabStyle" TargetType="ToggleButton">
+                    <Setter Property="Width" Value="28" /><Setter Property="Height" Value="44" />
+                    <Setter Property="Margin" Value="0,0,0,8" /><Setter Property="HorizontalAlignment" Value="Right" />
+                    <Setter Property="Background" Value="{DynamicResource Card}" /><Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                    <Setter Property="Cursor" Value="Hand" /><Setter Property="FontFamily" Value="Segoe MDL2 Assets" /><Setter Property="FontSize" Value="15" />
+                    <Setter Property="FocusVisualStyle" Value="{StaticResource QuietFocusVisual}" />
+                    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="TabSurface" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True"><Setter Property="Width" Value="32" /><Setter Property="Background" Value="{DynamicResource Surface}" /><Setter Property="Foreground" Value="{DynamicResource Accent}" /><Setter TargetName="TabSurface" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Hover}" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate></Setter.Value></Setter>
+                </Style>
+            </StackPanel.Resources>
+            <ToggleButton x:Name="FilesPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE8B7;" Tag="Files" Click="PageTab_Click" ToolTip="文件：常用、浏览和搜索" AutomationProperties.Name="文件页" />
+            <ToggleButton x:Name="PerformancePageTab" Style="{StaticResource PageTabStyle}" Content="&#xE9D9;" Tag="Performance" Click="PageTab_Click" ToolTip="性能：电脑状态" AutomationProperties.Name="性能页" />
+        </StackPanel>
+        <Thumb x:Name="PanelResizeGrip" Grid.Column="1" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6" Cursor="SizeNWSE" DragDelta="PanelResizeGrip_DragDelta" ToolTip="调整大小">
+            <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="Transparent"><Path Data="M 4,12 L 12,4 M 8,12 L 12,8" Stroke="{DynamicResource Muted}" StrokeThickness="1" /></Grid></ControlTemplate></Thumb.Template>
+        </Thumb>
+    </Grid>
 </Window>
 
 

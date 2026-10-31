@@ -58,7 +58,7 @@ internal static class PerformanceVerification
             "Old configuration migrates pins and settings without retaining removed history");
         check(window.FindName("RecentSection") == null && window.FindName("DropZone") == null && window.AddButton != null,
             "Home removes recent usage and external drop zone while keeping Add");
-        window.GoHome(); window.ExpandPanel(); window.EnablePerformanceForVerification();
+        window.GoHome(); window.SelectPage("Performance",false); window.ExpandPanel(); window.EnablePerformanceForVerification();
         for (int i = 0; i < 150 && window.LastPerformanceSnapshot?.CpuLoad == null; i++) await Task.Delay(100);
         var snapshot = window.LastPerformanceSnapshot;
         check(snapshot is { CpuLoad: >= 0 and <= 100, MemoryTotal: > 0 } && window.PerformanceActive,
@@ -73,7 +73,7 @@ internal static class PerformanceVerification
         if (Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_GPU") == "1")
             check(window.LastPerformanceSnapshot is { GpuLoad: >= 0 and <= 100 } && window.LastPerformanceSnapshot.GpuUsageStatus.Contains("Windows GPU 最繁忙引擎"),
                 "Real GPU load comes from matched Windows engine counters");
-        window.Width = 430; window.Height = 650; window.UpdateLayout();
+        window.Width = 462; window.Height = 650; window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight + 1,
             "All four performance cards fit the default window without scrolling");
         check(window.MemoryCard.Ring && window.VramCard.Ring && !window.CpuCard.Ring && !window.GpuCard.Ring,
@@ -91,13 +91,13 @@ internal static class PerformanceVerification
             !System.Windows.Automation.AutomationProperties.GetName(window.CpuCard).Contains(snapshot!.CpuName),
             "CPU and GPU replace model text with a sixty-second caption and accessible readings");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-standard.png"));
-        window.Width = 380; window.Height = 480; window.UpdateLayout();
+        window.Width = 412; window.Height = 480; window.UpdateLayout();
         check(window.CpuCard.Graph.ActualHeight >= 12 && window.GpuCard.Graph.ActualHeight >= 12 &&
             window.MemoryCard.ValueText != "—", "Compact cards keep a visible chart and memory readout");
         check(window.MemoryCard.CapacityFits && window.VramCard.CapacityFits && window.MemoryCard.RingChart.ActualWidth <= 50,
             "Compact ring cards keep their complete capacity text without expanding the cards");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-small.png"));
-        window.Width = 430; window.Height = 650;
+        window.Width = 462; window.Height = 650;
 
         window.CollapsePanel(); await Task.Delay(700); int paused = window.PerformanceSamples;
         long serviceSamples = requireTemperature ? TemperatureClient.Read(false).Samples : 0;
@@ -108,7 +108,7 @@ internal static class PerformanceVerification
         check(window.PerformanceSamples > paused, "Expanding home resumes sampling with a new baseline");
         await window.NavigateToFolderAsync(root); await Task.Delay(700); paused = window.PerformanceSamples; await Task.Delay(2400);
         check(!window.PerformanceActive && paused == window.PerformanceSamples, "Folder browsing pauses performance sampling");
-        window.GoHome(); await Task.Delay(2400);
+        window.GoHome(); window.SelectPage("Performance",false); await Task.Delay(2400);
         check(window.PerformanceActive && window.PerformanceSamples > paused, "Returning home resumes performance sampling");
         for (int i = 0; i < 200; i++) window.CpuCard.Set(i, "test", 50, true);
         check(window.CpuCard.HistoryCount == PerformanceGraph.MaximumSamples, "Performance graph history stays bounded at one minute of one-second samples");

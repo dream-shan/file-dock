@@ -41,7 +41,7 @@ public partial class MainWindow
 
     private void UpdateFolderWatcher(bool refresh = false)
     {
-        if (!LiveFolderUpdatesEnabled || _quitting || !IsVisible || CurrentFolderPath == null)
+        if (!LiveFolderUpdatesEnabled || _quitting || !IsVisible || !IsFilesPage || CurrentFolderPath == null)
         { StopFolderWatcher(); return; }
         bool recursive = SearchBox.Text.Trim().Length > 0;
         if (_folderWatcher == null || _folderWatcher.Path != CurrentFolderPath || _folderWatcher.IncludeSubdirectories != recursive)
@@ -89,14 +89,14 @@ public partial class MainWindow
     {
         if (!_liveDirty) { _folderRefreshTimer?.Stop(); return; }
         if (_liveBusy || _folderLoading || _dragging || _dragEntry != null || _movingPanel) return;
-        if (!LiveFolderUpdatesEnabled || !IsVisible || CurrentFolderPath == null || _quitting) { StopFolderWatcher(); return; }
+        if (!LiveFolderUpdatesEnabled || !IsVisible || !IsFilesPage || CurrentFolderPath == null || _quitting) { StopFolderWatcher(); return; }
         _liveDirty = false; _liveBusy = true;
         int generation = _watchGeneration;
         string root = CurrentFolderPath, query = SearchBox.Text.Trim();
         using var cancellation = new CancellationTokenSource();
         _liveRefreshCancellation = cancellation;
         var token = cancellation.Token;
-        bool Current() => !token.IsCancellationRequested && generation == _watchGeneration && CurrentFolderPath == root && SearchBox.Text.Trim() == query && IsVisible && !_quitting;
+        bool Current() => !token.IsCancellationRequested && generation == _watchGeneration && CurrentFolderPath == root && SearchBox.Text.Trim() == query && IsVisible && IsFilesPage && !_quitting;
         var scroll = VisualChildren(FolderList).OfType<ScrollViewer>().FirstOrDefault();
         double offset = scroll?.VerticalOffset ?? 0;
         try

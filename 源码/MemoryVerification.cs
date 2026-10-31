@@ -60,7 +60,7 @@ internal static class MemoryVerification
         check(!window.MemoryOnlyActive && !window.PerformanceActive && memory==window.MemoryReadCount,"Locked session pauses memory checks and full performance sampling");
         window.SetMemoryPauseForVerification(false);await Task.Delay(2200);
         check(window.MemoryOnlyActive && window.MemoryReadCount>memory,"Unlock resumes the lightweight memory check");
-        window.ExpandPanel();window.GoHome();await Task.Delay(100);
+        window.ExpandPanel();window.GoHome();window.SelectPage("Performance",false);await Task.Delay(100);
         check(window.PerformanceActive && !window.MemoryOnlyActive,"Expanded home reuses one-second samples without a second memory timer");
         window.SetMemoryPauseForVerification(true);
         string original=window.State.ThemeMode;

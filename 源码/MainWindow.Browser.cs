@@ -40,6 +40,7 @@ public partial class MainWindow
         string fullPath;
         try { fullPath = Path.GetFullPath(path); }
         catch (Exception ex) { SetStatus("无法浏览此路径：" + ex.Message, true); return; }
+        SelectPage("Files");
         StopFolderWatcher();
         ClearFileSelection();
         ++_openRequestVersion;
@@ -54,8 +55,7 @@ public partial class MainWindow
         _folderLoading = true;
         _folderFailed = false;
         _folderEntries.Clear();
-        PinsSection.Visibility = PerformanceSection.Visibility = Visibility.Collapsed;
-        BrowserPanel.Visibility = Visibility.Visible;
+        UpdatePageLayout();
         UpdateFolderSearchHint();
         FolderTitle.Text = FileName(fullPath);
         FolderPathText.Text = fullPath;
@@ -136,6 +136,7 @@ public partial class MainWindow
 
     internal void GoHome()
     {
+        SelectPage("Files");
         if (CurrentFolderPath == null) return;
         StopFolderWatcher();
         ClearFileSelection();
@@ -146,8 +147,7 @@ public partial class MainWindow
         _folderBack.Clear();
         _folderEntries.Clear();
         FolderList.ItemsSource = null;
-        BrowserPanel.Visibility = Visibility.Collapsed;
-        PinsSection.Visibility = PerformanceSection.Visibility = Visibility.Visible;
+        UpdatePageLayout();
         SearchPlaceholder.Text = "搜索常用文件或路径";
         SearchBox.ToolTip = null;
         SearchBox.Text = _homeSearch;

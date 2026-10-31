@@ -2,15 +2,15 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.13 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.14 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.13) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.14) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
-| 常用入口与电脑状态 | 文件夹内浏览 |
+| 独立性能页与侧边标签 | 文件夹内浏览（示意） |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/home-dark.png" width="360" alt="文件坞深色主页，包含常用入口与电脑状态卡片"> | <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
+| <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/home-dark.png" width="360" alt="文件坞深色性能页，包含侧边标签与电脑状态卡片"> | <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
 
 截图由实际程序渲染，使用内置验证样例与示例读数，不包含维护者的私人文件；图中数值不代表日常资源占用或硬件测试结果。界面支持跟随系统、浅色和深色主题。
 
@@ -18,13 +18,13 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 - **快速访问文件**：从屏幕边缘唤出，添加常用文件夹，在面板内逐层浏览，单击打开文件。
 - **找到并使用文件**：递归搜索当前文件夹及子目录，预览图片，Ctrl 多选后整组拖放或复制到支持接收的应用。
-- **查看电脑状态**：显示 CPU/GPU 占用与温度、内存/显存及实际网速；首页展开时每秒刷新，收起后仅保留低频内存提醒。
+- **查看电脑状态**：显示 CPU/GPU 占用与温度、内存/显存及实际网速；性能页展开时每秒刷新，收起后仅保留低频内存提醒。
 
 下载版解压后运行，无需另装 .NET。CPU 温度依赖额外驱动和温度服务，安装步骤见下文；未安装这些组件时仍可使用文件功能。当前为预发布候选版，兼容范围和限制见后文。
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.13-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.14-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -39,7 +39,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 - **常用入口**：添加文件/文件夹，拖动卡片排序；右键管理、复制路径或打开所在位置。
 - **文件夹浏览**：返回、上一级、路径导航和类型筛选；默认不显示隐藏/系统项目。
-- **搜索**：首页筛选常用项；文件夹内按名称搜索当前目录及全部子目录。清空关键词回到当前层，不搜索文件内容或全盘索引。最多 1000 项，类型筛选应用于已找到的结果。无法读取的子目录会提示；不进入后代目录链接/junction，避免循环。
+- **搜索**：文件页筛选常用项；文件夹内按名称搜索当前目录及全部子目录。清空关键词回到当前层，不搜索文件内容或全盘索引。最多 1000 项，类型筛选应用于已找到的结果。无法读取的子目录会提示；不进入后代目录链接/junction，避免循环。
 - **多选与传输**：Ctrl+单击选中/取消，松开 Ctrl 后整组拖出，或 Ctrl+C / Ctrl+V 复制。原文件保留；网页需自身支持拖放或粘贴。拖出时收起，Esc 取消拖拽后恢复面板。
 - **图片**：列表缩略图、悬停大图、右键复制图片；单击仍由默认应用打开。单张图片复制同时提供图片内容格式，多文件保持独立文件。
 - **主题**：默认跟随 Windows 应用主题，也可手动选浅色/深色；托盘随系统任务栏主题保持可见。
@@ -123,6 +123,8 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
+- 新增外侧“文件 / 性能”标签，首次启动默认显示性能，之后记住所选页面；左右贴边自动镜像。文件页独立显示常用、搜索和浏览，切换保留目录、搜索、选择和滚动位置。性能页每秒更新；文件页及收起时仅保留轻量内存检测，隐藏文件夹暂停监听，返回后同步变化。
+
 - 收起入口随内存占用平滑增强颜色和不透明度；超过 80% 时显示清晰的红色背景与浅色箭头，低于 78% 后恢复渐变。鼠标悬停显示当前占用。
 
 - 默认开启“桌面自动展开，遮挡时收起”：只在上方窗口与面板实际重叠时收起，窗口移开、关闭或最小化后恢复，不抢焦点。
@@ -156,7 +158,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.13-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.14-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

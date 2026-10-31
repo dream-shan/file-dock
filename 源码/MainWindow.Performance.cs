@@ -27,7 +27,7 @@ public partial class MainWindow
     internal void UpdatePerformanceActivity()
     {
         if (_performanceTimer == null || _performanceDisposed) return;
-        bool active = IsVisible && CurrentFolderPath == null && !_quitting && !MemoryPaused && (!App.IsSelfTest || _testPerformanceEnabled);
+        bool active = IsVisible && !IsFilesPage && !_quitting && !MemoryPaused && (!App.IsSelfTest || _testPerformanceEnabled);
         if (_performanceActive == active) { UpdateMemoryActivity(); return; }
         _performanceActive = active; ++_performanceGeneration;
         UpdateMemoryActivity();

@@ -21,5 +21,6 @@ public sealed class AppState
     public string? PanelScreen { get; set; }
     public bool KeepOpen { get; set; }
     public bool AutoDesktop { get; set; } = true;
+    public string SelectedPage { get; set; } = "Performance";
     public string ThemeMode { get; set; } = "System";
 }

@@ -71,8 +71,23 @@ internal static class MemoryVerification
                 ((System.Windows.Media.SolidColorBrush)window.MemoryCard.Accent).Color==MemoryPressure.ColorFor(85,theme=="Dark"),
                 $"Memory card uses readable high-pressure color and warning in {theme} theme");
             window.DockEntry.SetMemoryPressure(85,false);
-            var color=window.DockEntry.MemoryAccentColor;var expected=MemoryPressure.ColorFor(85,theme=="Dark");
-            if(color.R!=expected.R || color.G!=expected.G || color.B!=expected.B)throw new InvalidOperationException("Dock color mismatch");
+            check(window.DockEntry.MemoryWarning && window.DockEntry.MemoryIdleOpacity==.95 && window.DockEntry.MemoryAccentColor==System.Drawing.Color.White,
+                $"High memory entry uses an opaque red surface and white arrow in {theme} theme");
+            var entry=window.DockEntry;
+            check(entry.BackColor.R>entry.BackColor.G*2 && entry.BackColor.R>entry.BackColor.B*2,"High-pressure entry has a strongly red background");
+            typeof(DockTabWindow).GetMethod("OnMouseEnter",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(entry,new object[]{EventArgs.Empty});
+            typeof(DockTabWindow).GetMethod("OnMouseLeave",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(entry,new object[]{EventArgs.Empty});
+            check(entry.Opacity==.95,"Hovering and leaving the entry preserves high-pressure visibility");
+            window.DockEntry.SetMemoryPressure(79,false);
+            check(window.DockEntry.MemoryWarning && window.DockEntry.MemoryIdleOpacity==.95,"Entry warning stays visible until memory falls below recovery threshold");
+            window.DockEntry.SetMemoryPressure(77,false);
+            check(!window.DockEntry.MemoryWarning && window.DockEntry.MemoryIdleOpacity>.65 && window.DockEntry.MemoryIdleOpacity<.85,"Entry recovers to graded appearance below seventy-eight percent");
+            window.DockEntry.SetMemoryPressure(65,false);double normal=window.DockEntry.MemoryIdleOpacity;
+            window.DockEntry.SetMemoryPressure(70,false);double middle=window.DockEntry.MemoryIdleOpacity;
+            window.DockEntry.SetMemoryPressure(75,false);double high=window.DockEntry.MemoryIdleOpacity;
+            check(normal==.38 && normal<middle && middle<high && high==.65,"Entry opacity increases continuously with memory pressure");
+            window.DockEntry.SetMemoryPressure(null,false);
+            check(!window.DockEntry.MemoryWarning && window.DockEntry.MemoryIdleOpacity==.38,"Unknown memory clears stale entry alert and restores idle opacity");
             DemoVerification.SaveRender(window,Path.Combine(directory,"memory-high-"+theme.ToLowerInvariant()+".png"));
         }
         window.ApplyMemoryReading(new(77,100));

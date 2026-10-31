@@ -28,7 +28,7 @@ try {
     $report = Join-Path $result 'verification.txt'
     if (!(Test-Path -LiteralPath $report)) { throw 'Self-test returned no verification report.' }
     $checks = @(Get-Content -LiteralPath $report | Where-Object { $_ -like 'PASS:*' })
-    if ($checks.Count -lt 258) { throw 'Self-test did not complete the expected checks.' }
+    if ($checks.Count -lt 272) { throw 'Self-test did not complete the expected checks.' }
     $diagnostics = Join-Path $result 'data\Diagnostics\current.jsonl'
     $events = @(Get-Content -LiteralPath $diagnostics | ForEach-Object { ($_ | ConvertFrom-Json).eventName })
     foreach ($required in @('startup','window-ready','application-exit','message-loop-return','process-exit')) {

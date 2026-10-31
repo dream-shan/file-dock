@@ -13,6 +13,11 @@ internal sealed class DockTabWindow : Form
     private bool _moved;
     private bool _dark;
     private double? _memoryPercent;
+    private bool _memoryWarning, _hovered;
+    private double _entryOpacity=.38, _fromOpacity, _toOpacity=.38;
+    private readonly ToolTip _memoryTip = new();
+    internal bool MemoryWarning => _memoryWarning;
+    internal double MemoryIdleOpacity => _entryOpacity;
     private Color _entryAccent, _entryBorder, _entryBackground;
     private Timer? _pressureTimer;
     private long _pressureStart;
@@ -21,23 +26,29 @@ internal sealed class DockTabWindow : Form
     internal void SetMemoryPressure(double? percent,bool animate=true)
     {
         _memoryPercent=percent;
+        _memoryWarning=MemoryPressure.Warning(_memoryWarning,percent);
+        _memoryTip.SetToolTip(this,percent.HasValue ? $"内存占用 {percent.Value:0}%，点击展开整理" : "点击展开文件坞");
         Color normalAccent=_dark ? Color.FromArgb(130,179,255) : Color.FromArgb(41,111,235);
         Color normalBorder=_dark ? Color.FromArgb(149,162,181) : Color.FromArgb(180,197,220);
         Color normalBackground=_dark ? Color.FromArgb(48,53,62) : Color.White;
-        double blend=percent.HasValue ? Math.Clamp((percent.Value-65)/15,0,1) : 0;
-        var pressure=MemoryPressure.ColorFor(percent??0,_dark);
-        Color pressureColor=Color.FromArgb(pressure.R,pressure.G,pressure.B);
-        Color Mix(Color a,Color b,double t) => Color.FromArgb((int)Math.Round(a.R+(b.R-a.R)*t),(int)Math.Round(a.G+(b.G-a.G)*t),(int)Math.Round(a.B+(b.B-a.B)*t));
-        _toAccent=Mix(normalAccent,pressureColor,blend); _toBorder=Mix(normalBorder,pressureColor,blend);
-        _toBackground=blend<=0 ? normalBackground : Mix(normalBackground,pressureColor,.14*blend);
+        double value=percent.HasValue && double.IsFinite(percent.Value) ? Math.Clamp(percent.Value,0,100) : 0;
+        double blend=Math.Clamp((value-65)/15,0,1);
+        Color amber=_dark ? Color.FromArgb(236,188,77) : Color.FromArgb(174,111,10);
+        Color red=_dark ? Color.FromArgb(205,48,61) : Color.FromArgb(190,35,49);
+        Color Mix(Color a,Color b,double t) { t=Math.Clamp(t,0,1); return Color.FromArgb((int)Math.Round(a.R+(b.R-a.R)*t),(int)Math.Round(a.G+(b.G-a.G)*t),(int)Math.Round(a.B+(b.B-a.B)*t)); }
+        Color fill=value<=65 ? normalBackground : value<=75 ? Mix(normalBackground,amber,Math.Clamp((value-65)/10,0,1)*.72) : Mix(Mix(normalBackground,amber,.72),red,(value-75)/5);
+        _toBackground=_memoryWarning ? red : fill;
+        _toBorder=_memoryWarning ? (_dark ? Color.FromArgb(255,145,151) : Color.FromArgb(139,15,29)) : Mix(normalBorder,value<=75 ? amber : red,blend);
+        _toAccent=_memoryWarning ? Color.White : Mix(Mix(normalAccent,_dark ? Color.FromArgb(255,238,197) : Color.FromArgb(93,59,0),blend),Color.White,Math.Clamp((value-70)/5,0,1));
+        _toOpacity=_memoryWarning ? .95 : value<=75 ? .38+.27*Math.Clamp((value-65)/10,0,1) : .65+.20*Math.Clamp((value-75)/5,0,1);
         _pressureTimer?.Stop();
-        if(!animate || !Visible || _entryAccent.IsEmpty) { _entryAccent=_toAccent;_entryBorder=_toBorder;_entryBackground=_toBackground;BackColor=_entryBackground;Invalidate();return; }
-        if(_entryAccent==_toAccent && _entryBorder==_toBorder && _entryBackground==_toBackground)return;
-        _fromAccent=_entryAccent;_fromBorder=_entryBorder;_fromBackground=_entryBackground;_pressureStart=Environment.TickCount64;
+        if(!animate || !Visible || _entryAccent.IsEmpty) { _entryAccent=_toAccent;_entryBorder=_toBorder;_entryBackground=_toBackground;BackColor=_entryBackground;_entryOpacity=_toOpacity;ApplyEntryOpacity();Invalidate();return; }
+        if(_entryAccent==_toAccent && _entryBorder==_toBorder && _entryBackground==_toBackground && Math.Abs(_entryOpacity-_toOpacity)<.001)return;
+        _fromAccent=_entryAccent;_fromBorder=_entryBorder;_fromBackground=_entryBackground;_fromOpacity=_entryOpacity;_pressureStart=Environment.TickCount64;
         if(_pressureTimer==null){_pressureTimer=new Timer {Interval=30};_pressureTimer.Tick+=(_,_)=>{
             double t=Math.Clamp((Environment.TickCount64-_pressureStart)/300d,0,1);
             _entryAccent=Mix(_fromAccent,_toAccent,t);_entryBorder=Mix(_fromBorder,_toBorder,t);_entryBackground=Mix(_fromBackground,_toBackground,t);
-            BackColor=_entryBackground;Invalidate();if(t>=1)_pressureTimer.Stop();
+            BackColor=_entryBackground;_entryOpacity=_fromOpacity+(_toOpacity-_fromOpacity)*t;ApplyEntryOpacity();Invalidate();if(t>=1)_pressureTimer.Stop();
         };}
         _pressureTimer.Start();
     }
@@ -86,7 +97,7 @@ internal sealed class DockTabWindow : Form
     internal new void Show()
     {
         SetMemoryPressure(_memoryPercent,false);
-        UpdateShape(); Opacity = 0.38; base.Show();
+        UpdateShape(); _hovered=false; ApplyEntryOpacity(); base.Show();
         NativeMethods.SetWindowDisplayAffinity(Handle, 0);
         Invalidate();
     }
@@ -102,8 +113,9 @@ internal sealed class DockTabWindow : Form
         float direction = _owner.State.DockSide == "Left" ? -1 : 1;
         e.Graphics.DrawLines(pen, new[] { new PointF(center + direction * 2 * scale, y - 4 * scale), new PointF(center - direction * 2 * scale, y), new PointF(center + direction * 2 * scale, y + 4 * scale) });
     }
-    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Opacity = 0.9; }
-    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); if (!Capture) Opacity = 0.38; }
+    private void ApplyEntryOpacity() => Opacity = _hovered || Capture ? Math.Max(.9,_entryOpacity) : _entryOpacity;
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _hovered=true; ApplyEntryOpacity(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hovered=false; ApplyEntryOpacity(); }
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e); if (e.Button != MouseButtons.Left) return;
@@ -119,12 +131,12 @@ internal sealed class DockTabWindow : Form
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e); if (e.Button != MouseButtons.Left || !Capture) return;
-        Capture = false;
+        Capture = false; _hovered=ClientRectangle.Contains(PointToClient(Cursor.Position)); ApplyEntryOpacity();
         if (_moved) _owner.DockMoved(Left, Top); else _owner.ExpandPanel();
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { _pressureTimer?.Dispose(); ContextMenuStrip?.Dispose(); }
+        if (disposing) { _pressureTimer?.Dispose(); _memoryTip.Dispose(); ContextMenuStrip?.Dispose(); }
         base.Dispose(disposing);
     }
 }

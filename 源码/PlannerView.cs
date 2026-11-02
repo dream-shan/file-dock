@@ -42,13 +42,11 @@ public sealed class PlannerView : UserControl
 {
     private static readonly string[] Levels={"长期目标","月计划","周计划","日计划"};
     private AppState _state=null!;
-    private Action _save=null!;
+    private Func<bool> _save=null!;
     private DateTime _date=DateTime.Today;
     private bool _completed;
     private bool _editing;
-    private string? _detailId, _newParent;
-    private string _quickDraft="";
-    private TextBox? _quickInput;
+    private string? _detailId;
     private static readonly string[] Tabs={"长期","本月","本周","今天"};
     private static readonly ControlTemplate CircleTemplate=(ControlTemplate)XamlReader.Parse("""
         <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="CheckBox">
@@ -65,7 +63,7 @@ public sealed class PlannerView : UserControl
         """);
     private readonly DockPanel _root=new();
     private int Level => Math.Clamp(_state.PlannerLevel,0,3);
-    internal void Initialize(AppState state,Action save)
+    internal void Initialize(AppState state,Func<bool> save)
     {
         _state=state;_save=save;Content=_root;
         IsVisibleChanged+=(_,_)=>{if(IsVisible && !_editing)Render();};
@@ -95,24 +93,13 @@ public sealed class PlannerView : UserControl
         var dateLabel=Label(period,true);dateLabel.FontSize=10;dateLabel.VerticalAlignment=VerticalAlignment.Center;DockPanel.SetDock(dateLabel,Dock.Right);heading.Children.Add(dateLabel);
         var title=Label(Level switch{0=>"长期目标",1=>"本月待办",2=>"本周待办",_=>_date.Date==DateTime.Today ? "今日待办":"每日待办"});title.FontWeight=FontWeights.SemiBold;title.FontSize=14;heading.Children.Add(title);Header(heading);
         var tabs=new UniformGridProxy();
-        foreach(int i in new[]{3,2,1,0}){int n=i;var b=Button(Tabs[i],()=>{_state.PlannerLevel=n;_date=DateTime.Today;_completed=false;_detailId=null;_quickDraft="";_save();Render();});
+        foreach(int i in new[]{3,2,1,0}){int n=i;var b=Button(Tabs[i],()=>{_state.PlannerLevel=n;_date=DateTime.Today;_completed=false;_detailId=null;_save();Render();});
             var underline=new Border{BorderThickness=new Thickness(0,0,0,i==Level ? 2:0),Child=b,Margin=new Thickness(0,0,0,8)};
             if(i==Level){b.SetResourceReference(ForegroundProperty,"Accent");underline.SetResourceReference(Border.BorderBrushProperty,"Accent");}tabs.Children.Add(underline);}Header(tabs);
         if(Level!=0 && !PlanRules.InPeriod(new PlanItem{Level=Level,Date=DateTime.Today},Level,_date))Header(Button("返回"+Tabs[Level],()=>{_date=DateTime.Today;_detailId=null;Render();}));
-        var quick=new DockPanel{Margin=new Thickness(0,8,0,2)};
-        var add=Button("＋",QuickAdd);AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.ToolTip="添加待办（Enter）";DockPanel.SetDock(add,Dock.Left);quick.Children.Add(add);
-        add.IsEnabled=_detailId==null;
-        _quickInput=new TextBox{Text=_quickDraft,MaxLength=200,Padding=new Thickness(5),BorderThickness=new Thickness(0),VerticalContentAlignment=VerticalAlignment.Center,ToolTip="输入任务名称，按回车添加"};
-        _quickInput.SetResourceReference(BackgroundProperty,"Surface");_quickInput.SetResourceReference(ForegroundProperty,"Ink");AutomationProperties.SetAutomationId(_quickInput,"PlannerQuickInput");
-        _quickInput.IsEnabled=_detailId==null;
-        _quickInput.TextChanged+=(_,_)=>_quickDraft=_quickInput.Text;
-        _quickInput.KeyDown+=(_,e)=>{if(e.Key==Key.Enter){QuickAdd();e.Handled=true;}};
-        var inputGrid=new Grid();inputGrid.Children.Add(_quickInput);
-        var placeholder=Label("添加待办…",true);placeholder.Margin=new Thickness(5,0,0,0);placeholder.VerticalAlignment=VerticalAlignment.Center;placeholder.IsHitTestVisible=false;placeholder.Visibility=string.IsNullOrEmpty(_quickDraft) ? Visibility.Visible:Visibility.Collapsed;inputGrid.Children.Add(placeholder);
-        _quickInput.TextChanged+=(_,_)=>placeholder.Visibility=string.IsNullOrEmpty(_quickInput.Text) ? Visibility.Visible:Visibility.Collapsed;
-        quick.Children.Add(inputGrid);DockPanel.SetDock(quick,Dock.Bottom);_root.Children.Add(quick);
+        var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
         var list=new StackPanel();
-        if(_detailId=="")list.Children.Add(Editor(null,_newParent));
+
         var items=_state.Plans.Where(p=>PlanRules.InPeriod(p,Level,_date)).OrderBy(p=>p.Date).ThenBy(p=>p.Time=="" ? "99:99":p.Time).ToList();
         foreach(var p in items.Where(p=>!PlanRules.Complete(p,_state.Plans)))Row(list,p);
         if(items.Count==0 && _detailId!="")list.Children.Add(Label(Level==3 && _date.Date==DateTime.Today ? "今天暂无待办":"暂无待办",true));
@@ -121,11 +108,6 @@ public sealed class PlannerView : UserControl
         if(done.Count>0)list.Children.Add(completed);
         if(_completed)foreach(var p in done)Row(list,p);
         _root.Children.Add(new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-    }
-    private void QuickAdd()
-    {
-        if(string.IsNullOrWhiteSpace(_quickDraft))return;
-        _state.Plans.Add(new PlanItem{Title=_quickDraft.Trim(),Level=Level,Date=_date.Date});_quickDraft="";_save();Render();_quickInput?.Focus();
     }
     private void Shift(int n){if(Level==0)return;_detailId=null;_date=Level==1 ? _date.AddMonths(n):_date.AddDays(n*(Level==2 ? 7:1));Render();}
     private void Row(Panel list,PlanItem p)
@@ -145,41 +127,21 @@ public sealed class PlannerView : UserControl
         if(meta.Count>0){var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;if(overdue)subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Error");content.Children.Add(subtitle);}
         var edit=Button("",()=>{if(_detailId==p.Id){_detailId=null;Render();}else Edit(p);});edit.Content=content;AutomationProperties.SetName(edit,"详情："+p.Title);edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(edit);
         var separator=new Border{Child=row,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
-        if(_detailId==p.Id)list.Children.Add(Editor(p));
+
     }
     private void Edit(PlanItem? item,string? presetParent=null)
     {
-        _detailId=item?.Id??"";_newParent=presetParent;Render();
-    }
-    private UIElement Editor(PlanItem? item,string? presetParent=null)
-    {
         _editing=true;
-        var form=new StackPanel{Margin=new Thickness(30,4,5,12)};
-        int level=item?.Level??Level;
-        TextBox Input(string name,string value,Panel? destination=null){var target=destination??form;target.Children.Add(Label(name,true));var input=new TextBox{Text=value,Tag=name,Margin=new Thickness(0,2,0,5),Padding=new Thickness(5)};input.SetResourceReference(BackgroundProperty,"Card");input.SetResourceReference(ForegroundProperty,"Ink");target.Children.Add(input);return input;}
-        var title=Input("名称（必填）",item?.Title??"");title.MaxLength=200;
-        var time=Input("时间（可选，例如 09:00 或 09:00–10:30）",item?.Time??"");
-        var details=new StackPanel();var more=new Expander{Header="日期、备注和归属",Content=details,Margin=new Thickness(0,5,0,5)};AutomationProperties.SetAutomationId(more,"PlannerMore");form.Children.Add(more);
-        details.Children.Add(Label(level==0 ? "目标起始日期":"计划日期",true));var date=new DatePicker{SelectedDate=item?.Date??_date};details.Children.Add(date);
-        details.Children.Add(Label("截止日期（可选）",true));var due=new DatePicker{SelectedDate=item?.Deadline};details.Children.Add(due);
-        var notes=Input("备注",item?.Notes??"",details);notes.AcceptsReturn=true;notes.Height=50;notes.TextWrapping=TextWrapping.Wrap;
-        var parents=new List<PlanItem>{new(){Id="",Title="独立计划"}};parents.AddRange(_state.Plans.Where(p=>p.Level==level-1));
-        details.Children.Add(Label("归属上级（可选）",true));var parent=new ComboBox{ItemsSource=parents,DisplayMemberPath="Title",SelectedValuePath="Id",SelectedValue=presetParent??item?.ParentId??""};details.Children.Add(parent);
-        var error=Label("");form.Children.Add(error);
-        var actions=new WrapPanel();actions.Children.Add(Button("保存",()=>{
-            if(string.IsNullOrWhiteSpace(title.Text)||date.SelectedDate==null){error.Text="请填写名称和有效日期。";return;}
-            string value=time.Text.Trim().Replace('—','–').Replace('-','–');var parts=value.Split('–');
-            if(value!="" && (parts.Length>2 || parts.Any(s=>!TimeOnly.TryParseExact(s.Trim(),"HH:mm",CultureInfo.InvariantCulture,DateTimeStyles.None,out _)) || (parts.Length==2 && string.CompareOrdinal(parts[0].Trim(),parts[1].Trim())>=0))){error.Text="时间请使用 HH:mm，结束时间须晚于开始时间。";return;}
-            var p=item??new PlanItem{Level=level};p.Title=title.Text.Trim();p.Date=date.SelectedDate.Value.Date;p.Deadline=due.SelectedDate?.Date;p.Time=value;p.Notes=notes.Text;p.ParentId=parent.SelectedValue as string;
-            if(item==null)_state.Plans.Add(p);_date=p.Date;_detailId=null;_save();Render();
-        }));actions.Children.Add(Button("取消",()=>{_detailId=null;Render();}));form.Children.Add(actions);
-        if(item!=null){
-            if(level<3){form.Children.Add(Button("＋ 添加"+Levels[level+1],()=>{_state.PlannerLevel=level+1;_date=item.Date;Edit(null,item.Id);}));
-                foreach(var child in _state.Plans.Where(p=>p.ParentId==item.Id && p.Level==level+1))form.Children.Add(Button("↳ "+child.Title,()=>{_state.PlannerLevel=child.Level;Edit(child);}));}
-            form.Children.Add(Button("删除",()=>{var children=_state.Plans.Where(p=>p.ParentId==item.Id).ToList();_state.Plans.Remove(item);foreach(var c in children)c.ParentId=null;_detailId=null;_save();Render();
-                Header(Button("已删除 · 撤销",()=>{_state.Plans.Add(item);foreach(var c in children)c.ParentId=item.Id;_save();Render();}));}));
-        }
-        return form;
+        var draft=item==null ? new PlanItem{Level=Level,Date=_date,ParentId=presetParent}:new PlanItem{Id=item.Id,Level=item.Level,Date=item.Date,Deadline=item.Deadline,Title=item.Title,Time=item.Time,Notes=item.Notes,ParentId=item.ParentId,Done=item.Done};
+        bool Commit(PlanItem plan){int index=item==null ? -1:_state.Plans.IndexOf(item);int oldLevel=_state.PlannerLevel;
+            if(index<0)_state.Plans.Add(plan);else _state.Plans[index]=plan;_state.PlannerLevel=plan.Level;
+            if(!_save()){if(index<0)_state.Plans.Remove(plan);else _state.Plans[index]=item!;_state.PlannerLevel=oldLevel;return false;}
+            _date=plan.Date;_detailId=null;_completed=PlanRules.Complete(plan,_state.Plans);Render();return true;}
+        Action? delete=item==null ? null:()=>{var children=_state.Plans.Where(p=>p.ParentId==item.Id).ToList();_state.Plans.Remove(item);foreach(var c in children)c.ParentId=null;
+            if(!_save()){_state.Plans.Add(item);foreach(var c in children)c.ParentId=item.Id;return;}
+            _detailId=null;Render();Header(Button("已删除 · 撤销",()=>{_state.Plans.Add(item);foreach(var c in children)c.ParentId=item.Id;_save();Render();}));};
+        Action? child=item==null || item.Level==3 ? null:()=>{_state.PlannerLevel=item.Level+1;_date=item.Date;Edit(null,item.Id);};
+        _root.Children.Clear();_root.Children.Add(new PlanCard(draft,_state.Plans,item!=null,Commit,()=>{_detailId=null;Render();},delete,child,p=>Edit(p)));
     }
     private sealed class UniformGridProxy : System.Windows.Controls.Primitives.UniformGrid { public UniformGridProxy(){Columns=4;} }
 }

@@ -28,11 +28,4 @@ public partial class MainWindow
         ContentGrid.IsEnabled=true;PageRail.IsEnabled=true;PanelResizeGrip.IsEnabled=true;
         var old=_planReturnFocus;Dispatcher.BeginInvoke(()=>{if(old is UIElement el && el.IsVisible && el.IsEnabled)el.Focus();else Planner.FocusAdd();});QueueAfterPanelInteraction();
     }
-    internal static int PlanChoice(Window? owner,string question,string first,string second)
-    {
-        int result=2;var dialog=new Window{Title="文件坞",Owner=owner,SizeToContent=SizeToContent.WidthAndHeight,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,MaxWidth=480,WindowStyle=WindowStyle.ToolWindow};
-        dialog.SetResourceReference(BackgroundProperty,"Surface");dialog.SetResourceReference(ForegroundProperty,"Ink");var stack=new StackPanel{Margin=new Thickness(20)};dialog.Content=stack;
-        stack.Children.Add(new TextBlock{Text=question,TextWrapping=TextWrapping.Wrap,MaxWidth=360,Margin=new Thickness(0,0,0,16)});var buttons=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right};stack.Children.Add(buttons);
-        string[] choices={first,second,"取消"};for(int i=0;i<3;i++){int n=i;var b=new Button{IsCancel=i==2,Content=choices[i],Padding=new Thickness(10,6,10,6),Margin=new Thickness(3)};b.Click+=(_,_)=>{result=n;dialog.Close();};buttons.Children.Add(b);}var main=owner as MainWindow;bool held=main?._inDialog??false;if(main!=null)main._inDialog=true;try{dialog.ShowDialog();}finally{if(main!=null)main._inDialog=held;}return result;
-    }
 }

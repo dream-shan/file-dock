@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.23 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.24 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.23) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.24) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -24,7 +24,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.23-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.24-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -123,17 +123,9 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
-- 修正切换到长期范围时关联清除提示被覆盖的问题；清除原因与长期无上级说明同时显示。
-
-- 重做新建／编辑待办为面板内模态对话框：固定标题和底栏、正文独立滚动，范围分段单选、截止日期快捷项、可搜索上级、优先级和备注。支持键盘、草稿放弃确认及提交失败重试。
-- 统一周一／本地日期的周期、父级过滤和逾期规则；旧计划自动补齐周期与元数据，历史完成时间未知时保留空值。完成状态与子项进度分离，完成／删除上级提供子项处理选择。
-
-- 计划区改为今日待办清单：今天、本周、本月、长期切换；圆形完成勾选、完成项删除线与折叠、紧凑时间和归属说明。底部点击添加待办打开计划卡片；点击任务打开编辑卡片。保留现有计划与层级关联。
-
-- 上级选择显示计划名称，旧版个人计划与完成状态自动沿用。
-
-- 文件页常用下新增四级计划：长期目标、月计划、周计划、日计划；支持独立创建或关联上级、日期切换、可选时间和截止日期、备注、自动统计关联子项进度、完成折叠、删除撤销。数据随 Data 配置仅保存在本机，不进入仓库。
-
+- 新建／编辑待办简化为计划、范围、可选截止日期。移除补充信息、上级选择和子项联动，四种范围作为独立分类；旧备注、优先级、时间和关联字段保留，编辑不清空。完成只影响当前项，删除旧上级只解除引用并保留其他计划。
+- 计划占位符使用文本框原生光标位置和相同字体排版，支持一至四行自动增高、中文输入法组成状态、回车提交和 Shift+Enter 换行。未设置截止日期时隐藏清除按钮。
+- 保留范围与截止日期提醒、逾期判断、草稿放弃确认和保存失败重试，不引入新依赖。
 - 修正侧边标签外侧的整窗矩形边框：关闭系统附加边框，保留自定义窗口轮廓；选中标签与面板平直衔接，标签空隙继续透出桌面且不拦截点击。
 
 - 新增外侧“文件 / 性能”标签，首次启动默认显示性能，之后记住所选页面；左右贴边自动镜像。文件页独立显示常用、搜索和浏览，切换保留目录、搜索、选择和滚动位置。性能页每秒更新；文件页及收起时仅保留轻量内存检测，隐藏文件夹暂停监听，返回后同步变化。
@@ -171,7 +163,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.23-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.24-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

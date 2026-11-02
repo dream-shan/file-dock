@@ -24,9 +24,9 @@ internal static class PlanDialogVerification
             var peer=UIElementAutomationPeer.CreatePeerForElement(card)!;check(peer.GetPattern(PatternInterface.Window) is IWindowProvider provider && provider.IsModal,"Native accessibility exposes the plan card as a modal dialog");
             check(!Id<Button>(card,"PlanSubmit").IsEnabled && !card.HasChanges,"Empty dialog starts disabled without a dirty draft");
             var title=Id<TextBox>(card,"PlanTitle");title.Text=new string('测',161);w.UpdateLayout();check(All<TextBlock>(card).Any(t=>t.Text=="161/200" && t.IsVisible),"Title counter appears above 160 characters");
-            title.Text="整理本周学习计划";var more=Id<Expander>(card,"PlanMore");more.IsExpanded=true;w.UpdateLayout();Id<Grid>(card,"PlanMoreBody").BeginAnimation(UIElement.OpacityProperty,null);Id<Grid>(card,"PlanMoreBody").Opacity=1;check(Id<TextBox>(card,"PlanNotes").MaxLength==500,"Plan notes enforce the 500 character limit");
-            Id<RadioButton>(card,"PlanType0").IsChecked=true;check(!Id<Button>(card,"PlanParent").IsEnabled,"Long-term scope disables parent selection");
-            Id<RadioButton>(card,"PlanType3").IsChecked=true;
+            title.Text="整理本周学习计划";w.UpdateLayout();check(!All<Expander>(card).Any(),"Simple dialog contains no supplementary section");
+            title.Text="";w.UpdateLayout();var caret=title.GetRectFromCharacterIndex(0,true);check(!caret.IsEmpty && caret.Left>=title.Padding.Left && caret.Height>0,"Empty input exposes the native caret rectangle used by the placeholder");title.Text="整理本周学习计划";
+            Id<RadioButton>(card,"PlanType0").IsChecked=true;Id<RadioButton>(card,"PlanType3").IsChecked=true;
             foreach(string mode in new[]{"Dark","Light"}){
                 w.SetThemeMode(mode);w.UpdateLayout();var surface=ThemePalette.Brush("Surface").Color;var ink=ThemePalette.Brush("Ink").Color;var secondary=((SolidColorBrush)card.Resources["PlanSecondary"]).Color;var accent=((SolidColorBrush)card.Resources["PlanAccent"]).Color;var onAccent=((SolidColorBrush)card.Resources["PlanOnAccent"]).Color;
                 check(Contrast(ink,surface)>=4.5 && Contrast(secondary,surface)>=4.5 && Contrast(accent,onAccent)>=4.5,$"Plan text and primary action meet 4.5:1 in {mode}");
@@ -34,7 +34,7 @@ internal static class PlanDialogVerification
                 check(All<Button>(card).Where(b=>b.IsVisible).All(b=>b.Foreground is SolidColorBrush fg && Contrast(fg.Color,b.Background is SolidColorBrush bg ? Blend(bg.Color):surface)>=4.5),$"Every visible dialog action meets 4.5:1 in {mode}");
                 var body=Id<ScrollViewer>(card,"PlanBody");var footer=Id<Border>(card,"PlanFooter");body.ScrollToEnd();w.UpdateLayout();
                 var bodyBottom=body.TranslatePoint(new Point(0,body.ActualHeight),card).Y;var footerTop=footer.TranslatePoint(new Point(),card).Y;
-                check(bodyBottom<=footerTop+1 && footer.ActualHeight>=32,$"Expanded {mode} dialog scrolls above a separate visible footer");
+                check(bodyBottom<=footerTop+1 && footer.ActualHeight>=32,$"Simplified {mode} dialog keeps body above a visible footer");
                 DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-"+mode.ToLowerInvariant()+".png"));
             }
             w.Width=412;w.Height=480;w.UpdateLayout();var smallBody=Id<ScrollViewer>(card,"PlanBody");var smallFooter=Id<Border>(card,"PlanFooter");smallBody.ScrollToEnd();w.UpdateLayout();

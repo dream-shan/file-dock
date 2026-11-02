@@ -74,7 +74,7 @@ public sealed class PlannerView : UserControl
         var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
         var list=new StackPanel();
 
-        var items=_state.Plans.Where(p=>PlanRules.InPeriod(p,Level,_date)).OrderBy(p=>p.Date).ThenBy(p=>p.Time=="" ? "99:99":p.Time).ToList();
+        var items=_state.Plans.Where(p=>PlanRules.InPeriod(p,Level,_date)).OrderBy(p=>p.Date).ToList();
         foreach(var p in items.Where(p=>!PlanRules.Complete(p,_state.Plans)))Row(list,p);
         if(items.Count==0 && _detailId!="")list.Children.Add(Label(Level==3 && _date.Date==PlanRules.Today ? "今天暂无待办":"暂无待办",true));
         var done=items.Where(p=>PlanRules.Complete(p,_state.Plans)).ToList();
@@ -87,15 +87,12 @@ public sealed class PlannerView : UserControl
     private void Row(Panel list,PlanItem p)
     {
         var row=new DockPanel{Margin=new Thickness(0,4,0,4)};
-        var children=_state.Plans.Where(c=>c.ParentId==p.Id).ToList();
         bool done=PlanRules.Complete(p,_state.Plans);
         var check=new CheckBox{IsChecked=done,Template=CircleTemplate,IsEnabled=true,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(3,9,10,0),ToolTip="标记完成"};
         AutomationProperties.SetName(check,"完成："+p.Title);
         check.Click+=(_,_)=>ToggleDone(p,check.IsChecked==true);DockPanel.SetDock(check,Dock.Left);row.Children.Add(check);
         var content=new StackPanel();var title=Label(p.Title);title.FontSize=12;if(done){title.TextDecorations=TextDecorations.Strikethrough;title.SetResourceReference(TextBlock.ForegroundProperty,"Muted");}content.Children.Add(title);
-        var parent=_state.Plans.FirstOrDefault(c=>c.Id==p.ParentId);
-        var meta=new List<string>();if(p.Time.Length>0)meta.Add(p.Time);if(parent!=null)meta.Add("归属："+parent.Title);
-        if(children.Count>0)meta.Add($"{children.Count(c=>PlanRules.Complete(c,_state.Plans))} / {children.Count} 已完成");
+        var meta=new List<string>();
         bool overdue=PlanRules.Overdue(p,PlanRules.Today);
         if(PlanRules.EffectiveDue(p) is DateTime due)meta.Add(due.Date==PlanRules.Today ? "截止今天":$"截止 {due:M/d}");if(overdue)meta.Add("已逾期");
         if(meta.Count>0){var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;if(overdue)subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Error");content.Children.Add(subtitle);}
@@ -104,34 +101,30 @@ public sealed class PlannerView : UserControl
         var separator=new Border{Child=row,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
 
     }
-    private void Edit(PlanItem? item,string? presetParent=null)
+    private void Edit(PlanItem? item)
     {
         _editing=true;
         var owner=Window.GetWindow(this) as MainWindow;
-        var draft=item?.Copy()??new PlanItem{Level=Level,Date=PlanRules.Today,ScopePeriod=PlanRules.Period(Level,PlanRules.Today),ParentId=presetParent};
+        var draft=item?.Copy()??new PlanItem{Level=Level,Date=PlanRules.Today,ScopePeriod=PlanRules.Period(Level,PlanRules.Today)};
         bool Commit(PlanItem plan){int index=item==null ? -1:_state.Plans.FindIndex(v=>v.Id==item.Id);var previous=index<0 ? null:_state.Plans[index];int oldLevel=_state.PlannerLevel;
             if(index<0)_state.Plans.Add(plan);else _state.Plans[index]=plan;_state.PlannerLevel=plan.Level;
             if(!_save()){if(index<0)_state.Plans.Remove(plan);else _state.Plans[index]=previous!;_state.PlannerLevel=oldLevel;return false;}
             _date=PlanRules.Start(plan);_detailId=null;_completed=plan.Done;owner?.ClosePlanDialog();_revealId=plan.Id;Render();owner?.SetStatus((item==null ? "已添加到「":"已保存到「")+PlanRules.Names[plan.Level]+"」");return true;}
         Action? delete=item==null ? null:()=>DeletePlan(item,owner);
-        Action? child=item==null || item.Level==3 ? null:()=>{_state.PlannerLevel=item.Level+1;_date=item.Date;Edit(null,item.Id);};
-        var card=new PlanCard(draft,_state.Plans,item!=null,Commit,()=>{owner?.ClosePlanDialog();_detailId=null;Render();},delete,child,p=>Edit(p));
+        var card=new PlanCard(draft,item!=null,Commit,()=>{owner?.ClosePlanDialog();_detailId=null;Render();},delete);
         owner?.OpenPlanDialog(card);
     }
     internal void FocusAdd(){foreach(var child in Visuals(this))if(child is Button b && AutomationProperties.GetAutomationId(b)=="PlannerQuickAdd"){b.Focus();break;}}
     private static IEnumerable<DependencyObject> Visuals(DependencyObject p){yield return p;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in Visuals(VisualTreeHelper.GetChild(p,i)))yield return c;}
     private void ToggleDone(PlanItem p,bool done)
     {
-        var before=_state.Plans.Select(v=>v.Copy()).ToList();var children=PlanRules.Descendants(p,_state.Plans);int choice=1;
-        if(done && children.Any(c=>!c.Done)){choice=MainWindow.PlanChoice(Window.GetWindow(this),"上级还有未完成的子项，如何完成？","一并完成","仅完成自身");if(choice==2){Render();return;}}
-        PlanRules.SetDone(p,done);if(done && choice==0)foreach(var child in children)PlanRules.SetDone(child,true);
+        var before=_state.Plans.Select(v=>v.Copy()).ToList();PlanRules.SetDone(p,done);
         if(!_save()){_state.Plans.Clear();_state.Plans.AddRange(before);}Render();
     }
     private void DeletePlan(PlanItem p,MainWindow? owner)
     {
-        var before=_state.Plans.Select(v=>v.Copy()).ToList();var children=PlanRules.Descendants(p,_state.Plans);int choice=0;
-        if(children.Count>0){choice=MainWindow.PlanChoice(owner,"此计划有关联子项，如何删除？","子项变为独立","一并删除");if(choice==2)return;}
-        _state.Plans.RemoveAll(v=>v.Id==p.Id);if(choice==1)_state.Plans.RemoveAll(v=>children.Any(c=>c.Id==v.Id));else foreach(var child in _state.Plans.Where(c=>c.ParentId==p.Id))child.ParentId=null;
+        var before=_state.Plans.Select(v=>v.Copy()).ToList();var children=_state.Plans.Where(v=>v.ParentId==p.Id).ToList();
+        _state.Plans.RemoveAll(v=>v.Id==p.Id);foreach(var child in children)child.ParentId=null;
         if(!_save()){_state.Plans.Clear();_state.Plans.AddRange(before);return;}owner?.ClosePlanDialog();Render();
         Header(Button("已删除 · 撤销",()=>{var current=_state.Plans.Select(v=>v.Copy()).ToList();foreach(var old in before){var now=_state.Plans.FirstOrDefault(v=>v.Id==old.Id);if(now==null)_state.Plans.Add(old);else if(children.Any(c=>c.Id==now.Id))now.ParentId=old.ParentId;}if(!_save()){_state.Plans.Clear();_state.Plans.AddRange(current);}Render();}));
     }

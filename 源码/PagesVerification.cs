@@ -27,6 +27,7 @@ internal static class PagesVerification
     internal static async Task Run(MainWindow window,string root,Action<bool,string> check)
     {
         var goal=new PlanItem{Level=0,Title="Goal"};
+        check(goal.ToString()=="Goal","Planner parent selectors show titles in the existing themed combo template");
         var month=new PlanItem{Level=1,Title="Month",ParentId=goal.Id};
         var week=new PlanItem{Level=2,Title="Week",ParentId=month.Id};
         var day=new PlanItem{Level=3,Title="Day",ParentId=week.Id,Done=true,Notes="Notes",Time="09:00"};

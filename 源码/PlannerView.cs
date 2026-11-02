@@ -19,6 +19,7 @@ public sealed class PlanItem
     public string Time { get; set; } = "";
     public string? ParentId { get; set; }
     public bool Done { get; set; }
+    public override string ToString() => Title;
 }
 
 internal static class PlanRules
@@ -121,7 +122,7 @@ public sealed class PlannerView : UserControl
             if(value!="" && (parts.Length>2 || parts.Any(s=>!TimeOnly.TryParseExact(s.Trim(),"HH:mm",CultureInfo.InvariantCulture,DateTimeStyles.None,out _)) || (parts.Length==2 && string.CompareOrdinal(parts[0].Trim(),parts[1].Trim())>=0))){error.Text="时间请使用 HH:mm，结束时间须晚于开始时间。";return;}
             var p=item??new PlanItem{Level=level};p.Title=title.Text.Trim();p.Date=date.SelectedDate.Value.Date;p.Deadline=due.SelectedDate?.Date;p.Time=value;p.Notes=notes.Text;p.ParentId=parent.SelectedValue as string;
             if(item==null)_state.Plans.Add(p);_date=p.Date;_save();Render();
-        }));actions.Children.Add(Button("取消",Render));form.Children.Add(actions);
+        }));actions.Children.Add(Button("取消",Render));Header(actions);
         if(item!=null){
             if(level<3){form.Children.Add(Button("＋ 添加"+Levels[level+1],()=>{_state.PlannerLevel=level+1;_date=item.Date;Edit(null,item.Id);}));
                 foreach(var child in _state.Plans.Where(p=>p.ParentId==item.Id && p.Level==level+1))form.Children.Add(Button("↳ "+child.Title,()=>{_state.PlannerLevel=child.Level;Edit(child);}));}

@@ -32,6 +32,10 @@ internal static class PlannerVerification
             All<Button>(w.Planner).First(b=>b.Content is StackPanel).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();Field("PlanTitle").Text="取消的修改";Click("取消");check(w.State.Plans[1].Title=="验证今日计划","Cancel leaves stored task unchanged");
             var box=All<CheckBox>(w.Planner).First();box.IsChecked=true;box.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));check(w.State.Plans[1].Done,"Card-created daily task can be completed");
             Click("已完成 1 项 · 展开");All<Button>(w.Planner).First(b=>b.Content is StackPanel).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();Click("删除");check(w.State.Plans.Count==1,"Card deletes its task");Click("已删除 · 撤销");check(w.State.Plans.Count==2 && w.State.Plans[1].Notes=="验证备注","Undo restores card data");
+            var dateDraft=new PlanItem{Level=1,Date=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1).AddMonths(-1)};
+            var dateCard=new PlanCard(dateDraft,new List<PlanItem>(),false,_=>true,()=>{});dateCard.Measure(new Size(400,500));dateCard.Arrange(new Rect(0,0,400,500));dateCard.UpdateLayout();
+            All<Button>(dateCard).First(b=>b.Content as string=="今天").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            check(dateDraft.Level==3 && dateDraft.Date==DateTime.Today,"Switching from a monthly date to today resets the date to today");
             DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"planner-daily.png"));
             Click("＋ 添加待办");Field("PlanTitle").Text="保存失败草稿";
             using(var locked=new System.IO.FileStream(System.IO.Path.Combine(root,"data","state.json"),System.IO.FileMode.Open,System.IO.FileAccess.Read,System.IO.FileShare.Read)){

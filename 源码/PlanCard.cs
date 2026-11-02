@@ -48,7 +48,7 @@ internal sealed class PlanCard : UserControl
     private static TextBlock Label(string s)=>new(){Text=s,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,5,0,5)};
     private static Button Btn(string s,Action action){var b=new Button{Content=s,Padding=new Thickness(8,5,8,5),Margin=new Thickness(1)};b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;}
     private void Input(TextBox box,string id,Panel? panel=null){box.Padding=new Thickness(7);box.Margin=new Thickness(0,2,0,5);box.SetResourceReference(BackgroundProperty,"Card");box.SetResourceReference(ForegroundProperty,"Ink");AutomationProperties.SetAutomationId(box,id);(panel??_fields).Children.Add(box);}
-    private void ChangeLevel(int level){if(_hasChildren && level!=_originalLevel){_error.Text="此计划有关联子计划，请先解除子计划关联后再更改类型。";return;}string? old=_parent.SelectedValue as string;_draft.Level=level;RefreshTypes(old);if(!string.IsNullOrEmpty(old) && _parent.SelectedValue as string!=old)_error.Text="原上级不适用于此类型，请重新选择；也可以保持独立。";}
+    private void ChangeLevel(int level){if(_hasChildren && level!=_originalLevel){_error.Text="此计划有关联子计划，请先解除子计划关联后再更改类型。";return;}string? old=_parent.SelectedValue as string;if(level!=_draft.Level)_draft.Date=DateTime.Today;_draft.Level=level;RefreshTypes(old);if(!string.IsNullOrEmpty(old) && _parent.SelectedValue as string!=old)_error.Text="原上级不适用于此类型，请重新选择；也可以保持独立。";}
     private void RefreshTypes(string? parent)
     {
         for(int i=0;i<4;i++)_types[i].SetResourceReference(ForegroundProperty,i==_draft.Level ? "Accent":"Muted");

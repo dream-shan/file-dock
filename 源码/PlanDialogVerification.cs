@@ -1,0 +1,43 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
+using System.Windows.Input;
+using System.Windows.Media;
+namespace FileDockDemo;
+internal static class PlanDialogVerification
+{
+    private static IEnumerable<T> All<T>(DependencyObject p) where T:DependencyObject{if(p is T t)yield return t;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in All<T>(VisualTreeHelper.GetChild(p,i)))yield return c;}
+    private static T Id<T>(DependencyObject p,string id) where T:DependencyObject=>All<T>(p).First(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)==id);
+    private static double Contrast(Color a,Color b){double L(Color c){double C(byte v){double x=v/255d;return x<=.04045 ? x/12.92:Math.Pow((x+.055)/1.055,2.4);}return .2126*C(c.R)+.7152*C(c.G)+.0722*C(c.B);}double x=L(a),y=L(b);return (Math.Max(x,y)+.05)/(Math.Min(x,y)+.05);}
+    internal static void Run(MainWindow w,string root,Action<bool,string> check)
+    {
+        double width=w.Width,height=w.Height;string theme=w.State.ThemeMode;
+        try{
+            w.Width=462;w.Height=650;w.Planner.Render();w.UpdateLayout();Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();var card=w.ActivePlanCard??throw new InvalidOperationException("Dialog was not opened");
+            check(!w.ContentGrid.IsEnabled && !w.PageRail.IsEnabled,"Plan dialog disables background controls");
+            check(KeyboardNavigation.GetTabNavigation(card)==KeyboardNavigationMode.Cycle,"Plan dialog contains keyboard tab navigation");
+            var peer=UIElementAutomationPeer.CreatePeerForElement(card)!;check(peer.GetPattern(PatternInterface.Window) is IWindowProvider provider && provider.IsModal,"Native accessibility exposes the plan card as a modal dialog");
+            check(!Id<Button>(card,"PlanSubmit").IsEnabled && !card.HasChanges,"Empty dialog starts disabled without a dirty draft");
+            var title=Id<TextBox>(card,"PlanTitle");title.Text=new string('测',161);w.UpdateLayout();check(All<TextBlock>(card).Any(t=>t.Text=="161/200" && t.IsVisible),"Title counter appears above 160 characters");
+            title.Text="整理本周学习计划";var more=Id<Expander>(card,"PlanMore");more.IsExpanded=true;w.UpdateLayout();Id<Grid>(card,"PlanMoreBody").BeginAnimation(UIElement.OpacityProperty,null);Id<Grid>(card,"PlanMoreBody").Opacity=1;check(Id<TextBox>(card,"PlanNotes").MaxLength==500,"Plan notes enforce the 500 character limit");
+            Id<RadioButton>(card,"PlanType0").IsChecked=true;check(!Id<Button>(card,"PlanParent").IsEnabled,"Long-term scope disables parent selection");
+            Id<RadioButton>(card,"PlanType3").IsChecked=true;
+            foreach(string mode in new[]{"Dark","Light"}){
+                w.SetThemeMode(mode);w.UpdateLayout();var surface=ThemePalette.Brush("Surface").Color;var ink=ThemePalette.Brush("Ink").Color;var secondary=((SolidColorBrush)card.Resources["PlanSecondary"]).Color;var accent=((SolidColorBrush)card.Resources["PlanAccent"]).Color;var onAccent=((SolidColorBrush)card.Resources["PlanOnAccent"]).Color;
+                check(Contrast(ink,surface)>=4.5 && Contrast(secondary,surface)>=4.5 && Contrast(accent,onAccent)>=4.5,$"Plan text and primary action meet 4.5:1 in {mode}");
+                var body=Id<ScrollViewer>(card,"PlanBody");var footer=Id<Border>(card,"PlanFooter");body.ScrollToEnd();w.UpdateLayout();
+                var bodyBottom=body.TranslatePoint(new Point(0,body.ActualHeight),card).Y;var footerTop=footer.TranslatePoint(new Point(),card).Y;
+                check(bodyBottom<=footerTop+1 && footer.ActualHeight>=32,$"Expanded {mode} dialog scrolls above a separate visible footer");
+                DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-"+mode.ToLowerInvariant()+".png"));
+            }
+            w.Width=412;w.Height=480;w.UpdateLayout();var smallBody=Id<ScrollViewer>(card,"PlanBody");var smallFooter=Id<Border>(card,"PlanFooter");smallBody.ScrollToEnd();w.UpdateLayout();
+            check(smallBody.ViewportHeight>30 && smallBody.TranslatePoint(new Point(0,smallBody.ActualHeight),card).Y<=smallFooter.TranslatePoint(new Point(),card).Y+1,"Compact window keeps body and footer separate");
+            DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-small.png"));
+        }finally{w.ClosePlanDialog();w.Width=width;w.Height=height;w.SetThemeMode(theme);w.Planner.Render();}
+    }
+}

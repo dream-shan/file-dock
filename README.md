@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.20 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.21 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.20) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.21) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -24,7 +24,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.20-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.21-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -123,9 +123,8 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
-- 修正卡片切换类型时沿用旧日期的问题：切到今天、本周或本月时默认回到当前日期，仍可通过日期选择块改期。
-
-- 添加待办改为计划卡片：填写计划、选择长期/本月/本周/今天及对应日期；补充信息默认折叠。保存成功后转到目标清单，保存失败保留内容。编辑可调整类型，已有子计划时限制类型变化以保护关联。
+- 重做新建／编辑待办为面板内模态对话框：固定标题和底栏、正文独立滚动，范围分段单选、截止日期快捷项、可搜索上级、优先级和备注。支持键盘、草稿放弃确认及提交失败重试。
+- 统一周一／本地日期的周期、父级过滤和逾期规则；旧计划自动补齐周期与元数据，历史完成时间未知时保留空值。完成状态与子项进度分离，完成／删除上级提供子项处理选择。
 
 - 计划区改为今日待办清单：今天、本周、本月、长期切换；圆形完成勾选、完成项删除线与折叠、紧凑时间和归属说明。底部点击添加待办打开计划卡片；点击任务打开编辑卡片。保留现有计划与层级关联。
 
@@ -170,7 +169,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.20-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.21-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

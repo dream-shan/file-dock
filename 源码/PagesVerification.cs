@@ -32,7 +32,7 @@ internal static class PagesVerification
         var week=new PlanItem{Level=2,Title="Week",ParentId=month.Id};
         var day=new PlanItem{Level=3,Title="Day",ParentId=week.Id,Done=true,Notes="Notes",Time="09:00"};
         var plans=new System.Collections.Generic.List<PlanItem>{goal,month,week,day};
-        check(PlanRules.Complete(goal,plans),"Completed daily task rolls progress up through all four linked levels");
+        check(!PlanRules.Complete(goal,plans),"Completed daily task does not implicitly complete an ancestor");
         day.Done=false;check(!PlanRules.Complete(goal,plans),"Reopening daily task updates ancestor completion");
         check(PlanRules.Week(new DateTime(2026,11,1))==new DateTime(2026,10,26),"Planner weeks start Monday across month boundaries");
         day.Date=new DateTime(2026,11,2);check(PlanRules.InPeriod(day,3,day.Date) && !PlanRules.InPeriod(day,3,day.Date.AddDays(1)),"Daily plans remain on their assigned date");

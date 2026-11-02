@@ -522,6 +522,7 @@ public partial class MainWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (_captureInteractionHeld) { e.Handled = true; return; }
+        if(ActivePlanCard!=null){ActivePlanCard.HandleWindowKey(e);return;}
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SelectPage("Files"); SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
         if (Planner.IsKeyboardFocusWithin && e.Key != Key.Escape) return;
         if (HandleMemoryActionKey(e) || IsFilesPage && (HandleTransferKey(e) || HandleBrowserKey(e))) return;
@@ -529,7 +530,7 @@ public partial class MainWindow : Window
         if (IsFilesPage && e.Key == Key.Enter && !FilesPageTab.IsKeyboardFocused && !PerformancePageTab.IsKeyboardFocused) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
-    private void Window_Closing(object? sender, CancelEventArgs e) { if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
+    private void Window_Closing(object? sender, CancelEventArgs e) { if(!_quitting && ActivePlanCard!=null){e.Cancel=true;ActivePlanCard.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) {
         DiagnosticLog.Write("display-settings-changed");
         Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });

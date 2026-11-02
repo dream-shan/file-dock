@@ -8,6 +8,15 @@ using System.Text.Json.Serialization;
 namespace FileDockDemo;
 public sealed class PlanItem
 {
+    public int ScheduleSchema { get; set; }
+    public string Kind { get; set; }="once";
+    public string RepeatRule { get; set; }="daily";
+    public int Weekdays { get; set; }=127; // Monday = bit 0.
+    public int ActiveDays { get; set; }=2;
+    public int RestDays { get; set; }=1;
+    public DateTime ScheduledDate { get; set; }=PlanRules.Today;
+    public DateTime? DoneDate { get; set; }
+    public bool Migrated { get; set; }
     public string Id { get; set; }=Guid.NewGuid().ToString("N");
     public string Title { get; set; }="";
     public string Notes { get; set; }="";
@@ -42,6 +51,24 @@ public sealed class PlanDateConverter : JsonConverter<DateTime?>
 
 internal static class PlanRules
 {
+    internal static bool Appears(PlanItem p,DateTime day)
+    {
+        day=day.Date;var start=p.ScheduledDate.Date;if(day<start)return false;
+        if(p.Kind=="once")return day==start;
+        if(p.RepeatRule=="weekdays")return (p.Weekdays & (1<<(((int)day.DayOfWeek+6)%7)))!=0;
+        if(p.RepeatRule=="cycle")return (day-start).Days%(p.ActiveDays+p.RestDays)<p.ActiveDays;
+        return true;
+    }
+    internal static bool DoneToday(PlanItem p,DateTime day)=>p.Done && p.DoneDate?.Date==day.Date;
+    internal static string ScheduleLabel(PlanItem p)=>p.Kind=="once" ? "一次性 · "+p.ScheduledDate.ToString("M月d日") : p.RepeatRule switch {
+        "weekdays"=>"每周 "+string.Join("、",Enumerable.Range(0,7).Where(i=>(p.Weekdays&(1<<i))!=0).Select(i=>new[]{"一","二","三","四","五","六","日"}[i])),
+        "cycle"=>$"出现 {p.ActiveDays} 天 · 休息 {p.RestDays} 天",_=>"每天"};
+    internal static bool Reconcile(List<PlanItem> items,DateTime today)
+    {
+        bool changed=items.RemoveAll(p=>p.ScheduleSchema==1 && !p.Migrated && p.Kind=="once" && p.ScheduledDate.Date<today.Date)>0;
+        foreach(var p in items)if(p.ScheduleSchema==1 && !p.Migrated && p.Done && !DoneToday(p,today)){p.Done=false;p.DoneDate=null;p.CompletedAt=null;changed=true;}
+        return changed;
+    }
     internal const DayOfWeek WEEK_START=DayOfWeek.Monday;
     internal static readonly string[] Names={"长期","本月","本周","今天"};
     internal static DateTime Today=>DateTime.Today;
@@ -79,6 +106,8 @@ internal static class PlanRules
         p.ScopePeriod=Period(p.Level,Start(p));p.Date=Start(p);
         p.Priority=p.Priority is "low" or "medium" or "high" ? p.Priority:"none";
         if(!p.Done)p.CompletedAt=null;
+        if(p.ScheduleSchema==0){p.Kind="once";p.ScheduledDate=(p.Deadline??(p.Level==3 ? Start(p):Today)).Date;p.DoneDate=p.Done ? p.ScheduledDate:null;p.Migrated=true;p.ScheduleSchema=1;}
+        if(p.Kind is not ("once" or "repeat") || p.RepeatRule is not ("daily" or "weekdays" or "cycle") || p.Weekdays<1 || p.Weekdays>127 || p.ActiveDays<1 || p.ActiveDays>365 || p.RestDays<1 || p.RestDays>365 || p.ScheduleSchema!=1)throw new System.IO.InvalidDataException("待办重复规则无效。");
     }
-    internal static void SetDone(PlanItem p,bool done){p.Done=done;p.CompletedAt=done ? Now:null;p.UpdatedAt=Now;}
+    internal static void SetDone(PlanItem p,bool done){p.Done=done;p.DoneDate=done ? Today:null;p.CompletedAt=done ? Now:null;p.UpdatedAt=Now;}
 }

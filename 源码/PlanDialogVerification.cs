@@ -26,7 +26,7 @@ internal static class PlanDialogVerification
             var title=Id<TextBox>(card,"PlanTitle");title.Text=new string('测',161);w.UpdateLayout();check(All<TextBlock>(card).Any(t=>t.Text=="161/200" && t.IsVisible),"Title counter appears above 160 characters");
             title.Text="整理本周学习计划";w.UpdateLayout();check(!All<Expander>(card).Any(),"Simple dialog contains no supplementary section");
             title.Text="";w.UpdateLayout();var caret=title.GetRectFromCharacterIndex(0,true);check(!caret.IsEmpty && caret.Left>=title.Padding.Left && caret.Height>0,"Empty input exposes the native caret rectangle used by the placeholder");title.Text="整理本周学习计划";
-            Id<RadioButton>(card,"PlanType0").IsChecked=true;Id<RadioButton>(card,"PlanType3").IsChecked=true;
+            Id<RadioButton>(card,"PlanType0").IsChecked=true;Id<RadioButton>(card,"PlanType1").IsChecked=true;
             foreach(string mode in new[]{"Dark","Light"}){
                 w.SetThemeMode(mode);w.UpdateLayout();var surface=ThemePalette.Brush("Surface").Color;var ink=ThemePalette.Brush("Ink").Color;var secondary=((SolidColorBrush)card.Resources["PlanSecondary"]).Color;var accent=((SolidColorBrush)card.Resources["PlanAccent"]).Color;var onAccent=((SolidColorBrush)card.Resources["PlanOnAccent"]).Color;
                 check(Contrast(ink,surface)>=4.5 && Contrast(secondary,surface)>=4.5 && Contrast(accent,onAccent)>=4.5,$"Plan text and primary action meet 4.5:1 in {mode}");

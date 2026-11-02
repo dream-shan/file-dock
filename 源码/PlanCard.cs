@@ -23,18 +23,18 @@ internal sealed class PlanCard : UserControl
     private readonly PlanTitleBox _title=new();
     private readonly TextBlock _titleError=new(),_error=new(),_counter=new();
     private readonly Button _submit,_date,_clearDate;
-    private readonly RadioButton[] _types=new RadioButton[4];
-    private readonly StackPanel _body=new(),_warningArea=new();
+    private readonly RadioButton[] _types=new RadioButton[2];
+    private readonly StackPanel _body=new(),_warningArea=new(); private readonly StackPanel _schedule=new();
     private readonly List<Popup> _popups=new();
     private bool _touched,_busy,_committed,_initializing=true;
     private readonly bool _editing;
     internal bool HasChanges=>Snapshot()!=_original;
     internal bool IsBusy=>_busy;
-    private string Snapshot()=>string.Join("\u001f",_title.Text,_draft.Level,_draft.ScopePeriod,_draft.Deadline?.ToString("yyyy-MM-dd"));
+    private string Snapshot()=>string.Join("\u001f",_title.Text,_draft.Kind,_draft.RepeatRule,_draft.Weekdays,_draft.ActiveDays,_draft.RestDays,_draft.ScheduledDate.ToString("yyyy-MM-dd"));
     internal PlanCard(PlanItem draft,bool editing,Func<PlanItem,bool> commit,Action cancel,Action? delete=null)
     {
         _draft=draft;_commit=commit;_cancel=cancel;_editing=editing;
-        PlanRules.AssignPeriod(_draft,draft.Level,draft.Date);
+
         SetResourceReference(BackgroundProperty,"Surface");SetResourceReference(ForegroundProperty,"Ink");
         RefreshTheme();
         // Explicit local resources keep controls/popovers readable even under system control templates.
@@ -49,10 +49,10 @@ internal sealed class PlanCard : UserControl
         var titleBlock=Section("计划 *");_title.Text=draft.Title;_title.AcceptsReturn=true;_title.TextWrapping=TextWrapping.Wrap;_title.MinLines=1;_title.MaxLines=4;_title.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;_title.MaxLength=200;Input(_title,"PlanTitle");AutomationProperties.SetName(_title,"计划");
         titleBlock.Children.Add(new System.Windows.Documents.AdornerDecorator{Child=_title});_counter.HorizontalAlignment=HorizontalAlignment.Right;_counter.SetResourceReference(TextBlock.ForegroundProperty,"PlanSecondary");_counter.Visibility=Visibility.Collapsed;titleBlock.Children.Add(_counter);_titleError.SetResourceReference(TextBlock.ForegroundProperty,"Error");_titleError.TextWrapping=TextWrapping.Wrap;titleBlock.Children.Add(_titleError);
         _title.TextChanged+=(_,_)=>{_counter.Text=_title.Text.Length>160 ? $"{_title.Text.Length}/200":"";_counter.Visibility=_title.Text.Length>160 ? Visibility.Visible:Visibility.Collapsed;ValidateTitle();};_title.LostKeyboardFocus+=(_,_)=>{_touched=true;ValidateTitle();};
-        var scopes=Section("范围");var row=new ScopeGrid{Columns=4};AutomationProperties.SetName(row,"范围，单选");var scopeFrame=new Border{Child=row,CornerRadius=new CornerRadius(7),BorderThickness=new Thickness(1)};scopeFrame.SetResourceReference(Border.BackgroundProperty,"Input");scopeFrame.SetResourceReference(Border.BorderBrushProperty,"Border");scopes.Children.Add(scopeFrame);string group=Guid.NewGuid().ToString();
-        for(int i=0;i<4;i++){int level=i;var b=new RadioButton{GroupName=group,Margin=new Thickness(2),Padding=new Thickness(4,6,4,6),HorizontalContentAlignment=HorizontalAlignment.Center,IsChecked=i==draft.Level};b.SetResourceReference(ForegroundProperty,"PlanSecondary");b.Template=ScopeTemplate();AutomationProperties.SetAutomationId(b,"PlanType"+i);b.Checked+=(_,_)=>{if(!_initializing)ChangeLevel(level);};b.KeyDown+=(_,e)=>{if(e.Key is Key.Left or Key.Right){int next=(level+(e.Key==Key.Right ? 1:3))%4;_types[next].IsChecked=true;_types[next].Focus();e.Handled=true;}};_types[i]=b;row.Children.Add(b);}
-        var due=Section("截止日期（可选）");var dueRow=new DockPanel();_clearDate=Btn("×",()=>{_draft.Deadline=null;Refresh();});AutomationProperties.SetName(_clearDate,"清除截止日期");DockPanel.SetDock(_clearDate,Dock.Right);dueRow.Children.Add(_clearDate);_date=Btn("",OpenCalendar);_date.HorizontalContentAlignment=HorizontalAlignment.Left;AutomationProperties.SetAutomationId(_date,"PlanDate");dueRow.Children.Add(_date);var dateFrame=new Border{Child=dueRow,CornerRadius=new CornerRadius(6),BorderThickness=new Thickness(1),Padding=new Thickness(2)};dateFrame.SetResourceReference(Border.BackgroundProperty,"Input");dateFrame.SetResourceReference(Border.BorderBrushProperty,"Border");due.Children.Add(dateFrame);
-        due.Children.Add(_warningArea);
+        var scopes=Section("类型");var row=new ScopeGrid{Columns=2};scopes.Children.Add(row);string group=Guid.NewGuid().ToString();
+        for(int i=0;i<2;i++){int n=i;var b=new RadioButton{GroupName=group,Content=i==0 ? "一次性":"重复",Margin=new Thickness(2),Padding=new Thickness(12,8,12,8),IsChecked=(draft.Kind=="repeat" ? 1:0)==i};b.SetResourceReference(ForegroundProperty,"PlanSecondary");b.Template=ScopeTemplate();AutomationProperties.SetAutomationId(b,"PlanType"+i);b.Checked+=(_,_)=>{if(!_initializing){_draft.Kind=n==0 ? "once":"repeat";Refresh();}};b.KeyDown+=(_,e)=>{if(e.Key is Key.Left or Key.Right){_types[1-n].IsChecked=true;_types[1-n].Focus();e.Handled=true;}};row.Children.Add(b);_types[i]=b;}
+        _body.Children.Add(_schedule);
+        _date=Btn("",OpenCalendar);AutomationProperties.SetAutomationId(_date,"PlanDate");_clearDate=Btn("",()=>{});
         _error.TextWrapping=TextWrapping.Wrap;_error.SetResourceReference(TextBlock.ForegroundProperty,"Error");_body.Children.Add(_error);_initializing=false;Refresh();_original=Snapshot();_counter.Text=_title.Text.Length>160 ? $"{_title.Text.Length}/200":"";_counter.Visibility=_title.Text.Length>160 ? Visibility.Visible:Visibility.Collapsed;ValidateTitle();Loaded+=(_,_)=>FocusTitle();Unloaded+=(_,_)=>{foreach(var popup in _popups.ToArray())popup.IsOpen=false;};
     }
     internal void RefreshTheme(){bool dark=ThemePalette.Brush("Surface").Color.R<128;Resources["PlanSecondary"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#A4AEBE":"#536177"));var accent=(Color)ColorConverter.ConvertFromString(dark ? "#82B3FF":"#3554CC");Resources["PlanAccent"]=new SolidColorBrush(accent);Resources["PlanSelection"]=new SolidColorBrush(Color.FromArgb(31,accent.R,accent.G,accent.B));Resources["PlanOnAccent"]=new SolidColorBrush(dark ? Color.FromRgb(32,35,41):Colors.White);}
@@ -71,18 +71,23 @@ internal sealed class PlanCard : UserControl
         else if(e.Key==Key.Enter && _title.IsKeyboardFocusWithin && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)){Save();e.Handled=true;}
     }
     internal void RequestClose(){if(_busy)return;if(HasChanges && !App.IsSelfTest && MessageBox.Show(Window.GetWindow(this),"放弃已填写的内容？","文件坞",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;_cancel();}
-    private void ChangeLevel(int level){PlanRules.AssignPeriod(_draft,level,PlanRules.Today);Refresh();}
     private void Refresh()
     {
-        for(int i=0;i<4;i++){
-            var sample=new PlanItem();PlanRules.AssignPeriod(sample,i,PlanRules.Today);if(i==_draft.Level)sample=_draft;string hint=i switch{0=>"无期限",1=>PlanRules.Start(sample).ToString("MM月"),2=>$"{PlanRules.Start(sample):MM/dd}–{PlanRules.End(sample):MM/dd}",_=>PlanRules.Start(sample).ToString("MM/dd ddd")};
-            var text=new StackPanel();var name=Text(PlanRules.Names[i]);name.HorizontalAlignment=HorizontalAlignment.Center;name.Margin=new Thickness(0,0,0,5);name.SetResourceReference(TextBlock.ForegroundProperty,i==_draft.Level ? "PlanAccent":"PlanSecondary");text.Children.Add(name);var sub=Text(hint,true);sub.FontSize=9;sub.TextWrapping=TextWrapping.NoWrap;sub.Margin=new Thickness(0);text.Children.Add(sub);_types[i].Content=text;
+        _schedule.Children.Clear();
+        if(_draft.Kind=="repeat"){
+            var choices=new StackPanel();choices.Children.Add(Text("出现规律"));var rules=new WrapPanel();choices.Children.Add(rules);
+            string[] values={"daily","weekdays","cycle"},names={"每天","每周指定日期","做几天、停几天"};
+            for(int i=0;i<3;i++){string rule=values[i];var b=new RadioButton{Content=names[i],GroupName="RepeatRule",IsChecked=_draft.RepeatRule==rule,Margin=new Thickness(3),Padding=new Thickness(7),Template=ScopeTemplate()};b.SetResourceReference(ForegroundProperty,"PlanSecondary");AutomationProperties.SetAutomationId(b,"PlanRule"+i);b.Checked+=(_,_)=>{_draft.RepeatRule=rule;Refresh();};rules.Children.Add(b);}_schedule.Children.Add(choices);
+            if(_draft.RepeatRule=="weekdays"){
+                var days=new WrapPanel();string[] labels={"周一","周二","周三","周四","周五","周六","周日"};for(int i=0;i<7;i++){int bit=1<<i;var c=new CheckBox{Content=labels[i],Margin=new Thickness(4,8,4,8),IsChecked=(_draft.Weekdays&bit)!=0};c.SetResourceReference(ForegroundProperty,"Ink");c.Click+=(_,_)=>{if(c.IsChecked==true)_draft.Weekdays|=bit;else _draft.Weekdays&=~bit;RefreshPreview();};days.Children.Add(c);}_schedule.Children.Add(days);
+            }
+            if(_draft.RepeatRule=="cycle"){
+                var row=new WrapPanel{Margin=new Thickness(0,8,0,8)};row.Children.Add(Text("出现天数"));var active=new TextBox{Text=_draft.ActiveDays.ToString(),Width=55,MaxLength=3};Input(active,"PlanActiveDays");row.Children.Add(active);row.Children.Add(Text("休息天数"));var rest=new TextBox{Text=_draft.RestDays.ToString(),Width=55,MaxLength=3};Input(rest,"PlanRestDays");row.Children.Add(rest);active.TextChanged+=(_,_)=>{_draft.ActiveDays=int.TryParse(active.Text,out int n)?n:0;RefreshPreview();};rest.TextChanged+=(_,_)=>{_draft.RestDays=int.TryParse(rest.Text,out int n)?n:0;RefreshPreview();};_schedule.Children.Add(row);
+            }
         }
-        _date.Content=_draft.Deadline is DateTime due ? "▦  "+due.ToString("MM月d日 ddd")+"  ▾":"▦  不设截止日期  ▾";
-        _warningArea.Children.Clear();int? suggested=PlanRules.SuggestedLevel(_draft,PlanRules.Today);
-        if(suggested.HasValue){_warningArea.Children.Add(Text($"截止日期已超出「{PlanRules.Names[_draft.Level]}」，是否改为「{PlanRules.Names[suggested.Value]}」？",true));_warningArea.Children.Add(Btn("改为"+PlanRules.Names[suggested.Value],()=>{int n=suggested.Value;_types[n].IsChecked=true;}));}
-        _clearDate.Visibility=_draft.Deadline.HasValue ? Visibility.Visible:Visibility.Collapsed;
+        var label=Text(_draft.Kind=="once" ? "执行日期":"开始日期");label.Margin=new Thickness(0,14,0,8);_schedule.Children.Add(label);_date.Content="▦  "+_draft.ScheduledDate.ToString("yyyy年M月d日 ddd")+"  ▾";_schedule.Children.Add(_date);_schedule.Children.Add(_warningArea);RefreshPreview();
     }
+    private void RefreshPreview(){_warningArea.Children.Clear();if(_draft.Kind!="repeat")return;if((_draft.RepeatRule=="weekdays" && _draft.Weekdays==0) || (_draft.RepeatRule=="cycle" && (_draft.ActiveDays<1 || _draft.RestDays<1 || _draft.ActiveDays>365 || _draft.RestDays>365))){_warningArea.Children.Add(Text("请选择至少一天；出现和休息天数须为 1–365。",true));return;}var dates=Enumerable.Range(0,7).Select(i=>_draft.ScheduledDate.Date.AddDays(i));_warningArea.Children.Add(Text("近期安排："+string.Join(" · ",dates.Select(d=>$"{d:M/d} {(PlanRules.Appears(_draft,d)?"出现":"休息")}")),true));}
     private Popup Popup(UIElement content,UIElement target)
     {
         var border=new Border{Child=content,CornerRadius=new CornerRadius(8),Padding=new Thickness(10),BorderThickness=new Thickness(1)};border.Resources=Resources;border.SetResourceReference(Border.BackgroundProperty,"Surface");border.SetResourceReference(Border.BorderBrushProperty,"Border");
@@ -91,18 +96,20 @@ internal sealed class PlanCard : UserControl
     private void OpenCalendar()
     {
         var box=new StackPanel{Width=280};var quick=new WrapPanel();box.Children.Add(quick);Popup? popup=null;
-        void Select(DateTime? date){_draft.Deadline=date?.Date;popup!.IsOpen=false;Refresh();}
+        void Select(DateTime? date){_draft.ScheduledDate=(date??PlanRules.Today).Date;popup!.IsOpen=false;Refresh();}
         var today=PlanRules.Today;string[] names={"今天","明天","本周末","本月底"};DateTime[] dates={today,today.AddDays(1),PlanRules.Week(today).AddDays(6),new DateTime(today.Year,today.Month,DateTime.DaysInMonth(today.Year,today.Month))};for(int i=0;i<4;i++){var d=dates[i];quick.Children.Add(Btn(names[i],()=>Select(d)));}
-        var calendarHost=new StackPanel();box.Children.Add(calendarHost);DateTime month=new DateTime((_draft.Deadline??today).Year,(_draft.Deadline??today).Month,1);
+        var calendarHost=new StackPanel();box.Children.Add(calendarHost);DateTime month=new DateTime(_draft.ScheduledDate.Year,_draft.ScheduledDate.Month,1);
         void Calendar(){calendarHost.Children.Clear();var nav=new DockPanel();var prev=Btn("〈",()=>{if(month.Year>1 || month.Month>1){month=month.AddMonths(-1);Calendar();}});DockPanel.SetDock(prev,Dock.Left);nav.Children.Add(prev);var next=Btn("〉",()=>{if(month.Year<9999 || month.Month<12){month=month.AddMonths(1);Calendar();}});DockPanel.SetDock(next,Dock.Right);nav.Children.Add(next);nav.Children.Add(Text(month.ToString("yyyy年MM月")));calendarHost.Children.Add(nav);
             var days=new UniformGrid{Columns=7};calendarHost.Children.Add(days);for(int i=0;i<7;i++)days.Children.Add(Text(CultureInfo.CurrentCulture.DateTimeFormat.ShortestDayNames[((int)PlanRules.WEEK_START+i)%7],true));int offset=((int)month.DayOfWeek-(int)PlanRules.WEEK_START+7)%7;for(int i=0;i<offset;i++)days.Children.Add(new Border());
-            for(int i=1;i<=DateTime.DaysInMonth(month.Year,month.Month);i++){DateTime date=new DateTime(month.Year,month.Month,i);var b=Btn(i.ToString(),()=>Select(date));b.Padding=new Thickness(2);b.MinWidth=30;b.IsEnabled=date>=today;b.SetResourceReference(ForegroundProperty,date<today ? "PlanSecondary":"Ink");if(date==_draft.Deadline?.Date){b.SetResourceReference(BackgroundProperty,"PlanSelection");b.SetResourceReference(ForegroundProperty,"PlanAccent");}AutomationProperties.SetName(b,date.ToString("yyyy年M月d日"));days.Children.Add(b);}}
-        Calendar();box.Children.Add(Btn("清除",()=>Select(null)));popup=Popup(box,_date);
+            for(int i=1;i<=DateTime.DaysInMonth(month.Year,month.Month);i++){DateTime date=new DateTime(month.Year,month.Month,i);var b=Btn(i.ToString(),()=>Select(date));b.Padding=new Thickness(2);b.MinWidth=30;b.IsEnabled=date>=today;b.SetResourceReference(ForegroundProperty,date<today ? "PlanSecondary":"Ink");if(date==_draft.ScheduledDate.Date){b.SetResourceReference(BackgroundProperty,"PlanSelection");b.SetResourceReference(ForegroundProperty,"PlanAccent");}AutomationProperties.SetName(b,date.ToString("yyyy年M月d日"));days.Children.Add(b);}}
+        Calendar();popup=Popup(box,_date);
     }
     private void Save()
     {
         if(_busy||_committed)return;_touched=true;ValidateTitle();if(string.IsNullOrWhiteSpace(_title.Text))return;
         if(_title.Text.Trim().Length>200){_error.Text="计划最多200字。";return;}
+                if(_draft.Kind=="repeat" && ((_draft.RepeatRule=="weekdays" && _draft.Weekdays==0) || (_draft.RepeatRule=="cycle" && (_draft.ActiveDays<1 || _draft.RestDays<1 || _draft.ActiveDays>365 || _draft.RestDays>365)))){_error.Text="请选择出现日期，天数须为 1–365。";return;}
+        if(_draft.RepeatRule!="weekdays")_draft.Weekdays=127;if(_draft.RepeatRule!="cycle"){_draft.ActiveDays=2;_draft.RestDays=1;} _draft.ScheduleSchema=1;_draft.Migrated=false;_draft.Deadline=null;_draft.Level=3;_draft.Date=_draft.ScheduledDate;_draft.ScopePeriod=PlanRules.Period(3,_draft.Date);
         _draft.Title=_title.Text.Trim();_draft.CreatedAt??=PlanRules.Now;_draft.UpdatedAt=PlanRules.Now;_draft.PlanSchema=1;
         _busy=true;_submit.Content="保存中…";ValidateTitle();
         try{if(_commit(_draft))_committed=true;else _error.Text="保存失败，填写内容已保留。请检查文件权限或稍后重试。";}catch(Exception ex){_error.Text="保存失败："+ex.Message;}finally{_busy=false;_submit.Content=_editing ? "保存":"添加";ValidateTitle();}
@@ -110,7 +117,7 @@ internal sealed class PlanCard : UserControl
     private sealed class ScopeGrid : UniformGrid
     {
         protected override AutomationPeer OnCreateAutomationPeer()=>new ScopePeer(this);
-        private sealed class ScopePeer : FrameworkElementAutomationPeer{internal ScopePeer(ScopeGrid grid):base(grid){}protected override AutomationControlType GetAutomationControlTypeCore()=>AutomationControlType.Group;protected override string GetNameCore()=>"范围，单选";}
+        private sealed class ScopePeer : FrameworkElementAutomationPeer{internal ScopePeer(ScopeGrid grid):base(grid){}protected override AutomationControlType GetAutomationControlTypeCore()=>AutomationControlType.Group;protected override string GetNameCore()=>"类型，单选";}
     }
     protected override AutomationPeer OnCreateAutomationPeer()=>new DialogPeer(this);
     private sealed class DialogPeer : FrameworkElementAutomationPeer,IWindowProvider

@@ -17,7 +17,7 @@ public sealed class PlannerView : UserControl
     private AppState _state=null!;
     private Func<bool> _save=null!;
     private DateTime _date=PlanRules.Today;
-    private bool _completed;
+    private bool _manage; private DateTime _renderedDay=PlanRules.Today; private System.Windows.Threading.DispatcherTimer? _dayTimer;
     private bool _editing;
     private string? _detailId;
     private static readonly string[] Tabs={"长期","本月","本周","今天"};
@@ -41,7 +41,10 @@ public sealed class PlannerView : UserControl
     {
         _state=state;_save=save;Content=_root;
         IsVisibleChanged+=(_,_)=>{if(IsVisible && !_editing)Render();};
-        Render();
+        _dayTimer=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromSeconds(30)};
+        _dayTimer.Tick+=(_,_)=>{if(IsVisible && !_editing && _renderedDay!=PlanRules.Today)Render();};
+        IsVisibleChanged+=(_,_)=>{if(IsVisible)_dayTimer.Start();else _dayTimer.Stop();};
+        if(IsVisible)_dayTimer.Start();Render();
     }
     private static TextBlock Label(string text,bool muted=false)
     {
@@ -60,42 +63,27 @@ public sealed class PlannerView : UserControl
         _editing=false;
         _root.Children.Clear();
         var heading=new DockPanel{Margin=new Thickness(0,0,0,7)};
-        var nav=new StackPanel{Orientation=Orientation.Horizontal};
-        if(Level!=0){nav.Children.Add(Button("〈",()=>Shift(-1)));nav.Children.Add(Button("〉",()=>Shift(1)));}
-        DockPanel.SetDock(nav,Dock.Right);heading.Children.Add(nav);
-        string period=Level switch{0=>"持续积累，逐步完成",1=>_date.ToString("yyyy年M月"),2=>$"{PlanRules.Week(_date):M/d} — {PlanRules.Week(_date).AddDays(6):M/d}",_=>_date.ToString("M月d日 ddd")};
-        var dateLabel=Label(period,true);dateLabel.FontSize=10;dateLabel.VerticalAlignment=VerticalAlignment.Center;DockPanel.SetDock(dateLabel,Dock.Right);heading.Children.Add(dateLabel);
-        var title=Label(Level switch{0=>"长期目标",1=>"本月待办",2=>"本周待办",_=>_date.Date==PlanRules.Today ? "今日待办":"每日待办"});title.FontWeight=FontWeights.SemiBold;title.FontSize=14;heading.Children.Add(title);Header(heading);
-        var tabs=new UniformGridProxy();
-        foreach(int i in new[]{3,2,1,0}){int n=i;var b=Button(Tabs[i],()=>{_state.PlannerLevel=n;_date=PlanRules.Today;_completed=false;_detailId=null;_save();Render();});
-            var underline=new Border{BorderThickness=new Thickness(0,0,0,i==Level ? 2:0),Child=b,Margin=new Thickness(0,0,0,8)};
-            if(i==Level){b.SetResourceReference(ForegroundProperty,"Accent");underline.SetResourceReference(Border.BorderBrushProperty,"Accent");}tabs.Children.Add(underline);}Header(tabs);
-        if(Level!=0 && !PlanRules.InPeriod(new PlanItem{Level=Level,Date=PlanRules.Today},Level,_date))Header(Button("返回"+Tabs[Level],()=>{_date=PlanRules.Today;_detailId=null;Render();}));
+        if(ActiveCleanup())return;
+        var manage=Button(_manage ? "返回今天":"管理",()=>{_manage=!_manage;Render();});AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);
+        var dateLabel=Label(PlanRules.Today.ToString("M月d日 ddd"),true);DockPanel.SetDock(dateLabel,Dock.Right);heading.Children.Add(dateLabel);var title=Label(_manage ? "管理计划":"今日待办");title.FontSize=14;title.FontWeight=FontWeights.SemiBold;heading.Children.Add(title);Header(heading);
         var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
         var list=new StackPanel();
 
-        var items=_state.Plans.Where(p=>PlanRules.InPeriod(p,Level,_date)).OrderBy(p=>p.Date).ToList();
-        foreach(var p in items.Where(p=>!PlanRules.Complete(p,_state.Plans)))Row(list,p);
-        if(items.Count==0 && _detailId!="")list.Children.Add(Label(Level==3 && _date.Date==PlanRules.Today ? "今天暂无待办":"暂无待办",true));
-        var done=items.Where(p=>PlanRules.Complete(p,_state.Plans)).ToList();
-        var completed=Button($"已完成 {done.Count} 项 · {(_completed ? "收起":"展开")}",()=>{_completed=!_completed;_detailId=null;Render();});completed.HorizontalAlignment=HorizontalAlignment.Left;
-        if(done.Count>0)list.Children.Add(completed);
-        if(_completed)foreach(var p in done)Row(list,p);
+        var items=_state.Plans.Where(p=>_manage || PlanRules.Appears(p,PlanRules.Today)).OrderBy(p=>PlanRules.DoneToday(p,PlanRules.Today)).ThenBy(p=>p.CreatedAt).ToList();
+        foreach(var p in items)Row(list,p);if(items.Count==0)list.Children.Add(Label(_manage ? "暂无计划":"今天暂无待办",true));
         _root.Children.Add(new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
     }
-    private void Shift(int n){if(Level==0)return;_detailId=null;_date=Level==1 ? _date.AddMonths(n):_date.AddDays(n*(Level==2 ? 7:1));Render();}
+    private bool ActiveCleanup(){_renderedDay=PlanRules.Today;var before=_state.Plans.Select(p=>p.Copy()).ToList();if(PlanRules.Reconcile(_state.Plans,PlanRules.Today) && !_save()){_state.Plans=before;Header(Label("清理保存失败，原有计划已保留。",true));}return false;}
     private void Row(Panel list,PlanItem p)
     {
         var row=new DockPanel{Margin=new Thickness(0,4,0,4)};
-        bool done=PlanRules.Complete(p,_state.Plans);
-        var check=new CheckBox{IsChecked=done,Template=CircleTemplate,IsEnabled=true,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(3,9,10,0),ToolTip="标记完成"};
+        bool done=PlanRules.DoneToday(p,PlanRules.Today);
+        var check=new CheckBox{IsChecked=done,Template=CircleTemplate,IsEnabled=PlanRules.Appears(p,PlanRules.Today),VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(3,9,10,0),ToolTip="标记完成"};
         AutomationProperties.SetName(check,"完成："+p.Title);
         check.Click+=(_,_)=>ToggleDone(p,check.IsChecked==true);DockPanel.SetDock(check,Dock.Left);row.Children.Add(check);
         var content=new StackPanel();var title=Label(p.Title);title.FontSize=12;if(done){title.TextDecorations=TextDecorations.Strikethrough;title.SetResourceReference(TextBlock.ForegroundProperty,"Muted");}content.Children.Add(title);
         var meta=new List<string>();
-        bool overdue=PlanRules.Overdue(p,PlanRules.Today);
-        if(PlanRules.EffectiveDue(p) is DateTime due)meta.Add(due.Date==PlanRules.Today ? "截止今天":$"截止 {due:M/d}");if(overdue)meta.Add("已逾期");
-        if(meta.Count>0){var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;if(overdue)subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Error");content.Children.Add(subtitle);}
+        meta.Add(PlanRules.ScheduleLabel(p));if(p.Migrated)meta.Add("旧计划 · 请确认日期");if(_manage && !PlanRules.Appears(p,PlanRules.Today))meta.Add("今天不出现");var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;content.Children.Add(subtitle);if(done)row.Opacity=.6;
         var edit=Button("",()=>{if(_detailId==p.Id){_detailId=null;Render();}else Edit(p);});edit.Content=content;AutomationProperties.SetName(edit,"详情："+p.Title);edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(edit);
         if(_revealId==p.Id){_revealId=null;edit.SetResourceReference(BackgroundProperty,"Hover");Dispatcher.BeginInvoke(()=>{edit.BringIntoView();var animation=new System.Windows.Media.Animation.DoubleAnimation(.55,1,TimeSpan.FromMilliseconds(800));animation.Completed+=(_,_)=>edit.ClearValue(BackgroundProperty);edit.BeginAnimation(OpacityProperty,animation);});}
         var separator=new Border{Child=row,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
@@ -105,11 +93,12 @@ public sealed class PlannerView : UserControl
     {
         _editing=true;
         var owner=Window.GetWindow(this) as MainWindow;
-        var draft=item?.Copy()??new PlanItem{Level=Level,Date=PlanRules.Today,ScopePeriod=PlanRules.Period(Level,PlanRules.Today)};
+        var draft=item?.Copy()??new PlanItem{ScheduleSchema=1,Level=3,ScheduledDate=PlanRules.Today};
+        if(draft.Migrated && draft.ScheduledDate<PlanRules.Today)draft.ScheduledDate=PlanRules.Today;
         bool Commit(PlanItem plan){int index=item==null ? -1:_state.Plans.FindIndex(v=>v.Id==item.Id);var previous=index<0 ? null:_state.Plans[index];int oldLevel=_state.PlannerLevel;
             if(index<0)_state.Plans.Add(plan);else _state.Plans[index]=plan;_state.PlannerLevel=plan.Level;
             if(!_save()){if(index<0)_state.Plans.Remove(plan);else _state.Plans[index]=previous!;_state.PlannerLevel=oldLevel;return false;}
-            _date=PlanRules.Start(plan);_detailId=null;_completed=plan.Done;owner?.ClosePlanDialog();_revealId=plan.Id;Render();owner?.SetStatus((item==null ? "已添加到「":"已保存到「")+PlanRules.Names[plan.Level]+"」");return true;}
+            _date=PlanRules.Start(plan);_detailId=null;owner?.ClosePlanDialog();_revealId=plan.Id;Render();owner?.SetStatus(item==null ? "已添加待办":"已保存计划");return true;}
         Action? delete=item==null ? null:()=>DeletePlan(item,owner);
         var card=new PlanCard(draft,item!=null,Commit,()=>{owner?.ClosePlanDialog();_detailId=null;Render();},delete);
         owner?.OpenPlanDialog(card);

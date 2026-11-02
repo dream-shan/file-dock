@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.24 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.25 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.24) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.25) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -24,7 +24,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.24-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.25-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -123,9 +123,9 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
-- 新建／编辑待办简化为计划、范围、可选截止日期。移除补充信息、上级选择和子项联动，四种范围作为独立分类；旧备注、优先级、时间和关联字段保留，编辑不清空。完成只影响当前项，删除旧上级只解除引用并保留其他计划。
-- 计划占位符使用文本框原生光标位置和相同字体排版，支持一至四行自动增高、中文输入法组成状态、回车提交和 Shift+Enter 换行。未设置截止日期时隐藏清除按钮。
-- 保留范围与截止日期提醒、逾期判断、草稿放弃确认和保存失败重试，不引入新依赖。
+- 待办改为一次性／重复：一次性只在执行日期出现，过日后清理；重复支持每天、每周指定日期、做几天停几天，并提供七天预览。完成项淡化后排在未完成项下，不累计每日历史或未完成欠账。
+- “管理”可编辑未来、休息日和旧计划。旧记录迁移为一次性并标注“旧计划 · 请确认日期”，确认前不会自动清理；升级前备份 Data。清单可见时每 30 秒只检查本地日期，收起停止，重新展开自动核对。
+- 新建窗口保留计划输入、类型、执行／开始日期，不含提醒、定时生成、截止日期或周期分页。
 - 修正侧边标签外侧的整窗矩形边框：关闭系统附加边框，保留自定义窗口轮廓；选中标签与面板平直衔接，标签空隙继续透出桌面且不拦截点击。
 
 - 新增外侧“文件 / 性能”标签，首次启动默认显示性能，之后记住所选页面；左右贴边自动镜像。文件页独立显示常用、搜索和浏览，切换保留目录、搜索、选择和滚动位置。性能页每秒更新；文件页及收起时仅保留轻量内存检测，隐藏文件夹暂停监听，返回后同步变化。
@@ -163,7 +163,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.24-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.25-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

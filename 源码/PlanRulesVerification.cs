@@ -1,30 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 namespace FileDockDemo;
 internal static class PlanRulesVerification
 {
-    internal static void Run(Action<bool,string> check)
-    {
-        var today=new DateTime(2026,11,2);
-        PlanItem P(int level,DateTime date){var p=new PlanItem{Title="fixture",PlanSchema=1};PlanRules.AssignPeriod(p,level,date);return p;}
-        check(PlanRules.WEEK_START==DayOfWeek.Monday && PlanRules.Week(new DateTime(2027,1,3))==new DateTime(2026,12,28),"Week boundaries use Monday across years");
-        var leap=P(1,new DateTime(2028,2,12));check(leap.ScopePeriod=="2028-02" && PlanRules.End(leap)==new DateTime(2028,2,29),"Monthly period includes leap day");
-        var goal=P(0,today);var month=P(1,today);var week=P(2,today);var day=P(3,today);
-        check(goal.ScopePeriod==null && week.ScopePeriod=="2026-11-02" && day.ScopePeriod=="2026-11-02","Scope periods persist local calendar dates");
-        check(PlanRules.ParentAllowed(goal,day) && PlanRules.ParentAllowed(month,day) && PlanRules.ParentAllowed(week,day),"Daily tasks can choose any higher containing level");
-        check(!PlanRules.ParentAllowed(day,goal) && !PlanRules.ParentAllowed(month,month),"Same or lower levels cannot be parents");
-        goal.Done=true;check(!PlanRules.ParentAllowed(goal,day),"Completed tasks are excluded from parent candidates");goal.Done=false;
-        var crossing=P(2,new DateTime(2026,11,30));check(!PlanRules.ParentAllowed(month,crossing),"A cross-month week cannot attach to a partially containing month");
-        var prior=P(2,today.AddDays(-7));check(!PlanRules.ParentAllowed(prior,day),"Parent candidates exclude a different week");
-        check(PlanRules.EffectiveDue(goal)==null && PlanRules.EffectiveDue(month)==new DateTime(2026,11,30) && PlanRules.EffectiveDue(week)==new DateTime(2026,11,8),"Unset deadlines derive from period end except long-term");
-        check(!PlanRules.Overdue(day,today) && PlanRules.Overdue(day,today.AddDays(1)),"Overdue comparison treats today as inclusive");day.Done=true;check(!PlanRules.Overdue(day,today.AddDays(1)),"Completed tasks are not overdue");day.Done=false;
-        day.Deadline=today.AddDays(1);check(PlanRules.SuggestedLevel(day,today)==2,"Out-of-day due date suggests the containing week");day.Deadline=new DateTime(2026,12,1);check(PlanRules.SuggestedLevel(day,today)==0,"A date beyond the current month suggests long-term");
-        day.Deadline=today.AddDays(5);check(!PlanRules.Overdue(day,today.AddDays(1)),"Explicit deadline overrides implicit period end");
-        var legacy=new PlanItem{Title="legacy",Level=2,Date=new DateTime(2026,11,4),Done=true,ParentId=month.Id};PlanRules.Normalize(legacy);
-        check(legacy.ScopePeriod=="2026-11-02" && legacy.Done && legacy.ParentId==month.Id && legacy.Priority=="none" && legacy.CompletedAt==null && legacy.CreatedAtEstimated,"Legacy migration retains data and does not invent a completion timestamp");
-        var items=new List<PlanItem>{goal,month,week,day};month.ParentId=goal.Id;week.ParentId=month.Id;day.ParentId=week.Id;
-        check(PlanRules.Descendants(goal,items).Count==3,"Descendant traversal includes all hierarchy levels");
-        day.Done=true;check(!PlanRules.Complete(goal,items),"Child progress and parent completion remain independent");
-    }
+ internal static void Run(Action<bool,string> check){
+ var d=new DateTime(2026,11,2);var p=new PlanItem{ScheduleSchema=1,ScheduledDate=d};
+ check(PlanRules.Appears(p,d)&&!PlanRules.Appears(p,d.AddDays(1)),"Once appears only on scheduled date");check(!PlanRules.Appears(p,d.AddDays(-1)),"Future once remains hidden");
+ p.Kind="repeat";check(PlanRules.Appears(p,d.AddYears(1)),"Daily repeat has no end");check(!PlanRules.Appears(p,d.AddDays(-1)),"Repeat respects start");
+ p.RepeatRule="weekdays";p.Weekdays=31;for(int i=0;i<7;i++)check(PlanRules.Appears(p,d.AddDays(i))==(i<5),"Weekday mask "+i);
+ p.RepeatRule="cycle";p.ActiveDays=2;p.RestDays=1;for(int i=0;i<9;i++)check(PlanRules.Appears(p,d.AddDays(i))==(i%3<2),"Cycle boundary "+i);
+ p.ScheduledDate=new DateTime(2028,2,28);check(!PlanRules.Appears(p,new DateTime(2028,3,1)),"Cycle includes leap day");
+ p.Done=true;p.DoneDate=d;check(PlanRules.DoneToday(p,d)&&!PlanRules.DoneToday(p,d.AddDays(1)),"Done is per local day");var expired=new PlanItem{ScheduleSchema=1,ScheduledDate=d};var future=new PlanItem{ScheduleSchema=1,ScheduledDate=d.AddDays(5)};var items=new List<PlanItem>{p,expired,future};check(PlanRules.Reconcile(items,d.AddDays(1))&&items.Count==2&&!p.Done&&p.DoneDate==null&&p.CompletedAt==null,"Rollover prunes once and resets repeat without history");check(!PlanRules.Reconcile(items,d.AddDays(1)),"Rollover is idempotent");
+ var old=new PlanItem{Title="old",Level=0,Notes="keep",Done=true};PlanRules.Normalize(old);items.Add(old);PlanRules.Reconcile(items,PlanRules.Today.AddDays(4));check(items.Contains(old)&&old.Migrated&&old.Done&&old.Notes=="keep","Migration preserves legacy tasks until confirmation");
+ bool rejected=false;try{PlanRules.Normalize(new PlanItem{ScheduleSchema=1,Weekdays=0});}catch(System.IO.InvalidDataException){rejected=true;}check(rejected,"Empty weekday mask rejected");var copy=System.Text.Json.JsonSerializer.Deserialize<PlanItem>(System.Text.Json.JsonSerializer.Serialize(p))!;check(copy.ActiveDays==2&&copy.RestDays==1&&copy.ScheduledDate==p.ScheduledDate,"Schedule JSON roundtrip");
+ }
 }

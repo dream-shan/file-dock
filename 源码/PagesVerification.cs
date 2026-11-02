@@ -26,6 +26,20 @@ internal static class PagesVerification
     }
     internal static async Task Run(MainWindow window,string root,Action<bool,string> check)
     {
+        var goal=new PlanItem{Level=0,Title="Goal"};
+        var month=new PlanItem{Level=1,Title="Month",ParentId=goal.Id};
+        var week=new PlanItem{Level=2,Title="Week",ParentId=month.Id};
+        var day=new PlanItem{Level=3,Title="Day",ParentId=week.Id,Done=true,Notes="Notes",Time="09:00"};
+        var plans=new System.Collections.Generic.List<PlanItem>{goal,month,week,day};
+        check(PlanRules.Complete(goal,plans),"Completed daily task rolls progress up through all four linked levels");
+        day.Done=false;check(!PlanRules.Complete(goal,plans),"Reopening daily task updates ancestor completion");
+        check(PlanRules.Week(new DateTime(2026,11,1))==new DateTime(2026,10,26),"Planner weeks start Monday across month boundaries");
+        day.Date=new DateTime(2026,11,2);check(PlanRules.InPeriod(day,3,day.Date) && !PlanRules.InPeriod(day,3,day.Date.AddDays(1)),"Daily plans remain on their assigned date");
+        month.Date=new DateTime(2026,12,31);check(PlanRules.InPeriod(month,1,new DateTime(2026,12,1)) && !PlanRules.InPeriod(month,1,new DateTime(2027,12,1)),"Monthly filters distinguish years");
+        var plannerStore=new StorageService(Path.Combine(root,"planner-persistence"));
+        plannerStore.Save(new AppState{Plans=plans,PlannerLevel=1});var restored=plannerStore.Load();
+        check(restored.Plans.Count==4 && restored.Plans[3].ParentId==week.Id && restored.Plans[3].Notes=="Notes" && restored.PlannerLevel==1,"Plan hierarchy, notes and selected level survive storage reload");
+        check(new AppState().Plans.Count==0 && new AppState().PlannerLevel==3,"Existing settings default to empty daily planner");
         check(new AppState().SelectedPage=="Performance","New settings default to Performance without modifying existing pins or theme");
         window.ExpandPanel();window.GoHome();window.SelectPage("Performance");window.EnablePerformanceForVerification();window.EnableMemoryForVerification();
         check(!window.IsFilesPage && window.PerformanceSection.Visibility==Visibility.Visible && window.PinsSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Collapsed,
@@ -42,7 +56,8 @@ internal static class PagesVerification
         check(!window.CaptureInteractionHeld && window.IsFilesPage,"Side tabs become usable after screenshot selection ends");
         check(window.IsFilesPage && window.PinsSection.Visibility==Visibility.Visible && window.PerformanceSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Visible,"File tab shows favorites and search without performance cards");
         check(window.Storage.Load().SelectedPage=="Files","Last selected page survives settings reload");
-        check(window.PinsSection.ActualHeight>350,"Favorites receive the full available file-page height");
+        check(window.Planner.ActualHeight>130 && window.PinsList.ActualHeight<=156,"Favorites and planner share the file home without growing the window");
+        PlannerVerification.Run(window,root,check);
         string folder=Path.Combine(root,"page-switch-files");Directory.CreateDirectory(folder);
         for(int i=0;i<50;i++)File.WriteAllText(Path.Combine(folder,$"item-{i:00}.txt"),"fixture");
         await window.NavigateToFolderAsync(folder);window.SearchBox.Text="item";

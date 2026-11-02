@@ -13,6 +13,8 @@ public sealed class PinnedEntry
 
 public sealed class AppState
 {
+    public List<PlanItem> Plans { get; set; } = [];
+    public int PlannerLevel { get; set; } = 3;
     public List<PinnedEntry> Pins { get; set; } = [];
     public string DockSide { get; set; } = "Right";
     public double DockTop { get; set; } = -1;

@@ -107,6 +107,8 @@ public sealed class StorageService
 
     private static void Validate(AppState state)
     {
+        if(state.Plans is null || state.Plans.Any(p=>p is null || string.IsNullOrWhiteSpace(p.Id) || string.IsNullOrWhiteSpace(p.Title) || p.Level<0 || p.Level>3 || p.Notes is null || p.Time is null) || state.Plans.Select(p=>p.Id).Distinct().Count()!=state.Plans.Count)
+            throw new InvalidDataException("计划记录无效。");
         if (state.Pins is null)
             throw new InvalidDataException("配置文件中的列表无效。");
         if (state.Pins.Any(entry => entry is null || string.IsNullOrWhiteSpace(entry.Path) ||

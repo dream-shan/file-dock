@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         InitializeLiveFolder();
         InitializeTransfers();
         InitializePerformance();
+        Planner.Initialize(State, () => Persist());
         InitializePages();
         ApplyTheme();
         SizeChanged += (_, _) => { QueueDesktopPresence(); };
@@ -522,6 +523,7 @@ public partial class MainWindow : Window
     {
         if (_captureInteractionHeld) { e.Handled = true; return; }
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SelectPage("Files"); SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
+        if (Planner.IsKeyboardFocusWithin && e.Key != Key.Escape) return;
         if (HandleMemoryActionKey(e) || IsFilesPage && (HandleTransferKey(e) || HandleBrowserKey(e))) return;
         if (e.Key == Key.Escape) { if (Environment.TickCount64 >= _ignoreDragEscapeUntil) CollapsePanel(); e.Handled = true; }
         if (IsFilesPage && e.Key == Key.Enter && !FilesPageTab.IsKeyboardFocused && !PerformancePageTab.IsKeyboardFocused) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }

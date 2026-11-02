@@ -165,7 +165,7 @@
             <Grid x:Name="PinsSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="32" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="155" /><RowDefinition Height="*" MinHeight="130" />
                 </Grid.RowDefinitions>
                 <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
@@ -207,7 +207,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
-            </Grid>
+            <local:PlannerView x:Name="Planner" Grid.Row="2" Margin="0,10,0,0" /></Grid>
 
             <Grid x:Name="PerformanceSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,10">
                 <Grid.RowDefinitions>

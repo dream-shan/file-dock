@@ -30,6 +30,8 @@ internal static class PlanDialogVerification
             foreach(string mode in new[]{"Dark","Light"}){
                 w.SetThemeMode(mode);w.UpdateLayout();var surface=ThemePalette.Brush("Surface").Color;var ink=ThemePalette.Brush("Ink").Color;var secondary=((SolidColorBrush)card.Resources["PlanSecondary"]).Color;var accent=((SolidColorBrush)card.Resources["PlanAccent"]).Color;var onAccent=((SolidColorBrush)card.Resources["PlanOnAccent"]).Color;
                 check(Contrast(ink,surface)>=4.5 && Contrast(secondary,surface)>=4.5 && Contrast(accent,onAccent)>=4.5,$"Plan text and primary action meet 4.5:1 in {mode}");
+                Color Blend(Color c){double a=c.A/255d;return Color.FromRgb((byte)Math.Round(c.R*a+surface.R*(1-a)),(byte)Math.Round(c.G*a+surface.G*(1-a)),(byte)Math.Round(c.B*a+surface.B*(1-a)));}
+                check(All<Button>(card).Where(b=>b.IsVisible).All(b=>b.Foreground is SolidColorBrush fg && Contrast(fg.Color,b.Background is SolidColorBrush bg ? Blend(bg.Color):surface)>=4.5),$"Every visible dialog action meets 4.5:1 in {mode}");
                 var body=Id<ScrollViewer>(card,"PlanBody");var footer=Id<Border>(card,"PlanFooter");body.ScrollToEnd();w.UpdateLayout();
                 var bodyBottom=body.TranslatePoint(new Point(0,body.ActualHeight),card).Y;var footerTop=footer.TranslatePoint(new Point(),card).Y;
                 check(bodyBottom<=footerTop+1 && footer.ActualHeight>=32,$"Expanded {mode} dialog scrolls above a separate visible footer");

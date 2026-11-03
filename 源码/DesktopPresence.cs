@@ -67,7 +67,7 @@ internal static partial class NativeMethods
         for (int i = 0; current != IntPtr.Zero && i < 1024; i++)
         {
             if (!seen.Add(current)) return null;
-            if (IsDesktopBlocker(current, includeOwnProcess) && FrameBounds(current, out var r) &&
+            if (GetWindow(current,4)!=panel && IsDesktopBlocker(current, includeOwnProcess) && FrameBounds(current, out var r) &&
                 Math.Min(bounds.Right, r.Right) > Math.Max(bounds.Left, r.Left) &&
                 Math.Min(bounds.Bottom, r.Bottom) > Math.Max(bounds.Top, r.Top)) return true;
             current = GetWindow(current, 3);

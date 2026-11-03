@@ -26,7 +26,7 @@ public partial class MainWindow
         MemoryCard.CancelPendingAction();
         Mouse.Capture(null);
         IsHitTestVisible = false;
-        _captureToolTips = VisualChildren(this).OfType<FrameworkElement>()
+        _captureToolTips = VisualChildren(this).Concat(VisualChildren(PageRail)).OfType<FrameworkElement>()
             .Where(element => ToolTipService.GetIsEnabled(element)).ToArray();
         foreach (var element in _captureToolTips)
         {
@@ -37,6 +37,7 @@ public partial class MainWindow
         // Keep the HWND enabled: window detectors skip disabled windows.
         // WPF hit testing and the native input guard suspend actions instead.
         if (!NativeMethods.SetCaptureTopmost(handle, false)) DiagnosticLog.Write("capture-zorder-failed");
+        UpdatePageRail();
         UpdateMemoryActionHint();
         RecordDiagnosticState("capture-input-suspended");
     }
@@ -53,6 +54,7 @@ public partial class MainWindow
         IsHitTestVisible = _captureWasHitTestVisible;
         foreach (var element in _captureToolTips) ToolTipService.SetIsEnabled(element, true);
         _captureToolTips = Array.Empty<FrameworkElement>();
+        UpdatePageRail();
         UpdateMemoryActionHint();
         RecordDiagnosticState("capture-input-restored");
     }

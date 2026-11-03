@@ -18,7 +18,7 @@ public partial class MainWindow : IModuleHost
         _planShade=new Grid{Background=new SolidColorBrush(Color.FromArgb(150,0,0,0))};Grid.SetColumn(_planShade,Grid.GetColumn(PanelSurface));Panel.SetZIndex(_planShade,50);
         var border=new Border{Child=card.View,CornerRadius=new CornerRadius(12),BorderThickness=new Thickness(1),Margin=new Thickness(16),Padding=new Thickness(20),MaxWidth=520,VerticalAlignment=VerticalAlignment.Center};
         border.SetResourceReference(Border.BackgroundProperty,"Surface");border.SetResourceReference(Border.BorderBrushProperty,"Border");
-        void Size(){border.MaxHeight=Math.Max(200,ActualHeight*.85);border.Padding=new Thickness(ActualWidth<440 ? 16:20);}
+        void Size(){border.MaxHeight=Math.Max(200,ActualHeight*.85);border.Padding=new Thickness(ActualWidth<408 ? 16:20);}
         Size();_planShade.SizeChanged+=(_,_)=>Size();_planShade.Children.Add(border);PageRoot.Children.Add(_planShade);
         _planShade.MouseDown+=(_,e)=>{if(ReferenceEquals(e.OriginalSource,_planShade)){e.Handled=true;if(!card.HasChanges)card.RequestClose();}};
         Dispatcher.BeginInvoke(()=>card.FocusInitial());

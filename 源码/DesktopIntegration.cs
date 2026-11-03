@@ -84,29 +84,21 @@ internal static partial class NativeMethods
     }
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
     [DllImport("gdi32.dll")] private static extern int CombineRgn(IntPtr target,IntPtr first,IntPtr second,int mode);
-    internal static void ShapePagePanel(IntPtr window,double width,double height,bool tabsRight,bool filesSelected)
+    internal static void PlaceRail(IntPtr h,int x,int y,int width,int height)=>SetWindowPos(h,IntPtr.Zero,x,y,width,height,0x0014);
+    internal static void ShapePagePanel(IntPtr window,double width,double height)
     {
         double scale=WindowDpi(window)/96d;
-        int P(double v)=>(int)Math.Round(v*scale);
-        var body=CreateRoundRectRgn(P(tabsRight ? 0 : 32),0,P(tabsRight ? width-32 : width)+1,P(height)+1,P(40),P(40));
-        if(body==IntPtr.Zero)return;
-        try
-        {
-            foreach(double top in new[]{90d,142d})
-            {
-                bool selected=top==90 ? filesSelected : !filesSelected;
-                var tab=CreateRoundRectRgn(P(tabsRight ? width-34 : selected ? 0 : 4),P(top),P(tabsRight ? width-(selected ? 0 : 4) : 34)+1,P(top+44)+1,P(16),P(16));
-                if(tab==IntPtr.Zero)return;
-                try
-                {
-                    var join=CreateRectRgn(P(tabsRight ? width-34 : 24),P(top),P(tabsRight ? width-24 : 34)+1,P(top+44)+1);
-                    if(join==IntPtr.Zero)return;
-                    try{if(CombineRgn(tab,tab,join,2)==0 || CombineRgn(body,body,tab,2)==0)return;}
-                    finally{DeleteObject(join);}
-                }
-                finally{DeleteObject(tab);}
-            }
-            if(SetWindowRgn(window,body,true)!=0)body=IntPtr.Zero;
-        }
-        finally{if(body!=IntPtr.Zero)DeleteObject(body);}
-    }}
+        var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(40*scale),(int)Math.Round(40*scale));
+        if(region!=IntPtr.Zero && SetWindowRgn(window,region,true)==0)DeleteObject(region);
+    }
+    internal static void ShapeRailWindow(IntPtr window,double scale,bool right,bool files)
+    {
+        int P(double v)=>(int)Math.Round(v*scale);var region=CreateRectRgn(0,0,0,0);
+        try{foreach(int top in new[]{0,52}){bool selected=top==0?files:!files;
+            var tab=CreateRoundRectRgn(P(right?0:selected?0:4),P(top),P(right?(selected?34:30):34)+1,P(top+44)+1,P(16),P(16));
+            var join=CreateRectRgn(P(right?0:24),P(top),P(right?10:34)+1,P(top+44)+1);
+            try{if(tab==IntPtr.Zero || join==IntPtr.Zero || CombineRgn(tab,tab,join,2)==0 || CombineRgn(region,region,tab,2)==0)return;}finally{if(tab!=IntPtr.Zero)DeleteObject(tab);if(join!=IntPtr.Zero)DeleteObject(join);}}
+            if(SetWindowRgn(window,region,true)!=0)region=IntPtr.Zero;
+        }finally{if(region!=IntPtr.Zero)DeleteObject(region);}
+    }
+}

@@ -25,7 +25,7 @@ internal static class PlanDialogVerification
     {
         double width=w.Width,height=w.Height;string theme=w.State.ThemeMode;
         try{
-            w.Width=462;w.Height=650;w.Planner.Render();w.UpdateLayout();Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();var card=(w.ActiveModuleDialog as PlanCard)??throw new InvalidOperationException("Dialog was not opened");
+            w.Width=430;w.Height=650;w.Planner.Render();w.UpdateLayout();Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();var card=(w.ActiveModuleDialog as PlanCard)??throw new InvalidOperationException("Dialog was not opened");
             check(!w.ContentGrid.IsEnabled && !w.PageRail.IsEnabled,"Plan dialog disables background controls");
             check(KeyboardNavigation.GetTabNavigation(card)==KeyboardNavigationMode.Cycle,"Plan dialog contains keyboard tab navigation");
             var peer=UIElementAutomationPeer.CreatePeerForElement(card)!;check(peer.GetPattern(PatternInterface.Window) is IWindowProvider provider && provider.IsModal,"Native accessibility exposes the plan card as a modal dialog");
@@ -55,7 +55,7 @@ internal static class PlanDialogVerification
                 check(bodyBottom<=footerTop+1 && footer.ActualHeight>=32,$"Simplified {mode} dialog keeps body above a visible footer");
                 DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-"+mode.ToLowerInvariant()+".png"));
             }
-            w.Width=412;w.Height=480;w.UpdateLayout();var smallBody=Id<ScrollViewer>(card,"PlanBody");var smallFooter=Id<Border>(card,"PlanFooter");smallBody.ScrollToEnd();w.UpdateLayout();
+            w.Width=380;w.Height=480;w.UpdateLayout();var smallBody=Id<ScrollViewer>(card,"PlanBody");var smallFooter=Id<Border>(card,"PlanFooter");smallBody.ScrollToEnd();w.UpdateLayout();
             check(smallBody.ViewportHeight>30 && smallBody.TranslatePoint(new Point(0,smallBody.ActualHeight),card).Y<=smallFooter.TranslatePoint(new Point(),card).Y+1,"Compact window keeps body and footer separate");
             DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-small.png"));
             var activeDialog=w.ActiveModuleDialog;((IModuleHost)w).CloseDialog(new OtherDialog());check(ReferenceEquals(activeDialog,w.ActiveModuleDialog),"A module cannot close another dialog by passing the wrong instance");

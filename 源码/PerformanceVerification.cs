@@ -73,7 +73,7 @@ internal static class PerformanceVerification
         if (Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_GPU") == "1")
             check(window.LastPerformanceSnapshot is { GpuLoad: >= 0 and <= 100 } && window.LastPerformanceSnapshot.GpuUsageStatus.Contains("Windows GPU 最繁忙引擎"),
                 "Real GPU load comes from matched Windows engine counters");
-        window.Width = 462; window.Height = 650; window.UpdateLayout();
+        window.Width=430; window.Height = 650; window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight <= window.PerformanceScroll.ViewportHeight + 1,
             "All four performance cards fit the default window without scrolling");
         check(window.MemoryCard.Ring && window.VramCard.Ring && !window.CpuCard.Ring && !window.GpuCard.Ring,
@@ -91,13 +91,13 @@ internal static class PerformanceVerification
             !System.Windows.Automation.AutomationProperties.GetName(window.CpuCard).Contains(snapshot!.CpuName),
             "CPU and GPU replace model text with a sixty-second caption and accessible readings");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-standard.png"));
-        window.Width = 412; window.Height = 480; window.UpdateLayout();
+        window.Width=380; window.Height = 480; window.UpdateLayout();
         check(window.CpuCard.Graph.ActualHeight >= 12 && window.GpuCard.Graph.ActualHeight >= 12 &&
             window.MemoryCard.ValueText != "—", "Compact cards keep a visible chart and memory readout");
         check(window.MemoryCard.CapacityFits && window.VramCard.CapacityFits && window.MemoryCard.RingChart.ActualWidth <= 50,
             "Compact ring cards keep their complete capacity text without expanding the cards");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-small.png"));
-        window.Width = 462; window.Height = 650;
+        window.Width=430; window.Height = 650;
 
         window.CollapsePanel(); await Task.Delay(700); int paused = window.PerformanceSamples;
         long serviceSamples = requireTemperature ? TemperatureClient.Read(false).Samples : 0;
@@ -161,6 +161,3 @@ internal static class PerformanceVerification
         window.CollapsePanel(); window.ExpandPanel(); await Task.Delay(1200);
     }
 }
-
-
-

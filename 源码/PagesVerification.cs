@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using FileDockDemo.Features.Planner;
 using System;
 using System.IO;
@@ -18,6 +19,8 @@ internal static class PagesVerification
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
     [DllImport("gdi32.dll")] private static extern bool PtInRegion(IntPtr region,int x,int y);
     [DllImport("user32.dll")] private static extern int GetWindowRgn(IntPtr window,IntPtr region);
+    [StructLayout(LayoutKind.Sequential)] private struct NativeRect{public int Left,Top,Right,Bottom;}
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window,out NativeRect rect);
     private static T? Find<T>(DependencyObject parent) where T:DependencyObject
     {
         if(parent is T match)return match;
@@ -27,6 +30,9 @@ internal static class PagesVerification
     }
     internal static async Task Run(MainWindow window,string root,Action<bool,string> check)
     {
+        var rightPosition=new AppState{DockSide="Right",PanelLeft=100,PanelTop=200};PageRailWindow.MigratePosition(rightPosition);PageRailWindow.MigratePosition(rightPosition);
+        check(rightPosition.PanelLeft==132 && rightPosition.PanelTop==200 && rightPosition.PanelGeometryVersion==1,"Old right-docked body position migrates once without vertical shift");
+        var leftPosition=new AppState{DockSide="Left",PanelLeft=100,PanelTop=200};PageRailWindow.MigratePosition(leftPosition);check(leftPosition.PanelLeft==100,"Old left-docked body position is retained");
         var goal=new PlanItem{Level=0,Title="Goal"};
         check(goal.ToString()=="Goal","Planner parent selectors show titles in the existing themed combo template");
         var month=new PlanItem{Level=1,Title="Month",ParentId=goal.Id};
@@ -82,24 +88,34 @@ internal static class PagesVerification
         check(window.FolderList.Items.Count==51 && window.FolderWatcherActive,"Returning from performance refreshes changes made while folder monitoring was paused");
         window.LiveFolderUpdatesEnabled=false;window.GoHome();
         string side=window.State.DockSide,theme=window.State.ThemeMode;
-        window.Width=462;window.Height=650;
+        window.Width=430;window.Height=650;
         foreach(string nextSide in new[]{"Right","Left"})
         {
             window.State.DockSide=nextSide;window.UpdatePageRail();window.UpdateLayout();
             bool right=nextSide=="Left";
-            check(Grid.GetColumn(window.PageRail)==(right ? 1:0) && Grid.GetColumn(window.PanelSurface)==(right ? 0:1) && Math.Abs(window.PanelSurface.ActualWidth-430)<1,
+            check(window.PageTabsWindow!=null && window.PageTabsWindow.Owner==window && Grid.GetColumn(window.PanelSurface)==0 && Math.Abs(window.PanelSurface.ActualWidth-430)<1,
                 $"Side tabs mirror on {nextSide} dock without narrowing the original content");
             window.SelectPage("Files",false);window.UpdateLayout();window.UpdatePageRail();
             IntPtr region=CreateRectRgn(0,0,0,0);IntPtr handle=new WindowInteropHelper(window).Handle;double scale=NativeMethods.WindowDpi(handle)/96d;
             await Task.Delay(100);
             int borderStatus=DwmGetWindowAttribute(handle,34,out int borderColor,sizeof(int));
             check(borderStatus<0 || borderColor==unchecked((int)0xFFFFFFFE),"Supported DWM border rendering stays suppressed after layout settles");
-            check(Grid.GetColumn(window.PageJoin)==Grid.GetColumn(window.PanelSurface) && !window.PageJoin.IsHitTestVisible && window.PageJoin.Height==44,"Selected tab joins the body without an interactive seam overlay");
+            check(Window.GetWindow(window.PageJoin)==window.PageTabsWindow && !window.PageJoin.IsHitTestVisible && window.PageJoin.Height==44,"Selected tab joins the body without an interactive seam overlay");
             var tabBorder=(Border)window.FilesPageTab.Template.FindName("TabSurface",window.FilesPageTab);
             check(right ? tabBorder.CornerRadius.TopLeft==0 && tabBorder.CornerRadius.TopRight==8 : tabBorder.CornerRadius.TopRight==0 && tabBorder.CornerRadius.TopLeft==8,"Tab connection has square inner corners and rounded outer corners");
-            int P(double p)=>(int)Math.Round(p*scale);int x=P(right ? window.ActualWidth-2:2);
-            try{check(GetWindowRgn(handle,region)>0 && PtInRegion(region,x,P(112)) && !PtInRegion(region,x,P(70)) && !PtInRegion(region,x,P(200)),
-                $"Native window shape includes side tabs and excludes empty gaps on {nextSide} dock");}finally{DeleteObject(region);}
+            int P(double p)=>(int)Math.Round(p*scale);int x=P(right ? window.ActualWidth+2:-2);
+            try{check(GetWindowRgn(handle,region)>0 && !PtInRegion(region,x,P(112)) && PtInRegion(region,P(window.ActualWidth/2),P(112)),
+                $"Main window shape excludes the separate side tabs on {nextSide} dock");}finally{DeleteObject(region);}
+            var bodyBounds=window.PanelSurface.PointToScreen(new System.Windows.Point());
+            var mainHandle=new WindowInteropHelper(window).Handle;var railHandle=new WindowInteropHelper(window.PageTabsWindow!).Handle;
+            GetWindowRect(mainHandle,out var mainRect);GetWindowRect(railHandle,out var railRect);
+            check(mainHandle!=railHandle && Math.Abs(mainRect.Left-bodyBounds.X)<=1 && Math.Abs(mainRect.Right-mainRect.Left-window.PanelSurface.ActualWidth*scale)<=1,"Capture HWND rectangle exactly matches main body and has a separate rail HWND");
+            check(right ? Math.Abs(railRect.Left-mainRect.Right+P(2))<=1 : Math.Abs(railRect.Right-mainRect.Left-P(2))<=1,"Separate tabs attach to the main body on the correct side");
+            window.BeginCaptureShortcut();check(window.PageTabsWindow!.IsVisible && !window.PageTabsWindow!.IsHitTestVisible,"Screenshot leaves side icons visible while blocking tab clicks");window.CancelCaptureShortcutPending();
+            window.CollapsePanel();check(!window.PageTabsWindow!.IsVisible,"Collapsed main panel hides its attached tabs");window.ExpandPanel();check(window.PageTabsWindow!.IsVisible,"Revealed main panel restores its attached tabs");
+            double oldLeft=window.Left,oldTop=window.Top;window.Left+=18;window.Top+=12;window.UpdateLayout();GetWindowRect(railHandle,out var movedRail);check(Math.Abs(movedRail.Left-railRect.Left-P(18))<=1 && Math.Abs(movedRail.Top-railRect.Top-P(12))<=1,"Separate rail follows both axes of panel movement");window.Left=oldLeft;window.Top=oldTop;
+            long railStyle=NativeMethods.GetExtendedWindowStyle(railHandle);check((railStyle&0x80)!=0 && (railStyle&0x40000)==0,"Attached rail stays out of taskbar and Alt-Tab");
+            var escape=new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(window.PageTabsWindow!)!,Environment.TickCount,Key.Escape){RoutedEvent=Keyboard.PreviewKeyDownEvent};window.PageTabsWindow!.RaiseEvent(escape);check(escape.Handled && !window.IsVisible,"Escape in the attached rail reaches main panel commands");window.ExpandPanel();
             check(!MainWindow.IsMovementSurface(window.FilesPageTab) && !MainWindow.IsMovementSurface(window.PanelResizeGrip),"Navigation and resize controls cannot accidentally drag the panel");
             foreach(string nextTheme in new[]{"Light","Dark"})
             {
@@ -108,9 +124,9 @@ internal static class PagesVerification
                 window.SelectPage("Performance",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-performance-{nextSide}-{nextTheme}.png"));
             }
         }
-        window.Width=412;window.Height=480;window.UpdateLayout();
+        window.Width=380;window.Height=480;window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight<=window.PerformanceScroll.ViewportHeight+1 && window.MemoryCard.CapacityFits && window.VramCard.CapacityFits,"Independent performance page fits the compact window with complete capacity labels");
         DemoVerification.SaveRender(window,Path.Combine(root,"pages-performance-small.png"));
-        window.Width=462;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");
+        window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");
     }
 }

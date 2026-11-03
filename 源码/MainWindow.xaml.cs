@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         _dataDirectory = dataDirectory;
         Storage = new StorageService(dataDirectory);
         State = Storage.Load();
+        PageRailWindow.MigratePosition(State);
         _keepOpen = State.KeepOpen;
         _screen = Forms.Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == State.PanelScreen) ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
@@ -462,7 +463,7 @@ public partial class MainWindow : Window
         _desktopPresence.Reveal();
         RememberMemoryForeground();
         RecordDiagnosticState("expand-request");
-        _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); if (IsFilesPage) SearchBox.Focus(); else PerformancePageTab.Focus();
+        _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); if (IsFilesPage) SearchBox.Focus(); else Focus();
         NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
         UpdatePerformanceActivity();
     }
@@ -544,6 +545,7 @@ public partial class MainWindow : Window
     public void Quit() { RecordDiagnosticState("user-exit-request"); _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()
     {
+        _pageRailWindow?.DisposeRail();
         _plannerModule.Dispose();
         DisposeDiagnostics();
         RestoreCaptureInteraction();

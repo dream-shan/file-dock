@@ -9,15 +9,21 @@ public partial class MainWindow
 {
     internal bool IsFilesPage => State.SelectedPage == "Files";
     private bool _pagesReady;
+    private PageRailWindow? _pageRailWindow;
+    internal PageRailWindow? PageTabsWindow=>_pageRailWindow;
     private double _fileScrollOffset;
     private void InitializePages()
     {
         State.SelectedPage = State.SelectedPage == "Files" ? "Files" : "Performance";
+        PageRoot.Children.Remove(PageRail);PageRoot.Children.Remove(PageJoin);
+        _pageRailWindow=new PageRailWindow(this,PageRail,PageJoin);
+        IsVisibleChanged+=(_,_)=>UpdatePageRail();LocationChanged+=(_,_)=>_pageRailWindow?.Sync(State.DockSide=="Left",IsFilesPage);
         _pagesReady = true;
         SizeChanged += (_, _) => UpdatePageRail();
         Loaded += (_, _) => UpdatePageRail();
         UpdatePageLayout();
     }
+    internal void HandleRailKey(System.Windows.Input.KeyEventArgs e)=>Window_PreviewKeyDown(this,e);
     private void PageTab_Click(object sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton { Tag: string page }) SelectPage(page);
@@ -32,7 +38,7 @@ public partial class MainWindow
         UpdatePageLayout();
         if (changed)
         {
-            if (IsFilesPage) SearchBox.Focus(); else PerformancePageTab.Focus();
+            Activate();if (IsFilesPage) SearchBox.Focus(); else Focus();
             SetStatus(IsFilesPage ? "文件夹内浏览 · 文件单击打开" : "实时电脑状态");
             if (persist) Persist();
             if (IsFilesPage)
@@ -63,13 +69,7 @@ public partial class MainWindow
     {
         if (!_pagesReady) return;
         bool right = State.DockSide == "Left";
-        PageRoot.ColumnDefinitions[0].Width = right ? new GridLength(1,GridUnitType.Star) : new GridLength(32);
-        PageRoot.ColumnDefinitions[1].Width = right ? new GridLength(32) : new GridLength(1,GridUnitType.Star);
-        Grid.SetColumn(PanelSurface,right ? 0 : 1); Grid.SetColumn(PanelResizeGrip,right ? 0 : 1); Grid.SetColumn(PageRail,right ? 1 : 0);
         FilesPageTab.HorizontalAlignment = PerformancePageTab.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        Grid.SetColumn(PageJoin,right ? 0 : 1);
-        PageJoin.HorizontalAlignment=right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        PageJoin.Margin=right ? new Thickness(0,IsFilesPage ? 90 : 142,-2,0) : new Thickness(-2,IsFilesPage ? 90 : 142,0,0);
         foreach(var tab in new[]{FilesPageTab,PerformancePageTab})
         {
             tab.ApplyTemplate();
@@ -78,7 +78,8 @@ public partial class MainWindow
         }
         IntPtr handle = new WindowInteropHelper(this).Handle;
         if(handle!=IntPtr.Zero)ApplyNativeCorners(handle);
-        if (handle != IntPtr.Zero) NativeMethods.ShapePagePanel(handle,ActualWidth > 0 ? ActualWidth : Width,ActualHeight > 0 ? ActualHeight : Height,right,IsFilesPage);
+        if (handle != IntPtr.Zero) NativeMethods.ShapePagePanel(handle,ActualWidth > 0 ? ActualWidth : Width,ActualHeight > 0 ? ActualHeight : Height);
+        _pageRailWindow?.Sync(right,IsFilesPage);
     }
     private void PanelResizeGrip_DragDelta(object sender,DragDeltaEventArgs e)
     {

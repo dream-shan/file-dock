@@ -65,11 +65,11 @@ internal static class DemoVerification
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         window.SetStatus("演示界面 · 单击打开，右键管理");
         SaveRender(window, Path.Combine(directory, "ui-standard.png"));
-        window.Width = 412; window.Height = 480;
+        window.Width=380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "ui-small.png"));
         Check(window.PinsSection.ActualHeight > 150 && window.AddButton.IsVisible, "Minimum window size preserves performance panel and add button");
-        window.Width = 462; window.Height = 650;
+        window.Width=430; window.Height = 650;
         window.CollapsePanel(); Check(!window.IsVisible, "Collapse hides main window");
         window.Show();
         Check(window.IsVisible && window.IsFilesPage, "Expanded window restores the selected file page");
@@ -148,13 +148,13 @@ internal static class DemoVerification
             "Opening a file preserves the browsed folder when keep-open is enabled");
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-standard.png"));
-        window.Width = 412; window.Height = 480;
+        window.Width=380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-small.png"));
         Check(window.FolderList.ActualHeight > 80 && window.FolderBackButton.IsVisible && window.FolderUpButton.IsVisible &&
             window.FolderHomeButton.IsVisible && window.FolderRefreshButton.IsVisible,
             "Minimum window size preserves folder contents and navigation");
-        window.Width = 462; window.Height = 650;
+        window.Width=430; window.Height = 650;
         window.GoHome();
 
         // Keep the recursive-search fixture separate so the original browser
@@ -204,13 +204,13 @@ internal static class DemoVerification
         window.FolderFilterComboBox.SelectedIndex = 0;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "search-standard.png"));
-        window.Width = 412; window.Height = 480;
+        window.Width=380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "search-small.png"));
         Check(window.FolderList.ActualHeight > 80 && window.FolderFilterComboBox.IsVisible &&
             window.SearchPlaceholder.Text == "搜索当前文件夹及子文件夹",
             "Minimum window size preserves recursive results, type filter, and search hint");
-        window.Width = 462; window.Height = 650;
+        window.Width=430; window.Height = 650;
 
         window.SearchBox.Text = "共享预算";
         Task replacedSearch = window.WaitForFolderSearchAsync();
@@ -402,10 +402,10 @@ internal static class DemoVerification
             ((EntryView)window.PinsList.Items[0]).Id == "perf-499", "Filtering from the final row resets scrolling and preserves item identity");
         window.SearchBox.Text = "no-such-pin"; window.UpdateLayout();
         Check(window.PinsList.Items.Count == 0 && VisualTreeHelper.GetChildrenCount(pinPanel) == 0, "Empty pin results release realized containers");
-        window.SearchBox.Text = ""; window.Width = 412; window.Height = 480; window.UpdateLayout();
+        window.SearchBox.Text = ""; window.Width=380; window.Height = 480; window.UpdateLayout();
         Check(VisualTreeHelper.GetChildrenCount(pinPanel) <= 16 && window.PinsSection.ActualHeight > 150,
             "Virtualized pins preserve the compact window layout");
-        window.Width = 462; window.Height = 650; window.UpdateLayout();
+        window.Width=430; window.Height = 650; window.UpdateLayout();
         var timings = new List<double>();
         for (int i = 0; i < 20; i++)
         {
@@ -502,4 +502,3 @@ internal static class DemoVerification
         using var file = File.Create(path); encoder.Save(file);
     }
 }
-

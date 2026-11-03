@@ -1,3 +1,5 @@
+using FileDockDemo.Contracts;
+using FileDockDemo.Features.Planner;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +13,11 @@ using System.Windows.Media;
 namespace FileDockDemo;
 internal static class PlanDialogVerification
 {
+    private sealed class OtherDialog : IModuleDialog
+    {
+        public FrameworkElement View {get;}=new Border();public bool HasChanges=>false;
+        public void OnClosed(){}public void FocusInitial(){}public void RestoreFocus(){}public void RequestClose(){}public void HandleWindowKey(KeyEventArgs e){}public void RefreshTheme(){}
+    }
     private static IEnumerable<T> All<T>(DependencyObject p) where T:DependencyObject{if(p is T t)yield return t;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in All<T>(VisualTreeHelper.GetChild(p,i)))yield return c;}
     private static T Id<T>(DependencyObject p,string id) where T:DependencyObject=>All<T>(p).First(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)==id);
     private static double Contrast(Color a,Color b){double L(Color c){double C(byte v){double x=v/255d;return x<=.04045 ? x/12.92:Math.Pow((x+.055)/1.055,2.4);}return .2126*C(c.R)+.7152*C(c.G)+.0722*C(c.B);}double x=L(a),y=L(b);return (Math.Max(x,y)+.05)/(Math.Min(x,y)+.05);}
@@ -18,7 +25,7 @@ internal static class PlanDialogVerification
     {
         double width=w.Width,height=w.Height;string theme=w.State.ThemeMode;
         try{
-            w.Width=462;w.Height=650;w.Planner.Render();w.UpdateLayout();Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();var card=w.ActivePlanCard??throw new InvalidOperationException("Dialog was not opened");
+            w.Width=462;w.Height=650;w.Planner.Render();w.UpdateLayout();Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();var card=(w.ActiveModuleDialog as PlanCard)??throw new InvalidOperationException("Dialog was not opened");
             check(!w.ContentGrid.IsEnabled && !w.PageRail.IsEnabled,"Plan dialog disables background controls");
             check(KeyboardNavigation.GetTabNavigation(card)==KeyboardNavigationMode.Cycle,"Plan dialog contains keyboard tab navigation");
             var peer=UIElementAutomationPeer.CreatePeerForElement(card)!;check(peer.GetPattern(PatternInterface.Window) is IWindowProvider provider && provider.IsModal,"Native accessibility exposes the plan card as a modal dialog");
@@ -51,6 +58,9 @@ internal static class PlanDialogVerification
             w.Width=412;w.Height=480;w.UpdateLayout();var smallBody=Id<ScrollViewer>(card,"PlanBody");var smallFooter=Id<Border>(card,"PlanFooter");smallBody.ScrollToEnd();w.UpdateLayout();
             check(smallBody.ViewportHeight>30 && smallBody.TranslatePoint(new Point(0,smallBody.ActualHeight),card).Y<=smallFooter.TranslatePoint(new Point(),card).Y+1,"Compact window keeps body and footer separate");
             DemoVerification.SaveRender(w,System.IO.Path.Combine(root,"plan-dialog-small.png"));
-        }finally{w.ClosePlanDialog();w.Width=width;w.Height=height;w.SetThemeMode(theme);w.Planner.Render();}
+            var activeDialog=w.ActiveModuleDialog;((IModuleHost)w).CloseDialog(new OtherDialog());check(ReferenceEquals(activeDialog,w.ActiveModuleDialog),"A module cannot close another dialog by passing the wrong instance");
+            w.CloseModuleDialog();check(!w.Planner.IsEditing && w.ActiveModuleDialog==null,"Shell closure releases the module editing state");
+            Id<Button>(w,"PlannerQuickAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));check(w.Planner.IsEditing && w.ActiveModuleDialog!=null,"Planner can reopen after external shell closure");
+        }finally{w.CloseModuleDialog();w.Width=width;w.Height=height;w.SetThemeMode(theme);w.Planner.Render();}
     }
 }

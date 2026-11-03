@@ -1,3 +1,5 @@
+using FileDockDemo.Features.Planner;
+using FileDockDemo.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -43,6 +45,7 @@ public sealed class EntryView : INotifyPropertyChanged
 public partial class MainWindow : Window
 {
     internal readonly StorageService Storage;
+    private readonly PlannerModule _plannerModule;
     internal AppState State;
     private readonly string _dataDirectory;
     private List<EntryView> _displayPins = new();
@@ -82,7 +85,7 @@ public partial class MainWindow : Window
         InitializeLiveFolder();
         InitializeTransfers();
         InitializePerformance();
-        Planner.Initialize(State, () => Persist());
+        _plannerModule=new PlannerModule(Planner,new AppStatePlannerStore(State,()=>Persist()),this);
         InitializePages();
         ApplyTheme();
         SizeChanged += (_, _) => { QueueDesktopPresence(); };
@@ -522,7 +525,7 @@ public partial class MainWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (_captureInteractionHeld) { e.Handled = true; return; }
-        if(ActivePlanCard!=null){ActivePlanCard.HandleWindowKey(e);return;}
+        if(ActiveModuleDialog!=null){ActiveModuleDialog.HandleWindowKey(e);return;}
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SelectPage("Files"); SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
         if (Planner.IsKeyboardFocusWithin && e.Key != Key.Escape) return;
         if (HandleMemoryActionKey(e) || IsFilesPage && (HandleTransferKey(e) || HandleBrowserKey(e))) return;
@@ -530,7 +533,7 @@ public partial class MainWindow : Window
         if (IsFilesPage && e.Key == Key.Enter && !FilesPageTab.IsKeyboardFocused && !PerformancePageTab.IsKeyboardFocused) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
-    private void Window_Closing(object? sender, CancelEventArgs e) { if(!_quitting && ActivePlanCard!=null){e.Cancel=true;ActivePlanCard.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
+    private void Window_Closing(object? sender, CancelEventArgs e) { if(!_quitting && ActiveModuleDialog!=null){e.Cancel=true;ActiveModuleDialog.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) {
         DiagnosticLog.Write("display-settings-changed");
         Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });
@@ -541,6 +544,7 @@ public partial class MainWindow : Window
     public void Quit() { RecordDiagnosticState("user-exit-request"); _quitting = true; Persist(); Application.Current.Shutdown(); }
     public void DisposeResources()
     {
+        _plannerModule.Dispose();
         DisposeDiagnostics();
         RestoreCaptureInteraction();
         StopFolderWatcher();

@@ -6,7 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Input;
 
-namespace FileDockDemo;
+namespace FileDockDemo.Features.Planner;
 internal sealed class PlanTitleBox : TextBox
 {
     private Hint? _hint;

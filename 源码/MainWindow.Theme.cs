@@ -18,7 +18,7 @@ public partial class MainWindow
         bool dark = ThemePalette.Resolve(State.ThemeMode, systemAppsDark ?? ThemePalette.SystemAppsDark());
         if (_themeApplied && IsDarkTheme == dark) return;
         IsDarkTheme = dark; _themeApplied = true;
-        ThemePalette.Apply(dark); ActivePlanCard?.RefreshTheme();
+        ThemePalette.Apply(dark); ActiveModuleDialog?.RefreshTheme();
         AppLogo.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/FileDock-" + (dark ? "light" : "dark") + ".png"));
         CpuCard.ApplyTheme(ThemePalette.Brush("CpuAccent"));
         GpuCard.ApplyTheme(ThemePalette.Brush("GpuAccent"));

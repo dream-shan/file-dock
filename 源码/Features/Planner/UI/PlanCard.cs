@@ -1,3 +1,4 @@
+using FileDockDemo.Contracts;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,12 +14,13 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Markup;
 
-namespace FileDockDemo;
-internal sealed class PlanCard : UserControl
+namespace FileDockDemo.Features.Planner;
+internal sealed class PlanCard : UserControl, IModuleDialog
 {
+    private readonly IModuleHost _host;
     private readonly PlanItem _draft;
     private readonly Func<PlanItem,bool> _commit;
-    private readonly Action _cancel;
+    private readonly Action _cancel,_returnFocus;
     private readonly string _original;
     private readonly PlanTitleBox _title=new();
     private readonly TextBlock _titleError=new(),_error=new(),_counter=new();
@@ -31,9 +33,9 @@ internal sealed class PlanCard : UserControl
     internal bool HasChanges=>Snapshot()!=_original;
     internal bool IsBusy=>_busy;
     private string Snapshot()=>string.Join("\u001f",_title.Text,_draft.Kind,_draft.RepeatRule,_draft.Weekdays,_draft.ActiveDays,_draft.RestDays,_draft.ScheduledDate.ToString("yyyy-MM-dd"));
-    internal PlanCard(PlanItem draft,bool editing,Func<PlanItem,bool> commit,Action cancel,Action? delete=null)
+    internal PlanCard(PlanItem draft,bool editing,Func<PlanItem,bool> commit,Action cancel,IModuleHost host,Action returnFocus,Action? delete=null)
     {
-        _draft=draft;_commit=commit;_cancel=cancel;_editing=editing;
+        _returnFocus=returnFocus;_host=host;_draft=draft;_commit=commit;_cancel=cancel;_editing=editing;
 
         SetResourceReference(BackgroundProperty,"Surface");SetResourceReference(ForegroundProperty,"Ink");
         RefreshTheme();
@@ -70,7 +72,7 @@ internal sealed class PlanCard : UserControl
         if(e.Key==Key.Escape){var open=_popups.LastOrDefault(p=>p.IsOpen);if(open!=null)open.IsOpen=false;else RequestClose();e.Handled=true;}
         else if(e.Key==Key.Enter && _title.IsKeyboardFocusWithin && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)){Save();e.Handled=true;}
     }
-    internal void RequestClose(){if(_busy)return;if(HasChanges && !App.IsSelfTest && MessageBox.Show(Window.GetWindow(this),"放弃已填写的内容？","文件坞",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;_cancel();}
+    internal void RequestClose(){if(_busy)return;if(HasChanges && !_host.ConfirmDiscardChanges())return;_cancel();}
     private static Border Frame(UIElement child,string id="")
     {
         var frame=new Border{Child=child,CornerRadius=new CornerRadius(7),BorderThickness=new Thickness(1),Padding=new Thickness(2)};
@@ -115,7 +117,7 @@ internal sealed class PlanCard : UserControl
     private Popup Popup(UIElement content,UIElement target)
     {
         var border=new Border{Child=content,CornerRadius=new CornerRadius(8),Padding=new Thickness(10),BorderThickness=new Thickness(1)};border.Resources=Resources;border.SetResourceReference(Border.BackgroundProperty,"Surface");border.SetResourceReference(Border.BorderBrushProperty,"Border");
-        KeyboardNavigation.SetTabNavigation(border,KeyboardNavigationMode.Cycle);var popup=new Popup{Child=border,PlacementTarget=target,Placement=PlacementMode.Bottom,StaysOpen=false,AllowsTransparency=true};border.PreviewKeyDown+=(_,e)=>{if(e.Key==Key.Escape){popup.IsOpen=false;e.Handled=true;}};popup.Closed+=(_,_)=>{_popups.Remove(popup);if(Window.GetWindow(this) is MainWindow owner && owner.IsActive && !owner.CaptureInteractionHeld && target is Control c)c.Focus();};_popups.Add(popup);popup.IsOpen=true;border.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));return popup;
+        KeyboardNavigation.SetTabNavigation(border,KeyboardNavigationMode.Cycle);var popup=new Popup{Child=border,PlacementTarget=target,Placement=PlacementMode.Bottom,StaysOpen=false,AllowsTransparency=true};border.PreviewKeyDown+=(_,e)=>{if(e.Key==Key.Escape){popup.IsOpen=false;e.Handled=true;}};popup.Closed+=(_,_)=>{_popups.Remove(popup);if(_host.CanRestorePopupFocus && target is Control c)c.Focus();};_popups.Add(popup);popup.IsOpen=true;border.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));return popup;
     }
     private void OpenCalendar()
     {
@@ -138,6 +140,15 @@ internal sealed class PlanCard : UserControl
         _busy=true;_submit.Content="保存中…";ValidateTitle();
         try{if(_commit(_draft))_committed=true;else _error.Text="保存失败，填写内容已保留。请检查文件权限或稍后重试。";}catch(Exception ex){_error.Text="保存失败："+ex.Message;}finally{_busy=false;_submit.Content=_editing ? "保存":"添加";ValidateTitle();}
     }
+    internal event Action? Closed;
+    void IModuleDialog.OnClosed()=>Closed?.Invoke();
+    FrameworkElement IModuleDialog.View=>this;
+    bool IModuleDialog.HasChanges=>HasChanges;
+    void IModuleDialog.FocusInitial()=>FocusTitle();
+    void IModuleDialog.RestoreFocus()=>_returnFocus();
+    void IModuleDialog.RequestClose()=>RequestClose();
+    void IModuleDialog.HandleWindowKey(KeyEventArgs e)=>HandleWindowKey(e);
+    void IModuleDialog.RefreshTheme()=>RefreshTheme();
     private sealed class ScopeGrid : UniformGrid
     {
         protected override AutomationPeer OnCreateAutomationPeer()=>new ScopePeer(this);

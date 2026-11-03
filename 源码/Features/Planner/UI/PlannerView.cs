@@ -44,14 +44,14 @@ public sealed class PlannerView : UserControl
     private static TextBlock Label(string text,bool muted=false)
     {
         var t=new TextBlock{Text=text,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,2,0,2)};
-        t.SetResourceReference(TextBlock.ForegroundProperty,muted ? "Muted":"Ink");return t;
+        t.SetResourceReference(TextBlock.BackgroundProperty,"ContentSurface");t.SetResourceReference(TextBlock.ForegroundProperty,muted ? "Muted":"Ink");return t;
     }
     private Button Button(string text,Action action)
     {
         var b=new Button{Content=text,Padding=new Thickness(5,4,5,4),Margin=new Thickness(1)};
         b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;
     }
-    private void Header(UIElement element){DockPanel.SetDock(element,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,element);else _root.Children.Add(element);}
+    private void Header(UIElement element){var plate=new Border{Child=element,CornerRadius=new CornerRadius(6)};plate.SetResourceReference(Border.BackgroundProperty,"ContentSurface");DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
     internal void Render()
     {
         if(_controller==null)return;
@@ -60,7 +60,7 @@ public sealed class PlannerView : UserControl
         RenderedDay=PlanRules.Today;if(!_controller.Reconcile(RenderedDay))Header(Label("清理保存失败，原有计划已保留。",true));
         var manage=Button(_manage ? "返回今天":"管理",()=>{_manage=!_manage;Render();});AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);
         var dateLabel=Label(PlanRules.Today.ToString("M月d日 ddd"),true);DockPanel.SetDock(dateLabel,Dock.Right);heading.Children.Add(dateLabel);var title=Label(_manage ? "管理计划":"今日待办");title.FontSize=14;title.FontWeight=FontWeights.SemiBold;heading.Children.Add(title);Header(heading);
-        var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
+        var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.SetResourceReference(BackgroundProperty,"ContentSurface");add.HorizontalAlignment=HorizontalAlignment.Left;add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
         var list=new StackPanel();
 
         var items=_controller.Items(_manage,PlanRules.Today);
@@ -79,7 +79,7 @@ public sealed class PlannerView : UserControl
         meta.Add(PlanRules.ScheduleLabel(p));if(p.Migrated)meta.Add("旧计划 · 请确认日期");if(_manage && !PlanRules.Appears(p,PlanRules.Today))meta.Add("今天不出现");var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;content.Children.Add(subtitle);if(done)row.Opacity=.6;
         var edit=Button("",()=>Edit(p));edit.Content=content;AutomationProperties.SetName(edit,"详情："+p.Title);edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(edit);
         if(_revealId==p.Id){_revealId=null;edit.SetResourceReference(BackgroundProperty,"Hover");Dispatcher.BeginInvoke(()=>{edit.BringIntoView();var animation=new System.Windows.Media.Animation.DoubleAnimation(.55,1,TimeSpan.FromMilliseconds(800));animation.Completed+=(_,_)=>edit.ClearValue(BackgroundProperty);edit.BeginAnimation(OpacityProperty,animation);});}
-        var separator=new Border{Child=row,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
+        var separator=new Border{Child=row,CornerRadius=new CornerRadius(6),BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BackgroundProperty,"ContentSurface");separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
 
     }
     private void Edit(PlanItem? item)

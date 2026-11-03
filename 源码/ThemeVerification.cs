@@ -24,12 +24,13 @@ internal static class ThemeVerification
         try
         {
             check(JsonSerializer.Deserialize<AppState>("{\"Pins\":[]}")!.ThemeMode == "System" && ThemePalette.Normalize("unknown") == "System", "Old and unknown theme settings safely default to system without losing pins");
+            TransparencyVerification.Run(window,root,check);
             window.GoHome(); window.ExpandPanel(); window.SetThemeMode("System");
-            check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromRgb(250,251,253), "System light application theme applies to the panel");
+            check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,250,251,253), "System light application theme applies to the panel");
             window.CpuCard.Set(17, "theme validation", 60, true); int history = window.CpuCard.HistoryCount;
             window.SetThemeMode("Dark");
             check(window.IsDarkTheme && window.CpuCard.ValueText == "17%" && window.CpuCard.HistoryCount == history, "Changing theme preserves current performance values and history");
-            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromRgb(32,35,41) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("Card"), "Dark theme reaches panel, search and performance cards");
+            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,32,35,41) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("Card"), "Dark theme reaches panel, search and performance cards");
             check(((BitmapImage)window.AppLogo.Source).UriSource.ToString().Contains("light.png"), "Dark panel uses the light transparent mark");
             check(new StorageService(Path.Combine(root,"data")).Load().ThemeMode == "Dark", "Manual appearance choice persists to the existing settings file");
             var appearance = window.CreateAppearanceMenu();

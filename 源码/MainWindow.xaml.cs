@@ -404,6 +404,7 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
+        menu.Items.Add(CreateTransparencyMenu());
         var autoDesktop = new MenuItem { Header = "桌面自动展开，遮挡时收起", IsCheckable = true, IsChecked = State.AutoDesktop };
         autoDesktop.Click += (_, _) => SetAutoDesktop(autoDesktop.IsChecked);
         menu.Items.Add(autoDesktop);

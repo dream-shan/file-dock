@@ -17,11 +17,7 @@ public partial class MainWindow
 
     private void InitializeMovement()
     {
-        WindowChrome.SetWindowChrome(this, new WindowChrome {
-            CaptionHeight = 0, ResizeBorderThickness = new Thickness(6),
-            GlassFrameThickness = new Thickness(0), CornerRadius = new CornerRadius(20),
-            UseAeroCaptionButtons = false
-        });
+        // Per-pixel background composition; drag surfaces and the resize thumb remain active.
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);

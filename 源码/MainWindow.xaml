@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:FileDockDemo"
         xmlns:planner="clr-namespace:FileDockDemo.Features.Planner"
         Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="430" Height="650" MinWidth="380" MinHeight="480"
-        WindowStyle="None" AllowsTransparency="False" Background="{DynamicResource Surface}" PreviewMouseLeftButtonDown="MovePanelFromSurface"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" PreviewMouseLeftButtonDown="MovePanelFromSurface"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="False" Topmost="True"
         FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12" Foreground="{DynamicResource Ink}"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
@@ -95,7 +95,7 @@
     </Window.Resources>
 
     <Grid x:Name="PageRoot"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-    <Border Grid.Column="0" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
+    <Border Grid.Column="0" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource BlankSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
         <Grid x:Name="ContentGrid" Margin="19,17,19,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -106,7 +106,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag" Margin="0,0,0,17">
+            <Border CornerRadius="7" Background="{DynamicResource ContentSurface}" Margin="0,0,0,17"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -127,7 +127,7 @@
                     <Button x:Name="CollapseButton" Style="{StaticResource IconButton}" Content="&#xE76C;"
                             ToolTip="收起到屏幕边缘" AutomationProperties.Name="收起" />
                 </StackPanel>
-            </Grid>
+            </Grid></Border>
 
             <Border x:Name="FileSearchSurface" Grid.Row="1" Background="{DynamicResource Input}" CornerRadius="11" BorderBrush="{DynamicResource Border}" BorderThickness="1"
                     Padding="12,0" Height="42" Margin="0,0,0,13">
@@ -168,11 +168,11 @@
                     <RowDefinition Height="32" />
                     <RowDefinition Height="155" /><RowDefinition Height="*" MinHeight="130" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
                         HorizontalAlignment="Right" ToolTip="添加常用文件或文件夹" />
                 <Grid Grid.Row="1">
-                    <TextBlock x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="{DynamicResource Muted}"
+                    <TextBlock Background="{DynamicResource ContentSurface}" VerticalAlignment="Top" HorizontalAlignment="Center" x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="{DynamicResource Muted}"
                                FontSize="11" TextAlignment="Center" TextWrapping="Wrap" Margin="10,17" Visibility="Visible" />
                     <ListBox x:Name="PinsList" Background="Transparent" BorderThickness="0" Padding="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -216,7 +216,7 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="35" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
                 <TextBlock x:Name="PerformanceHint" Text="实时更新 · 1 秒" FontSize="9" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <Grid MinHeight="190">
@@ -245,7 +245,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid Margin="0,0,0,10">
+                <Grid Background="{DynamicResource ContentSurface}" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="FolderBackButton" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="返回（Alt + ←）" AutomationProperties.Name="返回" />
@@ -267,7 +267,7 @@
                         </StackPanel>
                     </Grid>
                 </Border>
-                <Grid Grid.Row="2" Margin="0,0,0,6">
+                <Grid Background="{DynamicResource ContentSurface}" Grid.Row="2" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <TextBlock x:Name="FolderCountText" Text="文件夹内容" FontSize="11" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <ComboBox x:Name="FolderFilterComboBox" Grid.Column="1" Width="73" Height="24" SelectedIndex="0" FontSize="11" Foreground="{DynamicResource Muted}" AutomationProperties.Name="当前文件夹类型筛选">
@@ -281,7 +281,7 @@
                              ItemContainerStyle="{StaticResource PlainItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Tag="{Binding}" Click="Item_Open" Style="{StaticResource QuietButton}" Padding="7,9" HorizontalContentAlignment="Stretch" >
+                                <Button Tag="{Binding}" Click="Item_Open" Background="{DynamicResource ContentSurface}" Style="{StaticResource QuietButton}" Padding="7,9" HorizontalContentAlignment="Stretch" >
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <Border Width="29" Height="34" Background="{DynamicResource Card}" CornerRadius="8" HorizontalAlignment="Left">
@@ -297,11 +297,11 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <TextBlock x:Name="FolderEmptyText" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+                    <TextBlock Background="{DynamicResource ContentSurface}" x:Name="FolderEmptyText" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="5">
+            <Border Grid.Row="5" Background="{DynamicResource ContentSurface}" CornerRadius="6"><Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -312,7 +312,7 @@
                     <TextBlock x:Name="HotkeyHint" Text="Ctrl + Alt + Space  唤出" FontSize="9.5" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
                     <TextBlock x:Name="InteractionHint" Text="文件夹内浏览 · 文件单击打开" FontSize="9.5" Foreground="{DynamicResource Muted}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
-            </Grid>
+            </Grid></Border>
         </Grid>
     </Border>
         <StackPanel x:Name="PageRail" Grid.Column="0" VerticalAlignment="Top" Margin="0,90,0,0">

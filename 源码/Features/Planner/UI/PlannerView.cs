@@ -18,6 +18,7 @@ public sealed class PlannerView : UserControl
     private IModuleHost? _host;
     private PlanCard? _editor;
     private bool _manage;
+    private ScrollViewer? _scroll;
     internal bool IsEditing=>_editor!=null;
     internal DateTime RenderedDay { get; private set; }=PlanRules.Today;
     private static readonly ControlTemplate CircleTemplate=(ControlTemplate)XamlReader.Parse("""
@@ -55,7 +56,7 @@ public sealed class PlannerView : UserControl
     internal void Render()
     {
         if(_controller==null)return;
-        _root.Children.Clear();
+        double offset=_scroll?.VerticalOffset??0;bool reveal=_revealId!=null;_root.Children.Clear();
         var heading=new DockPanel{Margin=new Thickness(0,0,0,7)};
         RenderedDay=PlanRules.Today;if(!_controller.Reconcile(RenderedDay))Header(Label("清理保存失败，原有计划已保留。",true));
         var manage=Button(_manage ? "返回今天":"管理",()=>{_manage=!_manage;Render();});AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);
@@ -65,7 +66,7 @@ public sealed class PlannerView : UserControl
 
         var items=_controller.Items(_manage,PlanRules.Today);
         foreach(var p in items)Row(list,p);if(items.Count==0)list.Children.Add(Label(_manage ? "暂无计划":"今天暂无待办",true));
-        _root.Children.Add(new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");_root.Children.Add(_scroll);var scroll=_scroll;if(!reveal)Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(_scroll,scroll))scroll.ScrollToVerticalOffset(offset);});
     }
     private void Row(Panel list,PlanItem p)
     {

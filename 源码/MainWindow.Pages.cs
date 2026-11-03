@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,21 +9,26 @@ namespace FileDockDemo;
 public partial class MainWindow
 {
     internal bool IsFilesPage => State.SelectedPage == "Files";
+    internal bool IsPlannerPage=>State.SelectedPage=="Planner";
+    internal bool IsPerformancePage=>State.SelectedPage=="Performance";
+    private ToggleButton[] PageButtons=>PageRail.Children.OfType<ToggleButton>().ToArray();
+    private int SelectedPageIndex=>Math.Max(0,Array.FindIndex(PageButtons,b=>b.Tag as string==State.SelectedPage));
     private bool _pagesReady;
     private PageRailWindow? _pageRailWindow;
     internal PageRailWindow? PageTabsWindow=>_pageRailWindow;
     private double _fileScrollOffset;
     private void InitializePages()
     {
-        State.SelectedPage = State.SelectedPage == "Files" ? "Files" : "Performance";
+        State.SelectedPage = NormalizePage(State.SelectedPage);
         PageRoot.Children.Remove(PageRail);PageRoot.Children.Remove(PageJoin);
         _pageRailWindow=new PageRailWindow(this,PageRail,PageJoin);
-        IsVisibleChanged+=(_,_)=>UpdatePageRail();LocationChanged+=(_,_)=>_pageRailWindow?.Sync(State.DockSide=="Left",IsFilesPage);
+        IsVisibleChanged+=(_,_)=>UpdatePageRail();LocationChanged+=(_,_)=>_pageRailWindow?.Sync(State.DockSide=="Left",SelectedPageIndex,PageButtons.Length);
         _pagesReady = true;
         SizeChanged += (_, _) => UpdatePageRail();
         Loaded += (_, _) => UpdatePageRail();
         UpdatePageLayout();
     }
+    private string NormalizePage(string page)=>PageButtons.Any(b=>b.Tag as string==page)?page:"Performance";
     internal void HandleRailKey(System.Windows.Input.KeyEventArgs e)=>Window_PreviewKeyDown(this,e);
     private void PageTab_Click(object sender, RoutedEventArgs e)
     {
@@ -31,15 +37,15 @@ public partial class MainWindow
     internal void SelectPage(string page, bool persist = true)
     {
         if (!_pagesReady || _captureInteractionHeld || _dragging || _movingPanel) return;
-        page = page == "Files" ? "Files" : "Performance";
+        page = NormalizePage(page);
         bool changed = State.SelectedPage != page;
         if (changed && IsFilesPage) _fileScrollOffset = FindFileScroll()?.VerticalOffset ?? 0;
         State.SelectedPage = page;
         UpdatePageLayout();
         if (changed)
         {
-            Activate();if (IsFilesPage) SearchBox.Focus(); else Focus();
-            SetStatus(IsFilesPage ? "文件夹内浏览 · 文件单击打开" : "实时电脑状态");
+            Activate();if (IsFilesPage) SearchBox.Focus(); else if(IsPlannerPage)Planner.FocusAdd();else Focus();
+            SetStatus(IsFilesPage ? "文件夹内浏览 · 文件单击打开" : IsPlannerPage ? "今日安排 · 点击编辑":"实时电脑状态");
             if (persist) Persist();
             if (IsFilesPage)
             {
@@ -57,29 +63,30 @@ public partial class MainWindow
     private void UpdatePageLayout()
     {
         if (!_pagesReady) return;
-        FilesPageTab.IsChecked = IsFilesPage; PerformancePageTab.IsChecked = !IsFilesPage;
+        foreach(var tab in PageButtons)tab.IsChecked=tab.Tag as string==State.SelectedPage;
+        PlannerSection.Visibility=IsPlannerPage?Visibility.Visible:Visibility.Collapsed;
         FileSearchSurface.Visibility = IsFilesPage ? Visibility.Visible : Visibility.Collapsed;
         PinsSection.Visibility = IsFilesPage && CurrentFolderPath == null ? Visibility.Visible : Visibility.Collapsed;
         BrowserPanel.Visibility = IsFilesPage && CurrentFolderPath != null ? Visibility.Visible : Visibility.Collapsed;
-        PerformanceSection.Visibility = IsFilesPage ? Visibility.Collapsed : Visibility.Visible;
+        PerformanceSection.Visibility = IsPerformancePage ? Visibility.Visible : Visibility.Collapsed;
         UpdatePerformanceActivity(); UpdateFolderWatcher(); UpdatePageRail();
-        if (!IsFilesPage) InteractionHint.Text="电脑状态 · 点击内存整理"; else UpdateFileSelection();
+        if(IsPlannerPage)InteractionHint.Text="一次性／重复 · 点击编辑";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else UpdateFileSelection();
     }
     internal void UpdatePageRail()
     {
         if (!_pagesReady) return;
         bool right = State.DockSide == "Left";
-        FilesPageTab.HorizontalAlignment = PerformancePageTab.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        foreach(var tab in new[]{FilesPageTab,PerformancePageTab})
+
+        foreach(var tab in PageButtons)
         {
-            tab.ApplyTemplate();
+            tab.HorizontalAlignment=right?HorizontalAlignment.Left:HorizontalAlignment.Right;tab.ApplyTemplate();
             if(tab.Template.FindName("TabSurface",tab) is Border border)
                 border.CornerRadius=right ? new CornerRadius(0,8,8,0) : new CornerRadius(8,0,0,8);
         }
         IntPtr handle = new WindowInteropHelper(this).Handle;
         if(handle!=IntPtr.Zero)ApplyNativeCorners(handle);
         if (handle != IntPtr.Zero) NativeMethods.ShapePagePanel(handle,ActualWidth > 0 ? ActualWidth : Width,ActualHeight > 0 ? ActualHeight : Height);
-        _pageRailWindow?.Sync(right,IsFilesPage);
+        _pageRailWindow?.Sync(right,SelectedPageIndex,PageButtons.Length);
     }
     private void PanelResizeGrip_DragDelta(object sender,DragDeltaEventArgs e)
     {

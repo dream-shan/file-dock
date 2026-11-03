@@ -28,6 +28,39 @@ internal static class PagesVerification
             if(Find<T>(VisualTreeHelper.GetChild(parent,i)) is T child)return child;
         return null;
     }
+    private static async Task VerifyPlannerPage(MainWindow window,string root,Action<bool,string> check)
+    {
+        var original=window.State.Plans;
+        try
+        {
+            window.State.Plans=Enumerable.Range(0,40).Select(i=>new PlanItem{Title=$"待办测试 {i:00}",Kind="repeat",RepeatRule="daily",ScheduledDate=PlanRules.Today.AddDays(1)}).ToList();
+            window.SelectPage("Planner");window.UpdateLayout();await Task.Delay(100);
+            check(window.IsPlannerPage && window.PlannerSection.IsVisible && !window.PinsSection.IsVisible && !window.BrowserPanel.IsVisible && !window.PerformanceSection.IsVisible && !window.FileSearchSurface.IsVisible,"Planner owns a full independent page without file search or performance cards");
+            check(window.PlannerPageTab.IsChecked==true && window.FilesPageTab.IsChecked==false && window.PerformancePageTab.IsChecked==false,"Exactly the planner tab is selected");
+            check(window.Storage.Load().SelectedPage=="Planner","Last planner page persists without altering plan schema");
+            check(window.PlannerMonitoring && !window.PerformanceActive && window.MemoryOnlyActive && !window.FolderWatcherActive,"Planner runs only its date timer and lightweight memory checks");
+            Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="管理").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();await Task.Delay(100);
+            var scroll=Find<ScrollViewer>(window.Planner)!;scroll.ScrollToVerticalOffset(500);window.UpdateLayout();double offset=scroll.VerticalOffset;
+            check(offset>0,"Independent planner scrolls a long management list");
+            window.SelectPage("Files",false);await Task.Delay(100);
+            check(!window.PlannerMonitoring && !window.Planner.IsVisible,"Leaving planner stops the date timer");
+            window.SelectPage("Planner",false);window.UpdateLayout();await Task.Delay(100);window.UpdateLayout();
+            scroll=Find<ScrollViewer>(window.Planner)!;
+            check(Visuals<Button>(window.Planner).Any(b=>(b.Content as string)=="返回今天") && Math.Abs(scroll.VerticalOffset-offset)<1,"Planner retains management mode and scroll after switching pages");
+            window.CollapsePanel();check(!window.PlannerMonitoring,"Collapsed planner pauses date checks");window.ExpandPanel();await Task.Delay(100);
+            check(window.IsPlannerPage && window.PlannerMonitoring,"Revealing planner restores its selected page and date timer");
+            window.Width=380;window.Height=480;window.UpdateLayout();
+            var add=Visuals<Button>(window.Planner).First(b=>System.Windows.Automation.AutomationProperties.GetAutomationId(b)=="PlannerQuickAdd");
+            var point=add.TranslatePoint(new Point(),window.Planner);
+            check(point.Y>=0 && point.Y+add.ActualHeight<=window.Planner.ActualHeight+1 && scroll.ViewportHeight>100,"Compact planner keeps the add action visible outside the scrolling list");
+            DemoVerification.SaveRender(window,Path.Combine(root,"pages-planner-small.png"));
+            window.Width=430;window.Height=650;
+            Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="返回今天").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        }
+        finally{window.State.Plans=original;window.Planner.Render();window.Persist();}
+    }
+    private static System.Collections.Generic.IEnumerable<T> Visuals<T>(DependencyObject p) where T:DependencyObject
+    {if(p is T item)yield return item;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var child in Visuals<T>(VisualTreeHelper.GetChild(p,i)))yield return child;}
     internal static async Task Run(MainWindow window,string root,Action<bool,string> check)
     {
         var rightPosition=new AppState{DockSide="Right",PanelLeft=100,PanelTop=200};PageRailWindow.MigratePosition(rightPosition);PageRailWindow.MigratePosition(rightPosition);
@@ -64,8 +97,9 @@ internal static class PagesVerification
         check(!window.CaptureInteractionHeld && window.IsFilesPage,"Side tabs become usable after screenshot selection ends");
         check(window.IsFilesPage && window.PinsSection.Visibility==Visibility.Visible && window.PerformanceSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Visible,"File tab shows favorites and search without performance cards");
         check(window.Storage.Load().SelectedPage=="Files","Last selected page survives settings reload");
-        check(window.Planner.ActualHeight>130 && window.PinsList.ActualHeight<=156,"Favorites and planner share the file home without growing the window");
+        check(window.PlannerSection.Visibility==Visibility.Collapsed && window.PinsList.ActualHeight>300,"File favorites use the full file page without a planner reservation");
         PlannerVerification.Run(window,root,check);
+        await VerifyPlannerPage(window,root,check);window.SelectPage("Files",false);
         string folder=Path.Combine(root,"page-switch-files");Directory.CreateDirectory(folder);
         for(int i=0;i<50;i++)File.WriteAllText(Path.Combine(folder,$"item-{i:00}.txt"),"fixture");
         await window.NavigateToFolderAsync(folder);window.SearchBox.Text="item";
@@ -73,7 +107,7 @@ internal static class PagesVerification
         window.UpdateLayout();var scroll=Find<ScrollViewer>(window.FolderList)!;scroll.ScrollToVerticalOffset(12);window.UpdateLayout();double offset=scroll.VerticalOffset;
         window.SelectFile((EntryView)window.FolderList.Items[2],false);
         var entries=window.FolderList.ItemsSource;
-        window.SelectPage("Performance",false);await Task.Delay(1200);
+        window.SelectPage("Planner",false);window.SelectPage("Performance",false);await Task.Delay(1200);
         check(window.CurrentFolderPath==folder && window.SearchBox.Text=="item" && ReferenceEquals(entries,window.FolderList.ItemsSource),"Switching to performance preserves folder results and search text");
         check(window.PerformanceActive && !window.MemoryOnlyActive && !window.FolderWatcherActive,"Performance page samples metrics even when a folder is retained, without a hidden folder watcher");
         window.SelectPage("Files",false);window.UpdateLayout();await Task.Delay(150);
@@ -111,6 +145,10 @@ internal static class PagesVerification
             GetWindowRect(mainHandle,out var mainRect);GetWindowRect(railHandle,out var railRect);
             check(mainHandle!=railHandle && Math.Abs(mainRect.Left-bodyBounds.X)<=1 && Math.Abs(mainRect.Right-mainRect.Left-window.PanelSurface.ActualWidth*scale)<=1,"Capture HWND rectangle exactly matches main body and has a separate rail HWND");
             check(right ? Math.Abs(railRect.Left-mainRect.Right+P(2))<=1 : Math.Abs(railRect.Right-mainRect.Left-P(2))<=1,"Separate tabs attach to the main body on the correct side");
+            window.SelectPage("Planner",false);window.UpdateLayout();
+            check(Math.Abs(window.PageTabsWindow!.ActualHeight-148)<1 && window.PageJoin.Margin.Top==52,"Rail height and selected seam derive from all three tabs");
+            IntPtr railRegion=CreateRectRgn(0,0,0,0);
+            try{check(GetWindowRgn(railHandle,railRegion)>0 && PtInRegion(railRegion,P(16),P(126)) && !PtInRegion(railRegion,P(16),P(48)) && !PtInRegion(railRegion,P(16),P(100)),"Rail shape contains the third tab and leaves both gaps transparent");}finally{DeleteObject(railRegion);}
             window.BeginCaptureShortcut();check(window.PageTabsWindow!.IsVisible && !window.PageTabsWindow!.IsHitTestVisible,"Screenshot leaves side icons visible while blocking tab clicks");window.CancelCaptureShortcutPending();
             window.CollapsePanel();check(!window.PageTabsWindow!.IsVisible,"Collapsed main panel hides its attached tabs");window.ExpandPanel();check(window.PageTabsWindow!.IsVisible,"Revealed main panel restores its attached tabs");
             double oldLeft=window.Left,oldTop=window.Top;window.Left+=18;window.Top+=12;window.UpdateLayout();GetWindowRect(railHandle,out var movedRail);check(Math.Abs(movedRail.Left-railRect.Left-P(18))<=1 && Math.Abs(movedRail.Top-railRect.Top-P(12))<=1,"Separate rail follows both axes of panel movement");window.Left=oldLeft;window.Top=oldTop;
@@ -121,6 +159,7 @@ internal static class PagesVerification
             {
                 window.SetThemeMode(nextTheme);
                 window.SelectPage("Files",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-files-{nextSide}-{nextTheme}.png"));
+                window.SelectPage("Planner",false);window.UpdateLayout();DemoVerification.SaveRender(window,Path.Combine(root,$"pages-planner-{nextSide}-{nextTheme}.png"));
                 window.SelectPage("Performance",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-performance-{nextSide}-{nextTheme}.png"));
             }
         }

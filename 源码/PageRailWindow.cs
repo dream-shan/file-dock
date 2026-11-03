@@ -35,20 +35,20 @@ internal sealed class PageRailWindow : Window
         if(msg==0x21){handled=true;return new IntPtr(3);} // MA_NOACTIVATE, still deliver the click.
         return IntPtr.Zero;
     }
-    internal void Sync(bool right,bool files)
+    internal void Sync(bool right,int selectedIndex,int count)
     {
         if(_closed)return;
         _tabs.HorizontalAlignment=HorizontalAlignment.Stretch;
         _join.HorizontalAlignment=right?HorizontalAlignment.Left:HorizontalAlignment.Right;
-        _join.Margin=new Thickness(0,files?0:52,0,0);
+        count=Math.Max(1,count);double height=count*52-8;Height=height;_join.Margin=new Thickness(0,selectedIndex*52,0,0);
         _tabs.Margin=right?new Thickness(2,0,0,0):new Thickness(0,0,2,0);
         if(!_owner.IsVisible){if(IsVisible)Hide();return;}
         if(Owner==null)Owner=_owner;
         if(!IsVisible){Left=_owner.Left+(right?_owner.ActualWidth-2:-32);Top=_owner.Top+90;Show();}
         var h=new WindowInteropHelper(this).Handle;var parent=new WindowInteropHelper(_owner).Handle;
         var point=_owner.PointToScreen(new Point(right?_owner.ActualWidth-2:-32,90));double scale=NativeMethods.WindowDpi(parent)/96d;
-        NativeMethods.PlaceRail(h,(int)Math.Round(point.X),(int)Math.Round(point.Y),(int)Math.Round(34*scale),(int)Math.Round(96*scale));
-        UpdateLayout();NativeMethods.ShapeRailWindow(h,scale,right,files);
+        NativeMethods.PlaceRail(h,(int)Math.Round(point.X),(int)Math.Round(point.Y),(int)Math.Round(34*scale),(int)Math.Round(height*scale));
+        UpdateLayout();NativeMethods.ShapeRailWindow(h,scale,right,selectedIndex,count);
         bool topmost=(NativeMethods.GetExtendedWindowStyle(parent)&8)!=0;
         if(((NativeMethods.GetExtendedWindowStyle(h)&8)!=0)!=topmost)NativeMethods.SetCaptureTopmost(h,topmost);
         IsHitTestVisible=!_owner.CaptureInteractionHeld;

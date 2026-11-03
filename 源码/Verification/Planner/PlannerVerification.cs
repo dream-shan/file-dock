@@ -10,7 +10,7 @@ namespace FileDockDemo;
 internal static class PlannerVerification
 {
  private static IEnumerable<T> All<T>(DependencyObject p) where T:DependencyObject{if(p is T t)yield return t;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in All<T>(VisualTreeHelper.GetChild(p,i)))yield return c;}
- internal static void Run(MainWindow w,string root,Action<bool,string> check){PlannerModuleVerification.Run(check);PlanRulesVerification.Run(check);var saved=w.State.Plans;try{
+ internal static void Run(MainWindow w,string root,Action<bool,string> check){PlannerModuleVerification.Run(check);PlanRulesVerification.Run(check);var saved=w.State.Plans;w.SelectPage("Planner",false);try{
  var old=new PlanItem{Title="旧任务",Notes="原备注",Priority="low",Time="10:00"};PlanRules.Normalize(old);w.State.Plans=new(){old};w.Planner.Render();w.UpdateLayout();
  void Click(string name){w.UpdateLayout();All<Button>(w).First(b=>b.Content as string==name || System.Windows.Automation.AutomationProperties.GetName(b)==name).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();}
  T Id<T>(string id) where T:DependencyObject=>All<T>(w).First(t=>System.Windows.Automation.AutomationProperties.GetAutomationId(t)==id);

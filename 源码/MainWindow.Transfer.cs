@@ -43,7 +43,7 @@ public partial class MainWindow
     private void UpdateFileSelection()
     {
         foreach (var entry in VisibleEntries()) entry.IsChosen = _selectedPaths.Contains(entry.Path);
-        InteractionHint.Text = !IsFilesPage ? "电脑状态 · 点击内存整理" : _selectedPaths.Count > 0 ? $"已选 {_selectedPaths.Count} 项 · Ctrl+C 复制" : "Ctrl 多选 · 拖出复制";
+        InteractionHint.Text = IsPlannerPage ? "一次性／重复 · 点击编辑" : !IsFilesPage ? "电脑状态 · 点击内存整理" : _selectedPaths.Count > 0 ? $"已选 {_selectedPaths.Count} 项 · Ctrl+C 复制" : "Ctrl 多选 · 拖出复制";
     }
     private void ReconcileFileSelection()
     {

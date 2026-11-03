@@ -91,10 +91,10 @@ internal static partial class NativeMethods
         var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(40*scale),(int)Math.Round(40*scale));
         if(region!=IntPtr.Zero && SetWindowRgn(window,region,true)==0)DeleteObject(region);
     }
-    internal static void ShapeRailWindow(IntPtr window,double scale,bool right,bool files)
+    internal static void ShapeRailWindow(IntPtr window,double scale,bool right,int selectedIndex,int count)
     {
         int P(double v)=>(int)Math.Round(v*scale);var region=CreateRectRgn(0,0,0,0);
-        try{foreach(int top in new[]{0,52}){bool selected=top==0?files:!files;
+        try{for(int i=0;i<count;i++){int top=i*52;bool selected=i==selectedIndex;
             var tab=CreateRoundRectRgn(P(right?0:selected?0:4),P(top),P(right?(selected?34:30):34)+1,P(top+44)+1,P(16),P(16));
             var join=CreateRectRgn(P(right?0:24),P(top),P(right?10:34)+1,P(top+44)+1);
             try{if(tab==IntPtr.Zero || join==IntPtr.Zero || CombineRgn(tab,tab,join,2)==0 || CombineRgn(region,region,tab,2)==0)return;}finally{if(tab!=IntPtr.Zero)DeleteObject(tab);if(join!=IntPtr.Zero)DeleteObject(join);}}

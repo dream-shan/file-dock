@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     internal readonly StorageService Storage;
     private readonly PlannerModule _plannerModule;
     internal AppState State;
+    internal bool PlannerMonitoring=>_plannerModule.IsMonitoring;
     private readonly string _dataDirectory;
     private List<EntryView> _displayPins = new();
     private bool _loaded, _quitting, _keepOpen, _isCollapsed, _inDialog, _menuOpen;
@@ -464,7 +465,7 @@ public partial class MainWindow : Window
         _desktopPresence.Reveal();
         RememberMemoryForeground();
         RecordDiagnosticState("expand-request");
-        _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); if (IsFilesPage) SearchBox.Focus(); else Focus();
+        _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); if (IsFilesPage) SearchBox.Focus(); else if(IsPlannerPage) Planner.FocusAdd(); else Focus();
         NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
         UpdatePerformanceActivity();
     }
@@ -532,7 +533,7 @@ public partial class MainWindow : Window
         if (Planner.IsKeyboardFocusWithin && e.Key != Key.Escape) return;
         if (HandleMemoryActionKey(e) || IsFilesPage && (HandleTransferKey(e) || HandleBrowserKey(e))) return;
         if (e.Key == Key.Escape) { if (Environment.TickCount64 >= _ignoreDragEscapeUntil) CollapsePanel(); e.Handled = true; }
-        if (IsFilesPage && e.Key == Key.Enter && !FilesPageTab.IsKeyboardFocused && !PerformancePageTab.IsKeyboardFocused) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
+        if (IsFilesPage && e.Key == Key.Enter && !PageButtons.Any(tab=>tab.IsKeyboardFocused)) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
     private void Window_Closing(object? sender, CancelEventArgs e) { if(!_quitting && ActiveModuleDialog!=null){e.Cancel=true;ActiveModuleDialog.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }

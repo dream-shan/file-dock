@@ -154,7 +154,7 @@ public partial class MainWindow : Window
         InitializeDiagnostics();
     }
 
-    private void QueueDockRaise()
+    internal void QueueDockRaise()
     {
         if (_quitting || !_isCollapsed || _foregroundUpdateQueued) return;
         _foregroundUpdateQueued = true;
@@ -164,10 +164,9 @@ public partial class MainWindow : Window
             if (_quitting || !_isCollapsed || _dock == null) return;
             if (UpdateCaptureVisibility()) return;
             if (!_dock.IsVisible) _dock.Show();
-            IntPtr handle = _dock.Handle;
             // Reorder events also occur while unrelated windows change. Avoid
             // redundant raises and feedback when we already sit above the app.
-            if (!NativeMethods.IsAboveForeground(handle)) NativeMethods.RaiseWithoutActivation(handle);
+            if(!_dock.EnsureTopmost()) DiagnosticLog.Write("entry-zorder-restore-failed");
         }, DispatcherPriority.Background);
     }
 

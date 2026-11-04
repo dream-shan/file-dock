@@ -94,12 +94,30 @@ internal sealed class DockTabWindow : Form
         ClientSize = new Size((int)Math.Round(Width * ScaleFactor), (int)Math.Round(Height * ScaleFactor));
         NativeMethods.RoundEdgeWindow(Handle, Width, Height);
     }
+    internal bool NativeTopmost => IsHandleCreated && !IsDisposed && (NativeMethods.GetExtendedWindowStyle(Handle)&8)!=0;
+    internal bool EnsureTopmost()
+    {
+        if(IsDisposed || !Visible)return false;
+        // WinForms may still cache TopMost=true after a native z-order change.
+        // Check the actual HWND, and restore without activating the entry.
+        if(!NativeTopmost || !NativeMethods.IsAboveForeground(Handle))
+            if(!NativeMethods.RaiseWithoutActivation(Handle))return false;
+        return NativeTopmost;
+    }
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        // React to actual demotion rather than polling. Screenshot hiding is
+        // handled by the owner's capture gate and is never overridden here.
+        if(m.Msg==0x0047 && IsHandleCreated && Visible && !IsDisposed && !NativeTopmost)
+            _owner?.QueueDockRaise();
+    }
     internal new void Show()
     {
         SetMemoryPressure(_memoryPercent,false);
         UpdateShape(); _hovered=false; ApplyEntryOpacity(); base.Show();
         NativeMethods.SetWindowDisplayAffinity(Handle, 0);
-        Invalidate();
+        EnsureTopmost();Invalidate();
     }
     protected override void OnDpiChanged(DpiChangedEventArgs e) { base.OnDpiChanged(e); UpdateShape(); }
     protected override void OnPaint(PaintEventArgs e)

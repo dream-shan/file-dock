@@ -441,6 +441,7 @@ internal static class DemoVerification
         dock.Hide();
 
         IconVerification.Run(window, Check);
+        await EdgeRecoveryVerification.Run(window,Check);
         await FeatureVerification.Run(window, directory, Check);
         await PerformanceVerification.Run(window, directory, Check);
         await ThemeVerification.Run(window, directory, Check);

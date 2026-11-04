@@ -63,6 +63,7 @@ public partial class MainWindow
         bool? blocked = NativeMethods.IsPanelOccluded(handle);
         if (!blocked.HasValue) return;
         bool visible = _desktopPresence.WantVisible(IsVisible, _keepOpen, blocked.Value, own);
+        if(!visible && !IsVisible) QueueDockRaise();
         if (!visible && IsVisible) CollapsePanelCore(manual: false);
         else if (visible && !IsVisible)
         {

@@ -22,6 +22,8 @@ public sealed class AppState
     public List<PinnedEntry> Pins { get; set; } = [];
     public string DockSide { get; set; } = "Right";
     public double DockTop { get; set; } = -1;
+    public double PanelWidth {get;set;}=380;
+    public double PanelHeight {get;set;}=500;
     public double? PanelLeft { get; set; }
     public double? PanelTop { get; set; }
     public string? PanelScreen { get; set; }

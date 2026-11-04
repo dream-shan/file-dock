@@ -166,6 +166,6 @@ internal static class PagesVerification
         window.Width=380;window.Height=480;window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight<=window.PerformanceScroll.ViewportHeight+1 && window.MemoryCard.CapacityFits && window.VramCard.CapacityFits,"Independent performance page fits the compact window with complete capacity labels");
         DemoVerification.SaveRender(window,Path.Combine(root,"pages-performance-small.png"));
-        window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");
+        window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");CompactVerification.Run(window,root,check);
     }
 }

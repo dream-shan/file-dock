@@ -88,6 +88,9 @@ public partial class MainWindow
         if (handle != IntPtr.Zero) NativeMethods.ShapePagePanel(handle,ActualWidth > 0 ? ActualWidth : Width,ActualHeight > 0 ? ActualHeight : Height);
         _pageRailWindow?.Sync(right,SelectedPageIndex,PageButtons.Length);
     }
+    internal void ResetPanelSize(){Width=380;Height=500;PositionPanel();RememberPanelSize();SetStatus("已恢复默认大小");}
+    internal void RememberPanelSize(){State.PanelWidth=Width;State.PanelHeight=Height;Persist();}
+    private void PanelResizeGrip_DragCompleted(object sender,DragCompletedEventArgs e){if(!_captureInteractionHeld){PositionPanel();RememberPanelSize();QueueDesktopPresence();}}
     private void PanelResizeGrip_DragDelta(object sender,DragDeltaEventArgs e)
     {
         if (_captureInteractionHeld) return;

@@ -78,6 +78,7 @@ public partial class MainWindow : Window
         State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
+        Width=State.PanelWidth;Height=State.PanelHeight;
         InitializeMovement();
         InitializeDesktopPresence();
         Activated += PanelActivatedForDesktop;
@@ -406,6 +407,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(CreateTransparencyMenu());
+        AddMenu(menu, "恢复默认大小", ResetPanelSize);
         var autoDesktop = new MenuItem { Header = "桌面自动展开，遮挡时收起", IsCheckable = true, IsChecked = State.AutoDesktop };
         autoDesktop.Click += (_, _) => SetAutoDesktop(autoDesktop.IsChecked);
         menu.Items.Add(autoDesktop);
@@ -502,7 +504,7 @@ public partial class MainWindow : Window
         UpdatePageRail();
         if (App.IsSelfTest) return;
         Rect area = WorkArea();
-        MaxHeight = Math.Max(480, area.Height - 20); Height = Math.Min(Height, MaxHeight);
+        MaxWidth=Math.Max(MinWidth,area.Width-20);Width=Math.Min(Width,MaxWidth);MaxHeight = Math.Max(480, area.Height - 20); Height = Math.Min(Height, MaxHeight);
         Left = State.DockSide == "Left" ? area.Left + 10 : Math.Max(area.Left, area.Right - Width - 10);
         Top = Math.Clamp(State.DockTop < 0 ? area.Top + (area.Height - Height) / 2 : State.DockTop - 30, area.Top + 6, Math.Max(area.Top + 6, area.Bottom - Height - 6));
         if (State.PanelLeft is double left && State.PanelTop is double top) { var saved = ConstrainPanel(new Rect(left, top, Width, Height), area); Left = saved.Left; Top = saved.Top; }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:FileDockDemo"
         xmlns:planner="clr-namespace:FileDockDemo.Features.Planner"
-        Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="430" Height="650" MinWidth="380" MinHeight="480"
+        Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="380" Height="500" MinWidth="380" MinHeight="480"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" PreviewMouseLeftButtonDown="MovePanelFromSurface"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="False" Topmost="True"
         FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12" Foreground="{DynamicResource Ink}"
@@ -96,7 +96,7 @@
 
     <Grid x:Name="PageRoot"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
     <Border Grid.Column="0" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource BlankSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
-        <Grid x:Name="ContentGrid" Margin="19,17,19,14">
+        <Grid x:Name="ContentGrid" Margin="16,14,16,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -106,7 +106,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border CornerRadius="7" Background="{DynamicResource ContentSurface}" Margin="0,0,0,17"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
+            <Border CornerRadius="7" Background="{DynamicResource ContentSurface}" Margin="0,0,0,12"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -130,7 +130,7 @@
             </Grid></Border>
 
             <Border x:Name="FileSearchSurface" Grid.Row="1" Background="{DynamicResource Input}" CornerRadius="11" BorderBrush="{DynamicResource Border}" BorderThickness="1"
-                    Padding="12,0" Height="42" Margin="0,0,0,13">
+                    Padding="12,0" Height="40" Margin="0,0,0,10">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -185,7 +185,7 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button HorizontalAlignment="Stretch" Height="70" Margin="0,3,5,3" Tag="{Binding}" Click="Item_Open"
+                                <Button HorizontalAlignment="Stretch" Height="64" Margin="0,3,5,3" Tag="{Binding}" Click="Item_Open"
                                          Background="{DynamicResource Card}" Style="{StaticResource QuietButton}"
                                         Padding="11,9" HorizontalContentAlignment="Stretch">
                                     <Grid>
@@ -340,7 +340,7 @@
             <ToggleButton x:Name="PerformancePageTab" Style="{StaticResource PageTabStyle}" Content="&#xE9D9;" Tag="Performance" Click="PageTab_Click" ToolTip="性能：电脑状态" AutomationProperties.Name="性能页" />
         </StackPanel>
         <Border x:Name="PageJoin" Width="4" Height="44" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="-2,142,0,0" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Accent}" BorderThickness="0,1,0,1" IsHitTestVisible="False" />
-        <Thumb x:Name="PanelResizeGrip" Grid.Column="0" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6" Cursor="SizeNWSE" DragDelta="PanelResizeGrip_DragDelta" ToolTip="调整大小">
+        <Thumb x:Name="PanelResizeGrip" Grid.Column="0" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6" Cursor="SizeNWSE" DragDelta="PanelResizeGrip_DragDelta" DragCompleted="PanelResizeGrip_DragCompleted" ToolTip="调整大小">
             <Thumb.Template><ControlTemplate TargetType="Thumb"><Grid Background="Transparent"><Path Data="M 4,12 L 12,4 M 8,12 L 12,8" Stroke="{DynamicResource Muted}" StrokeThickness="1" /></Grid></ControlTemplate></Thumb.Template>
         </Thumb>
     </Grid>

@@ -9,7 +9,7 @@ namespace FileDockDemo;
 // Two columns with pixel scrolling. Keep only visible rows and one buffer row.
 public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
 {
-    private const double RowHeight = 76;
+    private const double RowHeight = 70;
     private Size _extent, _viewport;
     private double _offset;
     public VirtualizingPinPanel() { ClipToBounds = true; }

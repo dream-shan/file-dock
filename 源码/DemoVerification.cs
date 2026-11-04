@@ -28,6 +28,8 @@ internal static class DemoVerification
         string note = Path.Combine(fixture, "每周周报.txt"), budget = Path.Combine(fixture, "项目预算.csv"), plan = Path.Combine(fixture, "产品方案.txt");
         File.WriteAllText(note, "仅供演示版自动验证使用。\n"); File.WriteAllText(budget, "项目,金额\n设计,300\n"); File.WriteAllText(plan, "文件坞验证文件。\n");
         window.Show();
+        Check(window.Width==380&&window.Height==500,"First launch uses compact default dimensions");
+
         Check(!window.IsFilesPage && window.State.SelectedPage == "Performance","First launch defaults to the performance page");
         window.SelectPage("Files",false);
         bool IsUtilityWindow(Window target)
@@ -72,6 +74,7 @@ internal static class DemoVerification
         window.Width=430; window.Height = 650;
         window.CollapsePanel(); Check(!window.IsVisible, "Collapse hides main window");
         window.Show();
+
         Check(window.IsVisible && window.IsFilesPage, "Expanded window restores the selected file page");
         Check(IsUtilityWindow(window), "Main panel retains utility style after hiding and showing");
         // Exercise the same entry-opening path used by pinned cards and browser rows.

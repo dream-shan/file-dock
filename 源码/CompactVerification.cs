@@ -9,6 +9,7 @@ using FileDockDemo.Features.Planner;
 namespace FileDockDemo;
 internal static class CompactVerification
 {
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
     private static System.Collections.Generic.IEnumerable<T> All<T>(DependencyObject p) where T:DependencyObject{if(p is T t)yield return t;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in All<T>(VisualTreeHelper.GetChild(p,i)))yield return c;}
     internal static void Run(MainWindow w,string root,Action<bool,string> check)
     {
@@ -17,7 +18,7 @@ internal static class CompactVerification
         var plans=w.State.Plans;var dates=w.State.Countdowns;double width=w.Width,height=w.Height,sw=w.State.PanelWidth,sh=w.State.PanelHeight;string page=w.State.SelectedPage;
         try{
             w.ResetPanelSize();w.UpdateLayout();check(w.Width==380&&w.Height==500,"Reset restores the compact 380 by 500 logical size");
-            w.Width=420;w.Height=580;w.RememberPanelSize();loaded=w.Storage.Load();check(loaded.PanelWidth==420&&loaded.PanelHeight==580,"Manual dimensions survive JSON reload");w.ResetPanelSize();w.UpdateLayout();
+            w.Width=420;w.Height=580;w.UpdateLayout();SendMessage(new System.Windows.Interop.WindowInteropHelper(w).Handle,0x0232,IntPtr.Zero,IntPtr.Zero);loaded=w.Storage.Load();check(loaded.PanelWidth==420&&loaded.PanelHeight==580,"Native resize-end dimensions survive JSON reload");w.ResetPanelSize();w.UpdateLayout();
             foreach(string p in new[]{"Files","Planner","Performance"}){w.SelectPage(p,false);w.UpdateLayout();check(w.Width==380&&w.Height==500,$"Switching to {p} does not resize the compact panel");DemoVerification.SaveRender(w,Path.Combine(root,"compact-"+p.ToLowerInvariant()+".png"));}
             check(w.PerformanceScroll.ExtentHeight<=w.PerformanceScroll.ViewportHeight+1&&w.MemoryCard.CapacityFits&&w.VramCard.CapacityFits,"Compact performance page fits all cards and capacity labels");
             w.State.Countdowns=new(){new CountdownItem{Title="考试",Date=DateTime.Today.AddDays(100)},new CountdownItem{Title="生日",Date=DateTime.Today.AddDays(200),Annual=true}};

@@ -2,9 +2,9 @@
 
 Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件夹，支持图片预览、多文件拖放与电脑状态监控。
 
-**当前版本：0.8.0-rc.30 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
+**当前版本：0.8.0-rc.31 · 开源候选版**。Windows x64 · C# / .NET 10 / WPF · [MIT 许可证](LICENSE)
 
-[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.30) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
+[下载 Windows x64 候选版](https://github.com/dream-shan/file-dock/releases/tag/v0.8.0-rc.31) · [快速开始](#下载与首次使用) · [问题反馈](https://github.com/dream-shan/file-dock/issues/new/choose)
 
 ## 界面预览
 
@@ -24,7 +24,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 下载与首次使用
 
-1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.30-win-x64.zip` 和 `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/dream-shan/file-dock/releases) 下载 `FileDock-0.8.0-rc.31-win-x64.zip` 和 `SHA256SUMS.txt`。
 2. 将完整 ZIP 解压到自己有写入权限的文件夹，双击 **`FileDock.exe`**。主程序自带运行时，无需安装 .NET，也不要以管理员身份启动，以免影响跨应用拖拽。
 3. 点击“我的常用”旁的“＋ 添加”选择文件或文件夹。单击文件夹在面板内浏览，单击文件由默认应用打开。
 4. 点击顶部箭头收起，通过贴边入口、托盘或 `Ctrl + Alt + Space` 唤出。使用设置/托盘菜单的“退出”完全关闭。
@@ -129,6 +129,8 @@ sc.exe delete FileDockTemperature
 
 ## 本候选版变化
 
+- 待办页新增重要日倒计时：支持公历日期、天数同步填写、一次性和每年重复；默认展示最近两项，可折叠或查看全部，点击编辑与删除。一次性到期后隐藏，每年重复在次日转入下一年；2 月 29 日在非闰年按 2 月 28 日计算。仅复用待办页日期检查，无新增后台计时器。
+
 - 拆分为文件、待办、性能三个独立页面。文件页常用区使用完整高度；待办页独立显示日期、管理、清单与底部添加按钮，不显示文件搜索。切页保留目录、搜索、选择以及待办管理和滚动位置。首次启动仍默认性能页，之后记住所选页面。
 - 仅性能页展开时采集完整硬件数据；待办页可见时才检查日期，文件页可见时才监听目录，其他页面及收起时保留轻量内存检测。三个侧边标签继续支持左右换边、主题同步和主面板单独截图。
 
@@ -182,7 +184,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\源码\Release.ps1
 GitHub Actions 在 PR/main 上检查；版本一致的 `v*` 标签触发预发布 Release，发布的是同一次 CI 验证过的包。发布说明取自包内本候选版变化，不上传原始测试截图或性能记录。
 
 ~~~powershell
-Get-FileHash .\FileDock-0.8.0-rc.30-win-x64.zip -Algorithm SHA256
+Get-FileHash .\FileDock-0.8.0-rc.31-win-x64.zip -Algorithm SHA256
 ~~~
 
 对照 `SHA256SUMS.txt`；源码检出中可运行 `源码\Verify-Package.ps1 -Archive <ZIP路径> -ExpectedCommit <完整提交号>` 验证结构和内容。

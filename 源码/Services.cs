@@ -109,6 +109,8 @@ public sealed class StorageService
     private static void Validate(AppState state)
     {
         state.EmptyAreaTransparency=Math.Clamp(state.EmptyAreaTransparency,0,85);
+        state.Countdowns??=[];
+        if(state.Countdowns.Any(p=>p==null||string.IsNullOrWhiteSpace(p.Id)||string.IsNullOrWhiteSpace(p.Title)||p.Title.Length>80))throw new InvalidDataException("重要日数据无效。");
         if(state.Plans!=null)foreach(var plan in state.Plans)if(plan!=null)PlanRules.Normalize(plan);
         if(state.Plans is null || state.Plans.Any(p=>p is null || string.IsNullOrWhiteSpace(p.Id) || string.IsNullOrWhiteSpace(p.Title) || p.Level<0 || p.Level>3 || p.Notes is null || p.Time is null) || state.Plans.Select(p=>p.Id).Distinct().Count()!=state.Plans.Count)
             throw new InvalidDataException("计划记录无效。");

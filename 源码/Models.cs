@@ -14,6 +14,7 @@ public sealed class PinnedEntry
 
 public sealed class AppState
 {
+    public List<CountdownItem> Countdowns {get;set;}=[];
     public List<PlanItem> Plans { get; set; } = [];
     public int EmptyAreaTransparency {get;set;}=60;
     public int PanelGeometryVersion {get;set;}

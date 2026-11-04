@@ -40,12 +40,12 @@ internal static class PagesVerification
             check(window.Storage.Load().SelectedPage=="Planner","Last planner page persists without altering plan schema");
             check(window.PlannerMonitoring && !window.PerformanceActive && window.MemoryOnlyActive && !window.FolderWatcherActive,"Planner runs only its date timer and lightweight memory checks");
             Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="管理").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();await Task.Delay(100);
-            var scroll=Find<ScrollViewer>(window.Planner)!;scroll.ScrollToVerticalOffset(500);window.UpdateLayout();double offset=scroll.VerticalOffset;
+            var scroll=Visuals<ScrollViewer>(window.Planner).Single(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)=="PlannerScroll");scroll.ScrollToVerticalOffset(500);window.UpdateLayout();double offset=scroll.VerticalOffset;
             check(offset>0,"Independent planner scrolls a long management list");
             window.SelectPage("Files",false);await Task.Delay(100);
             check(!window.PlannerMonitoring && !window.Planner.IsVisible,"Leaving planner stops the date timer");
             window.SelectPage("Planner",false);window.UpdateLayout();await Task.Delay(100);window.UpdateLayout();
-            scroll=Find<ScrollViewer>(window.Planner)!;
+            scroll=Visuals<ScrollViewer>(window.Planner).Single(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)=="PlannerScroll");
             check(Visuals<Button>(window.Planner).Any(b=>(b.Content as string)=="返回今天") && Math.Abs(scroll.VerticalOffset-offset)<1,"Planner retains management mode and scroll after switching pages");
             window.CollapsePanel();check(!window.PlannerMonitoring,"Collapsed planner pauses date checks");window.ExpandPanel();await Task.Delay(100);
             check(window.IsPlannerPage && window.PlannerMonitoring,"Revealing planner restores its selected page and date timer");
@@ -98,7 +98,7 @@ internal static class PagesVerification
         check(window.IsFilesPage && window.PinsSection.Visibility==Visibility.Visible && window.PerformanceSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Visible,"File tab shows favorites and search without performance cards");
         check(window.Storage.Load().SelectedPage=="Files","Last selected page survives settings reload");
         check(window.PlannerSection.Visibility==Visibility.Collapsed && window.PinsList.ActualHeight>300,"File favorites use the full file page without a planner reservation");
-        PlannerVerification.Run(window,root,check);
+        CountdownVerification.Run(window,root,check);PlannerVerification.Run(window,root,check);
         await VerifyPlannerPage(window,root,check);window.SelectPage("Files",false);
         string folder=Path.Combine(root,"page-switch-files");Directory.CreateDirectory(folder);
         for(int i=0;i<50;i++)File.WriteAllText(Path.Combine(folder,$"item-{i:00}.txt"),"fixture");

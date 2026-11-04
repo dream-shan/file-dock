@@ -14,7 +14,7 @@ internal sealed class PlannerModule : IModuleLifecycle
     {
         _view=view;_dayTimer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(30)};
         _dayTimer.Tick+=CheckDay;_view.IsVisibleChanged+=VisibilityChanged;
-        _view.Initialize(new PlannerController(store),host);
+        _view.Initialize(new PlannerController(store),host,store);
         if(_view.IsVisible)OnShown();
     }
     private void VisibilityChanged(object sender,DependencyPropertyChangedEventArgs e){if(_view.IsVisible)OnShown();else OnHidden();}

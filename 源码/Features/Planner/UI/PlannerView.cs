@@ -12,14 +12,14 @@ using System.Windows.Automation;
 
 namespace FileDockDemo.Features.Planner;
 
-public sealed class PlannerView : UserControl
+public sealed partial class PlannerView : UserControl
 {
     private PlannerController? _controller;
     private IModuleHost? _host;
     private PlanCard? _editor;
     private bool _manage;
     private ScrollViewer? _scroll;
-    internal bool IsEditing=>_editor!=null;
+    internal bool IsEditing=>_editor!=null||_countdownEditor!=null;
     internal DateTime RenderedDay { get; private set; }=PlanRules.Today;
     private static readonly ControlTemplate CircleTemplate=(ControlTemplate)XamlReader.Parse("""
         <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="CheckBox">
@@ -36,9 +36,9 @@ public sealed class PlannerView : UserControl
         """);
     private string? _revealId;
     private readonly DockPanel _root=new();
-    internal void Initialize(PlannerController controller,IModuleHost host)
+    internal void Initialize(PlannerController controller,IModuleHost host,IPlannerStore? store=null)
     {
-        _controller=controller;_host=host;Content=_root;Render();
+        _controller=controller;_host=host;_countdownStore=store;Content=_root;Render();
     }
     internal void Detach(){CloseEditor();_controller=null;_host=null;_root.Children.Clear();}
     private void CloseEditor(){var editor=_editor;_editor=null;if(editor!=null)_host?.CloseDialog(editor);}
@@ -57,6 +57,7 @@ public sealed class PlannerView : UserControl
     {
         if(_controller==null)return;
         double offset=_scroll?.VerticalOffset??0;bool reveal=_revealId!=null;_root.Children.Clear();
+        RenderCountdowns();
         var heading=new DockPanel{Margin=new Thickness(0,0,0,7)};
         RenderedDay=PlanRules.Today;if(!_controller.Reconcile(RenderedDay))Header(Label("清理保存失败，原有计划已保留。",true));
         var manage=Button(_manage ? "返回今天":"管理",()=>{_manage=!_manage;Render();});AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);

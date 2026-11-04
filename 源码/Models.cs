@@ -24,6 +24,7 @@ public sealed class AppState
     public double DockTop { get; set; } = -1;
     public double PanelWidth {get;set;}=380;
     public double PanelHeight {get;set;}=500;
+    public bool? PanelDocked {get;set;}
     public double? PanelLeft { get; set; }
     public double? PanelTop { get; set; }
     public string? PanelScreen { get; set; }

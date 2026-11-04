@@ -17,6 +17,7 @@ internal static class MovementVerification
             "Section headings provide additional movement surfaces");
         check(!MainWindow.IsMovementSurface(window.SearchBox) && !MainWindow.IsMovementSurface(window.SettingsButton) &&
             !MainWindow.IsMovementSurface(window.PinsList), "Search buttons and file lists keep their original pointer interactions");
+        AnchorVerification.Run(check);
         var area = new Rect(-1920,0,1920,1080);
         check(MainWindow.ConstrainPanel(new Rect(-1600,200,430,650),area) == new Rect(-1600,200,430,650),
             "Free panel position is retained on a negative-coordinate display");

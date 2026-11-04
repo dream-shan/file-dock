@@ -114,7 +114,7 @@ public sealed class PerformanceCard : Border
         _detail.FontSize,_detail.Foreground,VisualTreeHelper.GetDpi(this).PixelsPerDip).WidthIncludingTrailingWhitespace;
     internal void ApplyTheme(Brush accent)
     {
-        SetResourceReference(BackgroundProperty, "Card");
+        SetResourceReference(BackgroundProperty, "PaneCard");
         _label.SetResourceReference(TextBlock.ForegroundProperty, "Ink");
         _temperature.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         _detail.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
@@ -307,4 +307,3 @@ internal sealed class PerformanceGraph : FrameworkElement
         DrawSegment();
     }
 }
-

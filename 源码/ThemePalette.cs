@@ -12,7 +12,8 @@ internal static class ThemePalette
     private static bool? _dark;
     internal static Func<bool>? SystemAppsDarkForVerification;
     private static readonly (string Key, string Light, string Dark)[] Colors = {
-        ("ContentSurface", "#F2FAFBFD", "#F2202329"),
+        ("ContentSurface", "#55FAFBFD", "#55202329"),
+        ("PaneCard", "#80F1F4F9", "#802A2E36"), ("PaneInput", "#B3F1F4F9", "#B32A2E36"),
         ("Surface", "#FAFBFD", "#202329"), ("Card", "#F1F4F9", "#2A2E36"),
         ("Input", "#F1F4F9", "#2A2E36"), ("Border", "#DCE3EE", "#3D4552"),
         ("Ink", "#273247", "#E5E8ED"), ("Muted", "#748196", "#A4AEBE"),

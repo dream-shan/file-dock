@@ -30,7 +30,7 @@ internal static class ThemeVerification
             window.CpuCard.Set(17, "theme validation", 60, true); int history = window.CpuCard.HistoryCount;
             window.SetThemeMode("Dark");
             check(window.IsDarkTheme && window.CpuCard.ValueText == "17%" && window.CpuCard.HistoryCount == history, "Changing theme preserves current performance values and history");
-            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,32,35,41) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("Card"), "Dark theme reaches panel, search and performance cards");
+            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,32,35,41) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("PaneCard"), "Dark theme reaches panel, search and performance cards");
             check(((BitmapImage)window.AppLogo.Source).UriSource.ToString().Contains("light.png"), "Dark panel uses the light transparent mark");
             check(new StorageService(Path.Combine(root,"data")).Load().ThemeMode == "Dark", "Manual appearance choice persists to the existing settings file");
             var appearance = window.CreateAppearanceMenu();

@@ -173,7 +173,7 @@ public partial class MainWindow : Window
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
-        if(msg==0x0232 && _loaded && !_movingPanel && !_quitting){Width=ActualWidth;Height=ActualHeight;RememberPanelSize();QueueDesktopPresence();}
+        if(msg==0x0232 && _loaded && !_movingPanel && !_quitting){Width=ActualWidth;Height=ActualHeight;if(State.PanelDocked==true)PositionPanel();RememberPanelSize();QueueDesktopPresence();}
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x031E || msg == 0x031A) Dispatcher.BeginInvoke(UpdatePageRail);
@@ -413,8 +413,8 @@ public partial class MainWindow : Window
         menu.Items.Add(autoDesktop);
         menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
-        AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
-        AddMenu(menu, "贴到右侧", () => { State.PanelLeft = State.PanelTop = null; State.DockSide = "Right"; PositionPanel(); PositionDock(); Persist(); });
+        AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.PanelDocked=true; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
+        AddMenu(menu, "贴到右侧", () => { State.PanelLeft = State.PanelTop = null; State.PanelDocked=true; State.DockSide = "Right"; PositionPanel(); PositionDock(); Persist(); });
         var startup = new MenuItem { Header = "开机启动", IsCheckable = true, IsChecked = StartupEnabled() };
         startup.Click += (_, _) =>
         {
@@ -490,7 +490,7 @@ public partial class MainWindow : Window
         double scale = _dock!.ScaleFactor;
         _screen = Forms.Screen.FromHandle(_dock!.Handle);
         State.DockSide = left * scale < _screen.WorkingArea.Left + _screen.WorkingArea.Width / 2 ? "Left" : "Right";
-        State.PanelLeft = State.PanelTop = null; State.PanelScreen = _screen.DeviceName; State.DockTop = top; PositionDock(); PositionPanel(); Persist(); QueueDesktopPresence();
+        State.PanelLeft = State.PanelTop = null; State.PanelDocked=true; State.PanelScreen = _screen.DeviceName; State.DockTop = top; PositionDock(); PositionPanel(); Persist(); QueueDesktopPresence();
     }
     private Rect WorkArea(Visual? target = null)
     {
@@ -505,9 +505,10 @@ public partial class MainWindow : Window
         if (App.IsSelfTest) return;
         Rect area = WorkArea();
         MaxWidth=Math.Max(MinWidth,area.Width-20);Width=Math.Min(Width,MaxWidth);MaxHeight = Math.Max(480, area.Height - 20); Height = Math.Min(Height, MaxHeight);
-        Left = State.DockSide == "Left" ? area.Left + 10 : Math.Max(area.Left, area.Right - Width - 10);
+        State.PanelDocked??=InferDocked(State,area,Width);
+        Left = DockedLeft(State.DockSide,area,Width);
         Top = Math.Clamp(State.DockTop < 0 ? area.Top + (area.Height - Height) / 2 : State.DockTop - 30, area.Top + 6, Math.Max(area.Top + 6, area.Bottom - Height - 6));
-        if (State.PanelLeft is double left && State.PanelTop is double top) { var saved = ConstrainPanel(new Rect(left, top, Width, Height), area); Left = saved.Left; Top = saved.Top; }
+        if (State.PanelLeft is double left && State.PanelTop is double top) { var saved = ConstrainPanel(new Rect(left, top, Width, Height), area); Left = State.PanelDocked==true ? DockedLeft(State.DockSide,area,Width) : saved.Left; Top = saved.Top; }
     }
     private void PositionDock()
     {

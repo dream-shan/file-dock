@@ -45,14 +45,14 @@ public sealed partial class PlannerView : UserControl
     private static TextBlock Label(string text,bool muted=false)
     {
         var t=new TextBlock{Text=text,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,2,0,2)};
-        t.SetResourceReference(TextBlock.BackgroundProperty,"ContentSurface");t.SetResourceReference(TextBlock.ForegroundProperty,muted ? "Muted":"Ink");return t;
+        t.SetResourceReference(TextBlock.ForegroundProperty,muted ? "Muted":"Ink");return t;
     }
     private Button Button(string text,Action action)
     {
         var b=new Button{Content=text,Padding=new Thickness(5,4,5,4),Margin=new Thickness(1)};
         b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;
     }
-    private void Header(UIElement element){var plate=new Border{Child=element,CornerRadius=new CornerRadius(6)};plate.SetResourceReference(Border.BackgroundProperty,"ContentSurface");DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
+    private void Header(UIElement element,bool background=true){var plate=new Border{Child=element,CornerRadius=new CornerRadius(6)};if(background)plate.SetResourceReference(Border.BackgroundProperty,"ContentSurface");DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
     internal void Render()
     {
         if(_controller==null)return;
@@ -81,7 +81,7 @@ public sealed partial class PlannerView : UserControl
         meta.Add(PlanRules.ScheduleLabel(p));if(p.Migrated)meta.Add("旧计划 · 请确认日期");if(_manage && !PlanRules.Appears(p,PlanRules.Today))meta.Add("今天不出现");var subtitle=Label(string.Join(" · ",meta),true);subtitle.FontSize=10;content.Children.Add(subtitle);if(done)row.Opacity=.6;
         var edit=Button("",()=>Edit(p));edit.Content=content;AutomationProperties.SetName(edit,"详情："+p.Title);edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(edit);
         if(_revealId==p.Id){_revealId=null;edit.SetResourceReference(BackgroundProperty,"Hover");Dispatcher.BeginInvoke(()=>{edit.BringIntoView();var animation=new System.Windows.Media.Animation.DoubleAnimation(.55,1,TimeSpan.FromMilliseconds(800));animation.Completed+=(_,_)=>edit.ClearValue(BackgroundProperty);edit.BeginAnimation(OpacityProperty,animation);});}
-        var separator=new Border{Child=row,CornerRadius=new CornerRadius(6),BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BackgroundProperty,"ContentSurface");separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
+        var separator=new Border{Child=row,CornerRadius=new CornerRadius(6),BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,2,0,4)};separator.SetResourceReference(Border.BackgroundProperty,"PaneCard");separator.SetResourceReference(Border.BorderBrushProperty,"Border");list.Children.Add(separator);
 
     }
     private void Edit(PlanItem? item)

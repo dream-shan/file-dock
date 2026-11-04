@@ -30,6 +30,8 @@ public partial class MainWindow
         _ = DwmSetWindowAttribute(handle, 33, ref round, sizeof(int)); // Older Windows may ignore this preference.
     }
 
+    internal static double DockedLeft(string side,Rect area,double width)=>side=="Left"?area.Left:Math.Max(area.Left,area.Right-width);
+    internal static bool InferDocked(AppState state,Rect area,double width)=>state.PanelDocked ?? (!state.PanelLeft.HasValue || Math.Abs(state.PanelLeft.Value-DockedLeft(state.DockSide,area,width))<=80);
     internal static Rect ConstrainPanel(Rect desired, Rect area) => new Rect(
         Math.Clamp(desired.Left, area.Left, Math.Max(area.Left, area.Right - desired.Width)),
         Math.Clamp(desired.Top, area.Top, Math.Max(area.Top, area.Bottom - desired.Height)),
@@ -78,10 +80,13 @@ public partial class MainWindow
         _screen = System.Windows.Forms.Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(this).Handle);
         var position = ConstrainPanel(new Rect(Left, Top, ActualWidth, ActualHeight), WorkArea());
         Left = position.Left; Top = position.Top;
-        State.PanelLeft = Left; State.PanelTop = Top; State.PanelScreen = _screen.DeviceName;
+        State.PanelScreen = _screen.DeviceName;
         State.DockTop = Top + 30;
         Rect area = WorkArea();
         State.DockSide = Left + Width / 2 < area.Left + area.Width / 2 ? "Left" : "Right";
+        State.PanelDocked=Math.Abs(Left-DockedLeft(State.DockSide,area,Width))<=16;
+        if(State.PanelDocked==true)Left=DockedLeft(State.DockSide,area,Width);
+        State.PanelLeft=Left;State.PanelTop=Top;
         PositionDock(); Persist(); QueueDesktopPresence();
     }
 }

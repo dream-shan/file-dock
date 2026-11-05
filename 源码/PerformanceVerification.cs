@@ -11,6 +11,7 @@ internal static class PerformanceVerification
 {
     internal static async Task Run(MainWindow window, string root, Action<bool, string> check)
     {
+        await TemperatureIsolationVerification.Run(window, check);
         check(Math.Abs(PerformanceService.CalculateCpuLoad(150, 400, 300, 100, 200, 100)!.Value - 87.5) < .01,
             "CPU load subtracts idle time from kernel plus user delta");
         check(PerformanceService.CalculateCpuLoad(0, 0, 0, 100, 200, 100) == null,
@@ -66,7 +67,11 @@ internal static class PerformanceVerification
         File.WriteAllText(Path.Combine(root, "performance-sample.json"), JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }));
         bool requireTemperature = Environment.GetEnvironmentVariable("FILEDOCK_REQUIRE_TEMPERATURE") == "1";
         if (requireTemperature)
+        {
+            for (int i = 0; i < 100 && window.LastPerformanceSnapshot?.CpuTemperature == null; i++) await Task.Delay(100);
+            snapshot = window.LastPerformanceSnapshot;
             check(snapshot?.CpuTemperature is > 0 and <= 130, "Installed service returns a real CPU temperature to an unelevated UI");
+        }
         int refreshBaseline = window.PerformanceSamples;
         await Task.Delay(2200);
         check(window.PerformanceSamples - refreshBaseline is >= 2 and <= 3, "Visible metrics refresh once per second without blocking the UI");
@@ -102,9 +107,9 @@ internal static class PerformanceVerification
         window.Width=430; window.Height = 650;
 
         window.CollapsePanel(); await Task.Delay(700); int paused = window.PerformanceSamples;
-        long serviceSamples = requireTemperature ? TemperatureClient.Read(false).Samples : 0;
+        long serviceSamples = requireTemperature ? (await TemperatureClient.ReadAsync(false)).Samples : 0;
         await Task.Delay(2400);
-        if (requireTemperature) check(serviceSamples == TemperatureClient.Read(false).Samples, "Temperature service performs no sampling while the panel is collapsed");
+        if (requireTemperature) check(serviceSamples == (await TemperatureClient.ReadAsync(false)).Samples, "Temperature service performs no sampling while the panel is collapsed");
         check(!window.PerformanceActive && paused == window.PerformanceSamples, "Collapsed panel stops sampling");
         window.ExpandPanel(); await Task.Delay(2500);
         check(window.PerformanceSamples > paused, "Expanding home resumes sampling with a new baseline");

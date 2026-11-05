@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -8,6 +9,7 @@ namespace FileDockDemo;
 public partial class MainWindow
 {
     private readonly PerformanceService _performanceService = new();
+    private TemperatureSampler _temperatureSampler = new();
     private DispatcherTimer? _performanceTimer;
     private bool _performanceActive, _performanceBusy, _performanceDisposed, _resetPerformanceBaseline, _testPerformanceEnabled;
     private int _performanceGeneration;
@@ -15,6 +17,15 @@ public partial class MainWindow
     internal int PerformanceSamples => _performanceService.SampleCount;
     internal bool PerformanceActive => _performanceActive;
     internal PerformanceSnapshot? LastPerformanceSnapshot { get; private set; }
+    internal Task PendingTemperatureForVerification => _temperatureSampler.Pending;
+    internal void SetTemperatureReaderForVerification(
+        Func<CancellationToken, Task<(double? Temperature, long Samples)>>? read)
+    {
+        if (!App.IsSelfTest) throw new InvalidOperationException("Temperature fixtures require self-test mode.");
+        _temperatureSampler.Dispose();
+        _temperatureSampler = new TemperatureSampler(read);
+        _temperatureSampler.SetActive(_performanceActive);
+    }
 
     private void InitializePerformance()
     {
@@ -30,6 +41,7 @@ public partial class MainWindow
         bool active = IsVisible && IsPerformancePage && !_quitting && !MemoryPaused && (!App.IsSelfTest || _testPerformanceEnabled);
         if (_performanceActive == active) { UpdateMemoryActivity(); return; }
         _performanceActive = active; ++_performanceGeneration;
+        _temperatureSampler.SetActive(active);
         UpdateMemoryActivity();
         if (!active) { _performanceTimer.Stop(); return; }
         _resetPerformanceBaseline = true;
@@ -45,7 +57,8 @@ public partial class MainWindow
         bool reset = _resetPerformanceBaseline; _resetPerformanceBaseline = false;
         try
         {
-            _performanceWorker = Task.Run(() => _performanceService.Sample(reset));
+            _temperatureSampler.Poll();
+            _performanceWorker = Task.Run(() => _performanceService.Sample(reset, _temperatureSampler.ReadCached));
             var snapshot = await _performanceWorker;
             if (!_performanceActive || _performanceDisposed || generation != _performanceGeneration) return;
             LastPerformanceSnapshot = snapshot;
@@ -80,6 +93,7 @@ public partial class MainWindow
         if (_performanceDisposed) return;
         DisposeMemory();
         _performanceDisposed = true; _performanceActive = false; ++_performanceGeneration;
+        _temperatureSampler.Dispose();
         _performanceTimer?.Stop();
         // Close native handles only after the single in-flight sample completes.
         if (_performanceWorker is { IsCompleted: false } worker)

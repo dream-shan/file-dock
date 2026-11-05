@@ -16,18 +16,16 @@ internal sealed record PerformanceSnapshot(double? CpuLoad, double? CpuTemperatu
 internal sealed class PerformanceService : IDisposable
 {
     private bool _initialized;
-    private string _temperatureStatus = "", _cpuName = "CPU";
+    private string _cpuName = "CPU";
     private readonly NvidiaMetrics _nvidia = new();
     private readonly GpuEngineMetrics _gpuEngines = new();
-    private double? _cpuTemperature;
-    private long _temperatureTick;
     private ulong _idle, _kernel, _user;
     private bool _cpuBaseline;
     private long _networkTick;
     private Dictionary<string, (long Received, long Sent)> _networkBytes = new();
     internal int SampleCount { get; private set; }
 
-    internal PerformanceSnapshot Sample(bool resetBaseline)
+    internal PerformanceSnapshot Sample(bool resetBaseline, Func<TemperatureReading> readTemperature)
     {
         if (!_initialized)
         {
@@ -37,30 +35,21 @@ internal sealed class PerformanceService : IDisposable
                 using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
                 _cpuName = (key?.GetValue("ProcessorNameString") as string)?.Trim() ?? "CPU";
             }
-            catch (Exception ex) { _temperatureStatus = "CPU 温度暂不可用：" + ex.Message; }
+            catch { _cpuName = "CPU"; }
         }
         if (resetBaseline) { _cpuBaseline = false; _networkTick = 0; _networkBytes.Clear(); }
         double? load = ReadCpuLoad();
-        if (resetBaseline || Environment.TickCount64 - _temperatureTick >= 1000)
-        {
-            try
-            {
-                _cpuTemperature = TemperatureClient.Read().Temperature;
-                _temperatureStatus = _cpuTemperature.HasValue ? "CPU Tctl/Tdie 或封装温度 · 每秒读取 · 专用温度服务" : "传感器暂未返回有效温度";
-            }
-            catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
-            { _cpuTemperature = null; _temperatureStatus = "CPU 温度服务暂不可用：" + ex.Message; }
-            _temperatureTick = Environment.TickCount64;
-        }
         var memory = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
         if (!GlobalMemoryStatusEx(ref memory)) memory = default;
         var gpu = _nvidia.Read();
         var gpuUsage = _gpuEngines.Read(gpu.Name, resetBaseline);
         var network = ReadNetwork();
+        // Only read the cache; never wait for pipe connection or hardware work.
+        var temperature = readTemperature();
         SampleCount++;
-        return new PerformanceSnapshot(load, _cpuTemperature, _cpuName, gpuUsage.Percent, gpu.Temperature, gpu.Name,
+        return new PerformanceSnapshot(load, temperature.Value, _cpuName, gpuUsage.Percent, gpu.Temperature, gpu.Name,
             memory.TotalPhysical >= memory.AvailablePhysical ? memory.TotalPhysical - memory.AvailablePhysical : 0,
-            memory.TotalPhysical, gpu.Used, gpu.Total, network.Down, network.Up, network.Name, _temperatureStatus, _gpuEngines.Status);
+            memory.TotalPhysical, gpu.Used, gpu.Total, network.Down, network.Up, network.Name, temperature.Status, _gpuEngines.Status);
     }
 
     internal static double? CalculateCpuLoad(ulong idle, ulong kernel, ulong user, ulong oldIdle, ulong oldKernel, ulong oldUser)

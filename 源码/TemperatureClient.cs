@@ -4,31 +4,53 @@ using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
 namespace FileDockDemo;
 
 internal static class TemperatureClient
 {
-    internal static (double? Temperature, long Samples) Read(bool sample = true)
+    internal static async Task<(double? Temperature, long Samples)> ReadAsync(
+        bool sample = true, CancellationToken cancellationToken = default)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         using var pipe = new NamedPipeClientStream(".", "FileDock.Temperature.v1", PipeDirection.InOut, PipeOptions.Asynchronous);
-        pipe.Connect(500);
+        return await ReadFromPipeAsync(pipe, sample, cancellationToken, AuthenticateService,
+            TimeSpan.FromSeconds(8)).ConfigureAwait(false);
+    }
+
+    // Tests supply a private pipe and verifier; production always authenticates
+    // the server against SCM before sending even the read-only request byte.
+    internal static async Task<(double? Temperature, long Samples)> ReadFromPipeAsync(
+        NamedPipeClientStream pipe, bool sample, CancellationToken cancellationToken,
+        Action<NamedPipeClientStream> authenticate, TimeSpan timeout)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        try
+        {
+            await pipe.ConnectAsync(deadline.Token).ConfigureAwait(false);
+            deadline.Token.ThrowIfCancellationRequested();
+            authenticate(pipe);
+            deadline.Token.ThrowIfCancellationRequested();
+            await pipe.WriteAsync(new byte[] { sample ? (byte)1 : (byte)0 }, deadline.Token).ConfigureAwait(false);
+            var response = new byte[16];
+            await pipe.ReadExactlyAsync(response, deadline.Token).ConfigureAwait(false);
+            return (PerformanceService.ValidTemperature(BitConverter.ToDouble(response)), BitConverter.ToInt64(response, 8));
+        }
+        catch (OperationCanceledException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("温度服务响应超时", error);
+        }
+    }
+
+    private static void AuthenticateService(NamedPipeClientStream pipe)
+    {
         // Authenticate the pipe server against Windows Service Control Manager.
         // Ordinary users can query the service but cannot change its identity.
         if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out uint processId)) throw new Win32Exception();
         if (!IsServiceProcess(processId))
             throw new IOException("温度服务来源无法确认");
-        pipe.WriteByte(sample ? (byte)1 : (byte)0);
-        var response = new byte[16]; int received = 0;
-        while (received < response.Length)
-        {
-            int count = pipe.ReadAsync(response.AsMemory(received), deadline.Token).AsTask().GetAwaiter().GetResult();
-            if (count == 0) throw new IOException("温度服务已断开");
-            received += count;
-        }
-        return (PerformanceService.ValidTemperature(BitConverter.ToDouble(response)), BitConverter.ToInt64(response, 8));
     }
     private static bool IsServiceProcess(uint processId)
     {

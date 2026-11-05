@@ -52,6 +52,11 @@ internal static class FeatureVerification
         var second = window.PinsList.Items.Cast<EntryView>().First(e => e.Path == tallPath);
         window.SelectFile(first, true); window.SelectFile(second, true);
         check(window.SelectedFileCount == 2 && first.IsChosen && second.IsChosen, "Ctrl selection highlights multiple entries without opening them");
+        check(window.CopySelectionButton.IsVisible,"Selected files expose the copy action in the footer");
+        window.SelectPage("Performance",false);
+        check(!window.CopySelectionButton.IsVisible,"File copy action is hidden on the performance page");
+        window.SelectPage("Files",false);
+        check(window.CopySelectionButton.IsVisible && window.SelectedFileCount==2,"Returning to files restores the selected group and copy action");
         window.ApplyFilters();
         check(window.SelectedFileCount == 2 && window.PinsList.Items.Cast<EntryView>().Count(e => e.IsChosen) == 2, "Selection survives metadata/UI refresh");
         window.SelectFile(second, true); check(window.SelectedFileCount == 1, "Ctrl clicking a selected file removes it from the group");

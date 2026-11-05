@@ -92,6 +92,8 @@ internal static class PerformanceVerification
             "CPU and GPU replace model text with a sixty-second caption and accessible readings");
         DemoVerification.SaveRender(window, Path.Combine(root, "performance-standard.png"));
         window.Width=380; window.Height = 480; window.UpdateLayout();
+        check(window.PerformanceScroll.ExtentHeight<=window.PerformanceScroll.ViewportHeight+1,
+            "Minimum-size performance page keeps capacity labels visible without scrolling");
         check(window.CpuCard.Graph.ActualHeight >= 12 && window.GpuCard.Graph.ActualHeight >= 12 &&
             window.MemoryCard.ValueText != "—", "Compact cards keep a visible chart and memory readout");
         check(window.MemoryCard.CapacityFits && window.VramCard.CapacityFits && window.MemoryCard.RingChart.ActualWidth <= 50,

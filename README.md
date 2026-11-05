@@ -8,11 +8,11 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 
 ## 界面预览
 
-| 独立性能页与侧边标签 | 文件夹内浏览（示意） |
+| 独立性能页 | 文件夹内浏览（示意） |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/home-dark.png" width="360" alt="文件坞深色性能页，包含侧边标签与电脑状态卡片"> | <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
+| <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/home-dark.png" width="360" alt="文件坞深色性能页，包含横向趋势图与内存圆环"> | <img src="https://raw.githubusercontent.com/dream-shan/file-dock/main/docs/images/folder-browser.png" width="360" alt="文件坞在面板内浏览示例文件夹"> |
 
-截图由实际程序渲染，使用内置验证样例与示例读数，不包含维护者的私人文件；图中数值不代表日常资源占用或硬件测试结果。界面支持跟随系统、浅色和深色主题。
+截图由实际程序在隔离验证中渲染，文件为自动生成的样例，不包含维护者的私人文件；性能数值为截图时的采样，不代表日常资源占用或硬件基准测试结果。界面支持跟随系统、浅色和深色主题。
 
 ## 能做什么
 
@@ -128,6 +128,9 @@ sc.exe delete FileDockTemperature
 待办通过 `Contracts/ModuleContracts` 申请弹窗、关闭确认、状态提示和焦点恢复，通过 `IPlannerStore` 提交数据；`Infrastructure/AppStatePlannerStore` 接回现有 AppState、原子 JSON 保存及备份。模块内部不访问 MainWindow、AppState 或磁盘路径。文件和性能仍沿用原结构，留待下一轮拆分。
 
 ## 本候选版变化
+
+- 统一深浅主题、字号和圆角层级。文件页常用入口改为单列轻列表，完整行展示名称与路径；文件夹采用统一轮廓图标，多选后底部提供复制按钮。保留虚拟化、搜索、排序、图片预览和拖放。
+- 性能页采用 CPU/GPU 横向趋势区与并排内存圆环，最小窗口仍可查看容量和网速；待办页统一清单排版与底部添加入口，编辑表单保留紧凑布局。空白透明度继续沿用个人设置，内容底板增强可读性。
 
 - 主面板底板改为分层半透明：标题与提示区约 40% 透明，卡片约 30%，搜索框约 18%（默认空白透明度 60% 时）。移除待办文字的重复底色，菜单及编辑弹窗仍保留实色底板。
 - 默认贴边展开取消横向留白，停靠位置随宽度调整保持贴边；拖离边缘后保留自由位置，靠近边缘可重新停靠。旧版靠近停靠边缘的位置自动迁移，保留纵向位置和个人数据。

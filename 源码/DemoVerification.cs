@@ -391,6 +391,10 @@ internal static class DemoVerification
         var pinPanel = FindVisual<VirtualizingPinPanel>(window.PinsList)!;
         Check(pinPanel != null && VisualTreeHelper.GetChildrenCount(pinPanel) <= 20 && window.PinsList.Items.Count == 500,
             "500 pins realize only visible card containers");
+        var firstPin=(FrameworkElement)window.PinsList.ItemContainerGenerator.ContainerFromIndex(0);
+        var secondPin=(FrameworkElement)window.PinsList.ItemContainerGenerator.ContainerFromIndex(1);
+        Check(firstPin.ActualWidth>pinPanel!.ActualWidth-3 && secondPin.TranslatePoint(new Point(),pinPanel).Y>firstPin.TranslatePoint(new Point(),pinPanel).Y,
+            "Favorites use full-width rows with the next entry below the first");
         pinPanel!.SetVerticalOffset(double.PositiveInfinity); window.UpdateLayout();
         var finalCard = window.PinsList.ItemContainerGenerator.ContainerFromIndex(499) as FrameworkElement;
         Check(finalCard?.DataContext is EntryView last && last.Id == "perf-499", "Scrolling reaches the last virtualized pin with correct binding");

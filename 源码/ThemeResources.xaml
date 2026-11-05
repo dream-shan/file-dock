@@ -46,7 +46,8 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" /><Setter Property="CaretBrush" Value="{DynamicResource Ink}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource Selection}" /><Setter Property="SelectionTextBrush" Value="{DynamicResource Ink}" />
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
-            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost" /></Border>
+            <Border x:Name="InputBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost" /></Border>
+            <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger></ControlTemplate.Triggers>
         </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="Button">

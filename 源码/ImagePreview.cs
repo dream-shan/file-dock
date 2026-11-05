@@ -74,13 +74,19 @@ public sealed class EntryThumbnail : Grid
 {
     private readonly TextBlock _glyph = new() { FontFamily = new FontFamily("Segoe UI"), FontSize = 11, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly Image _image = new() { Stretch = Stretch.Uniform };
+    private readonly System.Windows.Shapes.Path _folder = new() {
+        Data=Geometry.Parse("M 1,5 L 1,3 Q 1,1 3,1 L 8,1 L 11,4 L 21,4 Q 23,4 23,6 L 23,18 Q 23,20 21,20 L 3,20 Q 1,20 1,18 Z M 1,7 L 23,7"),
+        StrokeThickness=1.4,Width=23,Height=20,Stretch=Stretch.Uniform,
+        HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed };
     private CancellationTokenSource? _thumbnailRequest, _previewRequest;
     private ToolTip? _tip;
     private ListBoxItem? _row;
 
     public EntryThumbnail()
     {
-        Children.Add(_glyph); Children.Add(_image);
+        _folder.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"FolderStroke");
+        _folder.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"FolderFill");
+        Children.Add(_glyph); Children.Add(_folder); Children.Add(_image);
         Loaded += (_, _) => Refresh();
         Unloaded += (_, _) => Release();
         DataContextChanged += (_, _) => { if (IsLoaded) Refresh(); };
@@ -104,6 +110,8 @@ public sealed class EntryThumbnail : Grid
         Release();
         if (DataContext is not EntryView entry) return;
         _glyph.Text = entry.IconGlyph; _glyph.SetResourceReference(TextBlock.ForegroundProperty, entry.Kind switch { "文件夹" => "FolderStroke", "图片" => "GpuAccent", "表格" => "MemoryAccent", _ => "Muted" }); _glyph.Visibility = Visibility.Visible;
+        _folder.Visibility=entry.Kind=="文件夹" ? Visibility.Visible : Visibility.Collapsed;
+        if(entry.Kind=="文件夹")_glyph.Visibility=Visibility.Collapsed;
         if (!IsVisible) return;
         _row = null;
         for (DependencyObject? p = this; p != null; p = VisualTreeHelper.GetParent(p))

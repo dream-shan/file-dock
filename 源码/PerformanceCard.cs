@@ -15,7 +15,7 @@ public sealed class PerformanceCard : Border
     private readonly Grid _grid;
     private readonly PerformanceRing _ring;
     private bool _ringMode;
-    private readonly TextBlock _actionHintText=new() { FontSize=8, Margin=new Thickness(0,2,0,0), TextTrimming=TextTrimming.CharacterEllipsis, Visibility=Visibility.Collapsed };
+    private readonly TextBlock _actionHintText=new() { FontSize=9, Margin=new Thickness(0,2,0,0), TextTrimming=TextTrimming.CharacterEllipsis, Visibility=Visibility.Collapsed };
     private bool _isAction, _actionMouseDown;
     internal event EventHandler? ActionRequested;
     internal bool ActionAvailable { get; set; }=true;
@@ -91,14 +91,25 @@ public sealed class PerformanceCard : Border
         {
             _graph.Trend = value;
             if (Ring) return;
+            _grid.ColumnDefinitions.Clear();
+            if(value)
+            {
+                _grid.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(100) });
+                _grid.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
+            }
+            _grid.VerticalAlignment=VerticalAlignment.Center;
             _grid.RowDefinitions[1].Height = value ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
-            _grid.RowDefinitions[2].Height = value ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+            _grid.RowDefinitions[2].Height = GridLength.Auto;
             _grid.RowDefinitions[3].Height = value ? GridLength.Auto : new GridLength(18);
-            Grid.SetRow(_graph, value ? 2 : 3); Grid.SetRow(_detail, value ? 3 : 2);
+            Grid.SetRow(_graph, value ? 0 : 3); Grid.SetRowSpan(_graph,value ? 3 : 1); Grid.SetColumn(_graph,value ? 1 : 0);
+            Grid.SetRow(_temperature,value ? 3 : 0); Grid.SetColumn(_temperature,value ? 1 : 0); _temperature.HorizontalAlignment=HorizontalAlignment.Left;
+            Grid.SetRow(_detail, value ? 3 : 2); Grid.SetColumn(_detail,value ? 1 : 0);
             _graph.MaxHeight = value ? 60 : double.PositiveInfinity;
+            _graph.MinHeight = value ? 40 : 0;
             _graph.VerticalAlignment = VerticalAlignment.Stretch;
             _detail.Text = value ? "最近 60 秒" : "正在读取…";
-            _detail.FontSize = value ? 8 : 9;
+            _detail.FontSize = 10;
+            _detail.HorizontalAlignment=value ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
             _detail.Margin = value ? new Thickness(0, 2, 0, 0) : new Thickness(0);
         }
     }
@@ -125,16 +136,16 @@ public sealed class PerformanceCard : Border
 
     public PerformanceCard()
     {
-        CornerRadius = new CornerRadius(12); Background = new SolidColorBrush(Color.FromRgb(243, 246, 252)); Padding = new Thickness(12, 7, 12, 5);
+        CornerRadius = new CornerRadius(10); Background = new SolidColorBrush(Color.FromRgb(243, 246, 252)); Padding = new Thickness(12, 6, 12, 6);
         var grid = _grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
-        _label = new TextBlock { FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(74, 87, 110)) };
-        _temperature = new TextBlock { FontSize = 10.5, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Right };
+        _label = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(74, 87, 110)) };
+        _temperature = new TextBlock { FontSize = 11, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Right };
         _value = new TextBlock { Text = "—", FontSize = 25, FontFamily = new FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-        _detail = new TextBlock { Text = "正在读取…", FontSize = 9, Foreground = Brushes.SlateGray, TextTrimming = TextTrimming.CharacterEllipsis };
+        _detail = new TextBlock { Text = "正在读取…", FontSize = 10, Foreground = Brushes.SlateGray, TextTrimming = TextTrimming.CharacterEllipsis };
         _graph = new PerformanceGraph();
         _ring = new PerformanceRing { Width=50,Height=50,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed };
         Grid.SetRow(_value, 1); Grid.SetRow(_detail, 2); Grid.SetRow(_graph, 3);

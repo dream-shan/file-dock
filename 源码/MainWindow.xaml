@@ -6,7 +6,7 @@
         Title="文件坞" Icon="Assets/FileDock-dark.ico" Width="380" Height="500" MinWidth="380" MinHeight="480"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" PreviewMouseLeftButtonDown="MovePanelFromSurface"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="False" Topmost="True"
-        FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="12" Foreground="{DynamicResource Ink}"
+        FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="13" Foreground="{DynamicResource Ink}"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         AllowDrop="True" Loaded="Window_Loaded" Deactivated="Window_Deactivated"
         Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown"
@@ -35,7 +35,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="8"
+                        <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="6"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
@@ -57,14 +57,14 @@
             </Setter>
         </Style>
         <Style TargetType="Button" x:Key="IconButton" BasedOn="{StaticResource QuietButton}">
-            <Setter Property="Width" Value="30" />
-            <Setter Property="Height" Value="30" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
             <Setter Property="FontSize" Value="14" />
         </Style>
         <Style TargetType="TextBlock" x:Key="SectionHeading">
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource Ink}" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -77,15 +77,19 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="10" BorderThickness="1" BorderBrush="Transparent">
+                        <Border x:Name="ItemBorder" Background="{DynamicResource ContentSurface}" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent">
                             <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsChosen}" Value="True">
                                 <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Selection}" />
                             </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -95,8 +99,8 @@
     </Window.Resources>
 
     <Grid x:Name="PageRoot"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-    <Border Grid.Column="0" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource BlankSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="20">
-        <Grid x:Name="ContentGrid" Margin="16,14,16,12">
+    <Border Grid.Column="0" x:Name="PanelSurface" Margin="0" Tag="PanelDrag" Background="{DynamicResource BlankSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="16">
+        <Grid x:Name="ContentGrid" Margin="18,16,18,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -106,13 +110,13 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border CornerRadius="7" Background="{DynamicResource ContentSurface}" Margin="0,0,0,12"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
+            <Border CornerRadius="8" Background="{DynamicResource ContentSurface}" Margin="0,0,0,16"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image x:Name="AppLogo" Source="Assets/FileDock-dark.png" Width="31" Height="31" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Image x:Name="AppLogo" Source="Assets/FileDock-dark.png" Width="27" Height="27" Margin="0,0,9,0" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="文件坞" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"
                                VerticalAlignment="Center" />
                     <Border Background="{DynamicResource Badge}" CornerRadius="4" Padding="5,2" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{x:Static local:App.VersionLabel}">
@@ -157,7 +161,7 @@
                         </TextBlock>
                     </Grid>
                     <Border Grid.Column="2" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="4"
-                            Padding="4,1" VerticalAlignment="Center" Margin="6,0,0,0">
+                            Padding="5,2" VerticalAlignment="Center" Margin="6,0,0,0">
                         <TextBlock Text="Ctrl F" FontFamily="Segoe UI" FontSize="9" Foreground="{DynamicResource Muted}" />
                     </Border>
                 </Grid>
@@ -165,7 +169,7 @@
 
             <Grid x:Name="PinsSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,12">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="32" />
+                    <RowDefinition Height="36" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
@@ -185,23 +189,27 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button HorizontalAlignment="Stretch" Height="64" Margin="0,3,5,3" Tag="{Binding}" Click="Item_Open"
-                                         Background="{DynamicResource PaneCard}" Style="{StaticResource QuietButton}"
-                                        Padding="11,9" HorizontalContentAlignment="Stretch">
+                                <Button HorizontalAlignment="Stretch" Height="60" Margin="0,1,2,1" Tag="{Binding}" Click="Item_Open"
+                                         Background="Transparent" Style="{StaticResource QuietButton}"
+                                        Padding="10,8" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding DisplayName}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="31" />
+                                            <ColumnDefinition Width="42" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="18" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Background="{DynamicResource IconSurface}" Width="27" Height="32" CornerRadius="7" VerticalAlignment="Center">
+                                        <Border Background="{DynamicResource IconSurface}" Width="32" Height="36" CornerRadius="7" HorizontalAlignment="Left" VerticalAlignment="Center">
                                             <local:EntryThumbnail />
                                         </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
-                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource Ink}" FontSize="11" FontWeight="SemiBold"
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource Muted}" FontSize="9" Margin="0,5,0,0"
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="0,3,0,0"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="›" FontSize="18" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="文件夹"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                        </TextBlock>
                                     </Grid>
                                 </Button>
                             </DataTemplate>
@@ -220,13 +228,13 @@
                 <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
                 <TextBlock x:Name="PerformanceHint" Text="实时更新 · 1 秒" FontSize="9" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                    <Grid MinHeight="190">
+                    <Grid MinHeight="258">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                        <local:PerformanceCard x:Name="CpuCard" Label="CPU" Trend="True" Accent="#4A6CF7" Margin="0,0,4,4" MinHeight="91" />
-                        <local:PerformanceCard x:Name="GpuCard" Label="GPU" Trend="True" Accent="#8B68D8" Grid.Column="1" Margin="4,0,0,4" MinHeight="91" />
-                        <local:PerformanceCard x:Name="MemoryCard" Label="内存" Ring="True" Accent="#239C88" Grid.Row="1" Margin="0,4,4,0" MinHeight="91" />
-                        <local:PerformanceCard x:Name="VramCard" Label="显存" Ring="True" Accent="#C38A3A" Grid.Row="1" Grid.Column="1" Margin="4,4,0,0" MinHeight="91" />
+                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="86" /></Grid.RowDefinitions>
+                        <local:PerformanceCard x:Name="CpuCard" Label="CPU" Trend="True" Accent="#345FCC" Grid.ColumnSpan="2" Margin="0,0,0,6" MinHeight="80" />
+                        <local:PerformanceCard x:Name="GpuCard" Label="GPU" Trend="True" Accent="#7954BD" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,6" MinHeight="80" />
+                        <local:PerformanceCard x:Name="MemoryCard" Label="内存" Ring="True" Accent="#239C88" Grid.Row="2" Margin="0,0,4,0" MinHeight="86" />
+                        <local:PerformanceCard x:Name="VramCard" Label="显存" Ring="True" Accent="#C38A3A" Grid.Row="2" Grid.Column="1" Margin="4,0,0,0" MinHeight="86" />
                     </Grid>
                 </ScrollViewer>
                 <Border x:Name="NetworkBar" Grid.Row="2" Background="{DynamicResource PaneCard}" CornerRadius="8" Padding="10,4" Margin="0,7,0,0">
@@ -255,7 +263,7 @@
                     <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" ToolTip="回到我的常用" />
                     <Button x:Name="FolderRefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="刷新当前文件夹" AutomationProperties.Name="刷新当前文件夹" />
                 </Grid>
-                <Border Grid.Row="1" Background="{DynamicResource PaneCard}" CornerRadius="11" Padding="12,11" Margin="0,0,0,9">
+                <Border Grid.Row="1" Background="{DynamicResource ContentSurface}" CornerRadius="8" Padding="10,7" Margin="0,0,0,8">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="35" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <Path Data="M 1,6 L 1,3 Q 1,1 3,1 L 11,1 L 14,5 L 26,5 Q 28,5 28,7 L 28,21 Q 28,23 26,23 L 3,23 Q 1,23 1,21 Z M 1,8 L 28,8" Stroke="{DynamicResource FolderStroke}" StrokeThickness="1.5" Fill="{DynamicResource FolderFill}" Width="27" Height="25" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
@@ -264,14 +272,14 @@
                             <ScrollViewer x:Name="BreadcrumbScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,4,0,0">
                                 <StackPanel x:Name="Breadcrumbs" Orientation="Horizontal" />
                             </ScrollViewer>
-                            <TextBlock x:Name="FolderPathText" FontSize="9" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                            <TextBlock x:Name="FolderPathText" FontSize="11" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                         </StackPanel>
                     </Grid>
                 </Border>
                 <Grid Background="{DynamicResource ContentSurface}" Grid.Row="2" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <TextBlock x:Name="FolderCountText" Text="文件夹内容" FontSize="11" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <ComboBox x:Name="FolderFilterComboBox" Grid.Column="1" Width="73" Height="24" SelectedIndex="0" FontSize="11" Foreground="{DynamicResource Muted}" AutomationProperties.Name="当前文件夹类型筛选">
+                    <ComboBox x:Name="FolderFilterComboBox" Grid.Column="1" Width="80" Height="28" SelectedIndex="0" FontSize="12" Foreground="{DynamicResource Muted}" AutomationProperties.Name="当前文件夹类型筛选">
                         <ComboBoxItem Content="全部" /><ComboBoxItem Content="文档" /><ComboBoxItem Content="表格" /><ComboBoxItem Content="图片" /><ComboBoxItem Content="文件夹" />
                     </ComboBox>
                 </Grid>
@@ -282,15 +290,15 @@
                              ItemContainerStyle="{StaticResource PlainItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Tag="{Binding}" Click="Item_Open" Background="{DynamicResource ContentSurface}" Style="{StaticResource QuietButton}" Padding="7,9" HorizontalContentAlignment="Stretch" >
+                                <Button Tag="{Binding}" Click="Item_Open" Background="Transparent" Style="{StaticResource QuietButton}" Padding="10,9" MinHeight="60" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding DisplayName}">
                                     <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <Border Width="29" Height="34" Background="{DynamicResource PaneCard}" CornerRadius="8" HorizontalAlignment="Left">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <Border Width="32" Height="36" Background="{DynamicResource IconSurface}" CornerRadius="7" HorizontalAlignment="Left">
                                             <local:EntryThumbnail />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,9,0">
-                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource Ink}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource Muted}" FontSize="9" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" Text="{Binding TimeLabel}" Foreground="{DynamicResource Muted}" FontSize="10" VerticalAlignment="Center" />
                                     </Grid>
@@ -302,16 +310,18 @@
                 </Grid>
             </Grid>
 
-            <Border Grid.Row="5" Background="{DynamicResource ContentSurface}" CornerRadius="6"><Grid>
+            <Border Grid.Row="5" Background="{DynamicResource ContentSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="0,9,0,0" CornerRadius="0"><Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="StatusText" Text="准备就绪" Foreground="{DynamicResource Muted}" FontSize="9.5" TextTrimming="CharacterEllipsis"
+                <TextBlock x:Name="StatusText" Text="准备就绪" Foreground="{DynamicResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="1,0,0,7" />
                 <Grid Grid.Row="1">
-                    <TextBlock x:Name="HotkeyHint" Text="Ctrl + Alt + Space  唤出" FontSize="9.5" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="InteractionHint" Text="文件夹内浏览 · 文件单击打开" FontSize="9.5" Foreground="{DynamicResource Muted}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="HotkeyHint" Text="快捷键唤出" ToolTip="Ctrl + Alt + Space 唤出文件坞" FontSize="10" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock x:Name="InteractionHint" Grid.Column="1" Text="文件夹内浏览 · 文件单击打开" FontSize="10" Foreground="{DynamicResource Muted}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    <Button x:Name="CopySelectionButton" Grid.Column="2" Content="复制" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}" Padding="7,3" Margin="6,0,0,0" Visibility="Collapsed" Click="CopySelection_Click" ToolTip="复制所选文件（Ctrl+C）" />
                 </Grid>
             </Grid></Border>
         </Grid>

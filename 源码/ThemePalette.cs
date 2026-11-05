@@ -12,16 +12,16 @@ internal static class ThemePalette
     private static bool? _dark;
     internal static Func<bool>? SystemAppsDarkForVerification;
     private static readonly (string Key, string Light, string Dark)[] Colors = {
-        ("ContentSurface", "#55FAFBFD", "#55202329"),
-        ("PaneCard", "#80F1F4F9", "#802A2E36"), ("PaneInput", "#B3F1F4F9", "#B32A2E36"),
-        ("Surface", "#FAFBFD", "#202329"), ("Card", "#F1F4F9", "#2A2E36"),
-        ("Input", "#F1F4F9", "#2A2E36"), ("Border", "#DCE3EE", "#3D4552"),
-        ("Ink", "#273247", "#E5E8ED"), ("Muted", "#748196", "#A4AEBE"),
-        ("Accent", "#4A6CF7", "#82B3FF"), ("Hover", "#E9EFFF", "#343F52"),
-        ("Pressed", "#DEE6FD", "#3D4C65"), ("IconSurface", "#FFFFFF", "#343A45"),
+        ("ContentSurface", "#E6FAFBFD", "#E620252D"),
+        ("PaneCard", "#F2F0F3F8", "#F22A313C"), ("PaneInput", "#F2F0F3F8", "#F22A313C"),
+        ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
+        ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
+        ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),
+        ("Accent", "#345FCC", "#91BBFF"), ("Hover", "#E8EFFC", "#354358"),
+        ("Pressed", "#DCE7FB", "#405573"), ("IconSurface", "#E8EDF5", "#343E4D"),
         ("Badge", "#EDF1FF", "#333D50"), ("BadgeText", "#6478AD", "#B4C4E6"),
-        ("FolderFill", "#FFF7E7", "#423927"), ("FolderStroke", "#D29524", "#E7B85B"),
-        ("CpuAccent", "#4A6CF7", "#82B3FF"), ("GpuAccent", "#8B68D8", "#B99AEB"),
+        ("FolderFill", "#FFF7E7", "#423B2D"), ("FolderStroke", "#956719", "#E5BB68"),
+        ("CpuAccent", "#345FCC", "#91BBFF"), ("GpuAccent", "#7954BD", "#BEA5ED"),
         ("MemoryAccent", "#239C88", "#65C8B9"), ("VramAccent", "#C38A3A", "#E1B96A"),
         ("Track", "#E0E7F2", "#414956"), ("Error", "#B34848", "#F29A9A"),
         ("Selection", "#D6E2FF", "#344969")

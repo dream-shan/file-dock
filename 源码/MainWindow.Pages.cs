@@ -69,6 +69,7 @@ public partial class MainWindow
         PinsSection.Visibility = IsFilesPage && CurrentFolderPath == null ? Visibility.Visible : Visibility.Collapsed;
         BrowserPanel.Visibility = IsFilesPage && CurrentFolderPath != null ? Visibility.Visible : Visibility.Collapsed;
         PerformanceSection.Visibility = IsPerformancePage ? Visibility.Visible : Visibility.Collapsed;
+        CopySelectionButton.Visibility=IsFilesPage && _selectedPaths.Count>0 ? Visibility.Visible : Visibility.Collapsed;
         UpdatePerformanceActivity(); UpdateFolderWatcher(); UpdatePageRail();
         if(IsPlannerPage)InteractionHint.Text="一次性／重复 · 点击编辑";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else UpdateFileSelection();
     }

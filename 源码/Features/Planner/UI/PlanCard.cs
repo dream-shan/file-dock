@@ -37,6 +37,7 @@ internal sealed class PlanCard : UserControl, IModuleDialog
     {
         _returnFocus=returnFocus;_host=host;_draft=draft;_commit=commit;_cancel=cancel;_editing=editing;
 
+        FontSize=12;
         SetResourceReference(BackgroundProperty,"Surface");SetResourceReference(ForegroundProperty,"Ink");
         RefreshTheme();
         // Explicit local resources keep controls/popovers readable even under system control templates.
@@ -57,7 +58,7 @@ internal sealed class PlanCard : UserControl, IModuleDialog
         _date=Btn("",OpenCalendar);AutomationProperties.SetAutomationId(_date,"PlanDate");_date.HorizontalContentAlignment=HorizontalAlignment.Stretch;_date.Padding=new Thickness(10,7,10,7);
         var errorStyle=new Style(typeof(TextBlock));var emptyError=new Trigger{Property=TextBlock.TextProperty,Value=""};emptyError.Setters.Add(new Setter(VisibilityProperty,Visibility.Collapsed));errorStyle.Triggers.Add(emptyError);_error.Style=errorStyle;_error.TextWrapping=TextWrapping.Wrap;_error.SetResourceReference(TextBlock.ForegroundProperty,"Error");_body.Children.Add(_error);_initializing=false;Refresh();_original=Snapshot();_counter.Text=_title.Text.Length>160 ? $"{_title.Text.Length}/200":"";_counter.Visibility=_title.Text.Length>160 ? Visibility.Visible:Visibility.Collapsed;ValidateTitle();Loaded+=(_,_)=>FocusTitle();Unloaded+=(_,_)=>{foreach(var popup in _popups.ToArray())popup.IsOpen=false;};
     }
-    internal void RefreshTheme(){bool dark=ThemePalette.Brush("Surface").Color.R<128;Resources["PlanSecondary"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#A4AEBE":"#536177"));var accent=(Color)ColorConverter.ConvertFromString(dark ? "#82B3FF":"#3554CC");Resources["PlanAccent"]=new SolidColorBrush(accent);Resources["PlanSelection"]=new SolidColorBrush(Color.FromArgb(31,accent.R,accent.G,accent.B));Resources["PlanOnAccent"]=new SolidColorBrush(dark ? Color.FromRgb(32,35,41):Colors.White);}
+    internal void RefreshTheme(){bool dark=ThemePalette.Brush("Surface").Color.R<128;Resources["PlanSecondary"]=ThemePalette.Brush("Muted");var accent=ThemePalette.Brush("Accent").Color;Resources["PlanAccent"]=ThemePalette.Brush("Accent");Resources["PlanSelection"]=new SolidColorBrush(Color.FromArgb(31,accent.R,accent.G,accent.B));Resources["PlanOnAccent"]=new SolidColorBrush(dark ? ThemePalette.Brush("Surface").Color:Colors.White);}
     private static TextBlock Text(string s,bool secondary=false){var t=new TextBlock{Text=s,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,4)};t.SetResourceReference(TextBlock.ForegroundProperty,secondary ? "PlanSecondary":"Ink");return t;}
     private StackPanel Section(string name){var p=new StackPanel{Margin=new Thickness(0,0,0,10)};p.Children.Add(Text(name));_body.Children.Add(p);return p;}
     private static Button Btn(string text,Action action){var b=new Button{Opacity=1,Content=text,Padding=new Thickness(10,7,10,7),Margin=new Thickness(2),MinHeight=32};b.SetResourceReference(StyleProperty,"QuietButton");b.SetResourceReference(ForegroundProperty,"PlanSecondary");b.Click+=(_,_)=>action();return b;}

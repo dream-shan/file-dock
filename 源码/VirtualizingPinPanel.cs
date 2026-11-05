@@ -6,10 +6,10 @@ using System.Windows.Media;
 
 namespace FileDockDemo;
 
-// Two columns with pixel scrolling. Keep only visible rows and one buffer row.
+// Full-width rows with pixel scrolling. Keep only visible rows and one buffer row.
 public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
 {
-    private const double RowHeight = 70;
+    private const double RowHeight = 64;
     private Size _extent, _viewport;
     private double _offset;
     public VirtualizingPinPanel() { ClipToBounds = true; }
@@ -19,13 +19,13 @@ public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
         var items = ItemsControl.GetItemsOwner(this);
         int count = items?.Items.Count ?? 0;
         double width = double.IsInfinity(availableSize.Width) ? 360 : availableSize.Width;
-        double height = Math.Ceiling(count / 2d) * RowHeight;
+        double height = count * RowHeight;
         _extent = new Size(width, height);
         _viewport = new Size(width, double.IsInfinity(availableSize.Height) ? Math.Min(height, 158) : availableSize.Height);
         _offset = Math.Clamp(_offset, 0, Math.Max(0, height - _viewport.Height));
         ScrollOwner?.InvalidateScrollInfo();
-        int first = Math.Max(0, (int)(_offset / RowHeight) - 1) * 2;
-        int last = Math.Min(count - 1, ((int)Math.Ceiling((_offset + _viewport.Height) / RowHeight) + 1) * 2 - 1);
+        int first = Math.Max(0, (int)(_offset / RowHeight) - 1);
+        int last = Math.Min(count - 1, (int)Math.Ceiling((_offset + _viewport.Height) / RowHeight));
         // First access connects WPF's generator. Existing saved pins can reach
         // the first measure before ItemContainerGenerator has been initialized.
         _ = InternalChildren;
@@ -58,7 +58,7 @@ public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
                         else InsertInternalChild(childIndex, child);
                         generator.PrepareItemContainer(child);
                     }
-                    child.Measure(new Size(width / 2, RowHeight));
+                    child.Measure(new Size(width, RowHeight));
                 }
             }
         }
@@ -70,8 +70,8 @@ public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
         for (int i = 0; i < InternalChildren.Count; i++)
         {
             int index = ItemContainerGenerator.IndexFromGeneratorPosition(new GeneratorPosition(i, 0));
-            InternalChildren[i].Arrange(new Rect((index % 2) * finalSize.Width / 2,
-                (index / 2) * RowHeight - _offset, finalSize.Width / 2, RowHeight));
+            InternalChildren[i].Arrange(new Rect(0,
+                index * RowHeight - _offset, finalSize.Width, RowHeight));
         }
         return finalSize;
     }
@@ -88,7 +88,7 @@ public sealed class VirtualizingPinPanel : VirtualizingPanel, IScrollInfo
 
     protected override void BringIndexIntoView(int index)
     {
-        double top = (index / 2) * RowHeight;
+        double top = index * RowHeight;
         if (top < _offset) SetVerticalOffset(top);
         else if (top + RowHeight > _offset + _viewport.Height) SetVerticalOffset(top + RowHeight - _viewport.Height);
     }

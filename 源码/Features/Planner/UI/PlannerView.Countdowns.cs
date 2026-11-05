@@ -20,8 +20,8 @@ public sealed partial class PlannerView
             foreach(var item in (_allDates?items:items.Take(2)))
             {
                 int days=item.Days(PlanRules.Today);var row=new DockPanel();var value=Label(days==0?"就是今天":days<0?"已到期":$"{days} 天");value.FontSize=19;value.FontWeight=FontWeights.SemiBold;value.SetResourceReference(TextBlock.ForegroundProperty,"Accent");DockPanel.SetDock(value,Dock.Right);row.Children.Add(value);
-                var text=new StackPanel();var name=Label(item.Title);name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(name);var date=Label(item.Next(PlanRules.Today).ToString("yyyy/MM/dd")+(item.Annual?" · 每年重复":""),true);date.FontSize=10;text.Children.Add(date);row.Children.Add(text);
-                var edit=Button("",()=>EditCountdown(item));edit.Content=row;edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;edit.SetResourceReference(BackgroundProperty,"PaneCard");AutomationProperties.SetName(edit,"重要日："+item.Title);rows.Children.Add(edit);
+                var text=new StackPanel();var name=Label(item.Title);name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(name);var date=Label(item.Next(PlanRules.Today).ToString("yyyy/MM/dd")+(item.Annual?" · 每年重复":""),true);date.FontSize=11;text.Children.Add(date);row.Children.Add(text);
+                var edit=Button("",()=>EditCountdown(item));edit.Content=row;edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;edit.Margin=new Thickness(0,2,0,2);edit.Padding=new Thickness(10,8,10,8);edit.SetResourceReference(BackgroundProperty,"PaneCard");AutomationProperties.SetName(edit,"重要日："+item.Title);rows.Children.Add(edit);
             }
             if(items.Length==0)rows.Children.Add(Label("添加考试、生日等重要日期",true));
             panel.Children.Add(new ScrollViewer{Content=rows,MaxHeight=_allDates?150:112,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});

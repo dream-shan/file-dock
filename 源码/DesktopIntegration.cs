@@ -88,7 +88,7 @@ internal static partial class NativeMethods
     internal static void ShapePagePanel(IntPtr window,double width,double height)
     {
         double scale=WindowDpi(window)/96d;
-        var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(40*scale),(int)Math.Round(40*scale));
+        var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(32*scale),(int)Math.Round(32*scale));
         if(region!=IntPtr.Zero && SetWindowRgn(window,region,true)==0)DeleteObject(region);
     }
     internal static void ShapeRailWindow(IntPtr window,double scale,bool right,int selectedIndex,int count)

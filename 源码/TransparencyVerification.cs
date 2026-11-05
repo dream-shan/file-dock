@@ -1,13 +1,14 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 namespace FileDockDemo;
 internal static class TransparencyVerification
 {
-    internal static void Run(MainWindow w,string root,Action<bool,string> check)
+    internal static async Task Run(MainWindow w,string root,Action<bool,string> check)
     {
         int original=w.State.EmptyAreaTransparency;
         try{
@@ -37,7 +38,7 @@ internal static class TransparencyVerification
             w.SetEmptyAreaTransparency(-20,false);check(w.State.EmptyAreaTransparency==0,"Transparency clamps lower bound");
             w.SetEmptyAreaTransparency(0,false);check(((SolidColorBrush)w.PanelSurface.Background).Color.A==255,"Zero transparency restores a solid panel background");
             w.SetEmptyAreaTransparency(500,false);check(w.State.EmptyAreaTransparency==85,"Transparency preview clamps upper bound");
-            w.SetEmptyAreaTransparency(60);check(w.Storage.Load().EmptyAreaTransparency==60,"Empty-area transparency persists without altering JSON format");
+            w.SetEmptyAreaTransparency(60);await w.WaitForSavesAsync();check(w.Storage.Load().EmptyAreaTransparency==60,"Empty-area transparency persists without altering JSON format");
             check(w.CreateTransparencyMenu().Items.Count==2,"Transparency menu exposes slider and default reset");
         }finally{w.SetEmptyAreaTransparency(original);}
     }

@@ -1,6 +1,7 @@
 using FileDockDemo.Features.Planner;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FileDockDemo;
 
@@ -10,6 +11,7 @@ public sealed class PinnedEntry
     public string Path { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Order { get; set; }
+    internal PinnedEntry Copy() => (PinnedEntry)MemberwiseClone();
 }
 
 public sealed class AppState
@@ -32,4 +34,12 @@ public sealed class AppState
     public bool AutoDesktop { get; set; } = true;
     public string SelectedPage { get; set; } = "Performance";
     public string ThemeMode { get; set; } = "System";
+    internal AppState Copy()
+    {
+        var copy = (AppState)MemberwiseClone();
+        copy.Pins = Pins.Select(p => p.Copy()).ToList();
+        copy.Plans = Plans.Select(p => p.Copy()).ToList();
+        copy.Countdowns = Countdowns.Select(p => p.Copy()).ToList();
+        return copy;
+    }
 }

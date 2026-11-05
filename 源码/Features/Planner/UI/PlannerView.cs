@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -18,6 +19,14 @@ public sealed partial class PlannerView : UserControl
     private IModuleHost? _host;
     private PlanCard? _editor;
     private bool _manage;
+    private Task _renderTask=Task.CompletedTask,_operationTask=Task.CompletedTask;
+    private int _renderGeneration;
+    internal async Task WaitForIdleAsync()
+    {
+        while(true){var render=_renderTask;var operation=_operationTask;var controller=_controller?.Pending??Task.CompletedTask;
+            await Task.WhenAll(render,operation,controller,_editor?.Pending??Task.CompletedTask,_countdownEditor?.Pending??Task.CompletedTask);
+            if(ReferenceEquals(render,_renderTask)&&ReferenceEquals(operation,_operationTask)&&ReferenceEquals(controller,_controller?.Pending??Task.CompletedTask))return;}
+    }
     private ScrollViewer? _scroll;
     internal bool IsEditing=>_editor!=null||_countdownEditor!=null;
     internal DateTime RenderedDay { get; private set; }=PlanRules.Today;
@@ -38,9 +47,9 @@ public sealed partial class PlannerView : UserControl
     private readonly DockPanel _root=new();
     internal void Initialize(PlannerController controller,IModuleHost host,IPlannerStore? store=null)
     {
-        _controller=controller;_host=host;_countdownStore=store;Content=_root;Render();
+        _controller=controller;_host=host;_countdownStore=store;Content=_root;Dispatcher.BeginInvoke(Render);
     }
-    internal void Detach(){CloseEditor();_controller=null;_host=null;_root.Children.Clear();}
+    internal void Detach(){++_renderGeneration;CloseEditor();_controller=null;_host=null;_root.Children.Clear();}
     private void CloseEditor(){var editor=_editor;_editor=null;if(editor!=null)_host?.CloseDialog(editor);}
     private static TextBlock Label(string text,bool muted=false)
     {
@@ -53,13 +62,16 @@ public sealed partial class PlannerView : UserControl
         b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;
     }
     private void Header(UIElement element){var plate=new Border{Child=element};DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
-    internal void Render()
+    internal void Render()=>_renderTask=RenderAsync(++_renderGeneration);
+    private async Task RenderAsync(int generation)
     {
         if(_controller==null)return;
+        bool reconciled=await _controller.ReconcileAsync(PlanRules.Today);
+        if(_controller==null||generation!=_renderGeneration)return;
         double offset=_scroll?.VerticalOffset??0;bool reveal=_revealId!=null;_root.Children.Clear();
         RenderCountdowns();
         var heading=new DockPanel{Margin=new Thickness(0,0,0,7)};
-        RenderedDay=PlanRules.Today;if(!_controller.Reconcile(RenderedDay))Header(Label("清理保存失败，原有计划已保留。",true));
+        RenderedDay=PlanRules.Today;if(!reconciled)Header(Label("清理保存失败，原有计划已保留。",true));
         var manage=Button(_manage ? "返回今天":"管理",()=>{_manage=!_manage;Render();});AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);
         var dateLabel=Label(PlanRules.Today.ToString("M月d日 ddd"),true);DockPanel.SetDock(dateLabel,Dock.Right);heading.Children.Add(dateLabel);var title=Label(_manage ? "管理计划":"今日待办");title.FontSize=14;title.FontWeight=FontWeights.SemiBold;heading.Children.Add(title);Header(heading);
         var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.SetResourceReference(BackgroundProperty,"Selection");add.SetResourceReference(ForegroundProperty,"Accent");add.HorizontalAlignment=HorizontalAlignment.Stretch;add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Margin=new Thickness(0,8,0,2);DockPanel.SetDock(add,Dock.Bottom);_root.Children.Add(add);
@@ -67,7 +79,7 @@ public sealed partial class PlannerView : UserControl
 
         var items=_controller.Items(_manage,PlanRules.Today);
         foreach(var p in items)Row(list,p);if(items.Count==0)list.Children.Add(Label(_manage ? "暂无计划":"今天暂无待办",true));
-        _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");_root.Children.Add(_scroll);var scroll=_scroll;if(!reveal)Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(_scroll,scroll))scroll.ScrollToVerticalOffset(offset);});
+        _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");_root.Children.Add(_scroll);var scroll=_scroll;if(!reveal)_ = Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(_scroll,scroll))scroll.ScrollToVerticalOffset(offset);});
     }
     private void Row(Panel list,PlanItem p)
     {
@@ -88,16 +100,22 @@ public sealed partial class PlannerView : UserControl
     {
         if(_controller==null || _host==null || IsEditing)return;
         var draft=_controller.CreateDraft(item);
-        bool Commit(PlanItem plan){if(!_controller.Save(plan))return false;CloseEditor();_revealId=plan.Id;Render();_host.ShowStatus(item==null?"已添加待办":"已保存计划");return true;}
-        var card=new PlanCard(draft,item!=null,Commit,()=>{CloseEditor();Render();},_host,FocusAdd,item==null?null:()=>DeletePlan(item));
+        async Task<bool> Commit(PlanItem plan){if(!await _controller.SaveAsync(plan))return false;CloseEditor();_revealId=plan.Id;Render();_host?.ShowStatus(item==null?"已添加待办":"已保存计划");return true;}
+        var card=new PlanCard(draft,item!=null,Commit,()=>{CloseEditor();Render();},_host,FocusAdd,item==null?null:()=>{DeletePlan(item);return _operationTask;});
         card.Closed+=()=>{if(ReferenceEquals(_editor,card))_editor=null;};_editor=card;_host.ShowDialog(card);
     }
     internal void FocusAdd(){foreach(var child in Visuals(this))if(child is Button b && AutomationProperties.GetAutomationId(b)=="PlannerQuickAdd"){b.Focus();break;}}
     private static IEnumerable<DependencyObject> Visuals(DependencyObject p){yield return p;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in Visuals(VisualTreeHelper.GetChild(p,i)))yield return c;}
-    private void ToggleDone(PlanItem p,bool done){_controller?.SetDone(p.Id,done);Render();}
-    private void DeletePlan(PlanItem p)
+    private void ToggleDone(PlanItem p,bool done)=>RunOperation(async()=>{if(_controller==null)return;bool saved=await _controller.SetDoneAsync(p.Id,done);Render();await _renderTask;if(!saved)Header(Button("保存失败 · 重试",()=>ToggleDone(p,done)));});
+    private void RunOperation(Func<Task> operation){if(!_operationTask.IsCompleted)return;_operationTask=RunOperationAsync(operation);}
+    private async Task RunOperationAsync(Func<Task> operation){IsEnabled=false;try{await operation();}finally{IsEnabled=true;}}
+    private void DeletePlan(PlanItem p)=>RunOperation(async()=>
     {
-        if(_controller==null || !_controller.Delete(p.Id,out var undo))return;
-        CloseEditor();Render();Header(Button("已删除 · 撤销",()=>{if(undo!=null)_controller.Undo(undo);Render();}));
-    }
+        if(_controller==null)return;var result=await _controller.DeleteAsync(p.Id);
+        if(!result.Success){_host?.ShowStatus("删除保存失败，原计划已保留，可重试。");return;}
+        CloseEditor();Render();await _renderTask;Header(Button("已删除 · 撤销",()=>RunOperation(async()=>{
+            bool saved=result.Undo!=null&&await _controller.UndoAsync(result.Undo);Render();await _renderTask;
+            if(!saved)Header(Button("撤销保存失败 · 重试",()=>RestoreUndo(result.Undo!)));})));
+    });
+    private void RestoreUndo(PlannerUndo undo)=>RunOperation(async()=>{if(_controller==null)return;bool saved=await _controller.UndoAsync(undo);Render();await _renderTask;if(!saved)Header(Button("撤销保存失败 · 重试",()=>RestoreUndo(undo)));});
 }

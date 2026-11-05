@@ -63,7 +63,7 @@ public sealed class App : Application
             window.Top = -10000;
             app.Startup += async (_, _) =>
             {
-                try { await DemoVerification.Run(window, Path.GetFullPath(args[1])); app.Shutdown(0); }
+                try { await DemoVerification.Run(window, Path.GetFullPath(args[1])); await window.WaitForSavesAsync(); app.Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString()); app.Shutdown(1); }
             };
         }

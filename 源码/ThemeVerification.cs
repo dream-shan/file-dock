@@ -49,7 +49,7 @@ internal static class ThemeVerification
         try
         {
             check(JsonSerializer.Deserialize<AppState>("{\"Pins\":[]}")!.ThemeMode == "System" && ThemePalette.Normalize("unknown") == "System", "Old and unknown theme settings safely default to system without losing pins");
-            TransparencyVerification.Run(window,root,check);
+            await TransparencyVerification.Run(window,root,check);
             VerifyHeaderContrast(window,root,check);
             window.GoHome(); window.ExpandPanel(); window.SetThemeMode("System");
             check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,250,251,253), "System light application theme applies to the panel");
@@ -58,7 +58,7 @@ internal static class ThemeVerification
             check(window.IsDarkTheme && window.CpuCard.ValueText == "17%" && window.CpuCard.HistoryCount == history, "Changing theme preserves current performance values and history");
             check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,32,37,45) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("PaneCard"), "Dark theme reaches panel, search and performance cards");
             check(((BitmapImage)window.AppLogo.Source).UriSource.ToString().Contains("light.png"), "Dark panel uses the light transparent mark");
-            check(new StorageService(Path.Combine(root,"data")).Load().ThemeMode == "Dark", "Manual appearance choice persists to the existing settings file");
+            await window.WaitForSavesAsync();check(new StorageService(Path.Combine(root,"data")).Load().ThemeMode == "Dark", "Manual appearance choice persists to the existing settings file");
             var appearance = window.CreateAppearanceMenu();
             var options = appearance.Items.Cast<MenuItem>().ToArray();
             check(options.Length == 3 && options.Single(i => i.IsChecked).Tag.ToString() == "Dark", "Appearance menu exposes system, light and dark with one active choice");

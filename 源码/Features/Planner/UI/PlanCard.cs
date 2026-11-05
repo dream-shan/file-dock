@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -19,7 +20,7 @@ internal sealed class PlanCard : UserControl, IModuleDialog
 {
     private readonly IModuleHost _host;
     private readonly PlanItem _draft;
-    private readonly Func<PlanItem,bool> _commit;
+    private readonly Func<PlanItem,Task<bool>> _commit;
     private readonly Action _cancel,_returnFocus;
     private readonly string _original;
     private readonly PlanTitleBox _title=new();
@@ -32,8 +33,9 @@ internal sealed class PlanCard : UserControl, IModuleDialog
     private readonly bool _editing;
     internal bool HasChanges=>Snapshot()!=_original;
     internal bool IsBusy=>_busy;
+    internal Task Pending {get;private set;}=Task.CompletedTask;
     private string Snapshot()=>string.Join("\u001f",_title.Text,_draft.Kind,_draft.RepeatRule,_draft.Weekdays,_draft.ActiveDays,_draft.RestDays,_draft.ScheduledDate.ToString("yyyy-MM-dd"));
-    internal PlanCard(PlanItem draft,bool editing,Func<PlanItem,bool> commit,Action cancel,IModuleHost host,Action returnFocus,Action? delete=null)
+    internal PlanCard(PlanItem draft,bool editing,Func<PlanItem,Task<bool>> commit,Action cancel,IModuleHost host,Action returnFocus,Func<Task>? delete=null)
     {
         _returnFocus=returnFocus;_host=host;_draft=draft;_commit=commit;_cancel=cancel;_editing=editing;
 
@@ -48,7 +50,7 @@ internal sealed class PlanCard : UserControl, IModuleDialog
         var heading=Text(editing ? "编辑计划":"新建待办");heading.FontSize=16;heading.FontWeight=FontWeights.SemiBold;heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);root.Children.Add(header);
         var scroll=new ScrollViewer{Content=_body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false};AutomationProperties.SetAutomationId(scroll,"PlanBody");Grid.SetRow(scroll,1);root.Children.Add(scroll);
         var footer=new Border{BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Margin=new Thickness(0,8,0,0)};footer.SetResourceReference(Border.BorderBrushProperty,"Border");footer.SetResourceReference(Border.BackgroundProperty,"Surface");AutomationProperties.SetAutomationId(footer,"PlanFooter");Grid.SetRow(footer,2);root.Children.Add(footer);
-        var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right};footer.Child=actions;if(delete!=null)actions.Children.Add(Btn("删除",delete));actions.Children.Add(Btn("取消",RequestClose));_submit=Btn(editing ? "保存":"添加",Save);_submit.SetResourceReference(BackgroundProperty,"PlanAccent");_submit.SetResourceReference(ForegroundProperty,"PlanOnAccent");AutomationProperties.SetAutomationId(_submit,"PlanSubmit");actions.Children.Add(_submit);
+        var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right};footer.Child=actions;if(delete!=null)actions.Children.Add(Btn("删除",()=>{if(!_busy)Pending=DeleteAsync(delete);}));actions.Children.Add(Btn("取消",RequestClose));_submit=Btn(editing ? "保存":"添加",Save);_submit.SetResourceReference(BackgroundProperty,"PlanAccent");_submit.SetResourceReference(ForegroundProperty,"PlanOnAccent");AutomationProperties.SetAutomationId(_submit,"PlanSubmit");actions.Children.Add(_submit);
         var titleBlock=Section("计划 *");_title.Text=draft.Title;_title.AcceptsReturn=true;_title.TextWrapping=TextWrapping.Wrap;_title.MinLines=1;_title.MaxLines=4;_title.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;_title.MaxLength=200;Input(_title,"PlanTitle");_title.Padding=new Thickness(6);AutomationProperties.SetName(_title,"计划");
         titleBlock.Children.Add(new System.Windows.Documents.AdornerDecorator{Child=_title});_counter.HorizontalAlignment=HorizontalAlignment.Right;_counter.SetResourceReference(TextBlock.ForegroundProperty,"PlanSecondary");_counter.Visibility=Visibility.Collapsed;titleBlock.Children.Add(_counter);_titleError.SetResourceReference(TextBlock.ForegroundProperty,"Error");_titleError.TextWrapping=TextWrapping.Wrap;titleBlock.Children.Add(_titleError);
         _title.TextChanged+=(_,_)=>{_counter.Text=_title.Text.Length>160 ? $"{_title.Text.Length}/200":"";_counter.Visibility=_title.Text.Length>160 ? Visibility.Visible:Visibility.Collapsed;ValidateTitle();};_title.LostKeyboardFocus+=(_,_)=>{_touched=true;ValidateTitle();};
@@ -131,7 +133,9 @@ internal sealed class PlanCard : UserControl, IModuleDialog
             for(int i=1;i<=DateTime.DaysInMonth(month.Year,month.Month);i++){DateTime date=new DateTime(month.Year,month.Month,i);var b=Btn(i.ToString(),()=>Select(date));b.Padding=new Thickness(2);b.MinWidth=30;b.IsEnabled=date>=today;b.SetResourceReference(ForegroundProperty,date<today ? "PlanSecondary":"Ink");if(date==_draft.ScheduledDate.Date){b.SetResourceReference(BackgroundProperty,"PlanSelection");b.SetResourceReference(ForegroundProperty,"PlanAccent");}AutomationProperties.SetName(b,date.ToString("yyyy年M月d日"));days.Children.Add(b);}}
         Calendar();popup=Popup(box,_date);
     }
-    private void Save()
+    private void Save(){if(!_busy)Pending=SaveAsync();}
+    private async Task DeleteAsync(Func<Task> delete){_busy=true;IsEnabled=false;try{await delete();}finally{_busy=false;IsEnabled=true;}}
+    private async Task SaveAsync()
     {
         if(_busy||_committed)return;_touched=true;ValidateTitle();if(string.IsNullOrWhiteSpace(_title.Text))return;
         if(_title.Text.Trim().Length>200){_error.Text="计划最多200字。";return;}
@@ -139,7 +143,8 @@ internal sealed class PlanCard : UserControl, IModuleDialog
         if(_draft.RepeatRule!="weekdays")_draft.Weekdays=127;if(_draft.RepeatRule!="cycle"){_draft.ActiveDays=2;_draft.RestDays=1;} _draft.ScheduleSchema=1;_draft.Migrated=false;_draft.Deadline=null;_draft.Level=3;_draft.Date=_draft.ScheduledDate;_draft.ScopePeriod=PlanRules.Period(3,_draft.Date);
         _draft.Title=_title.Text.Trim();_draft.CreatedAt??=PlanRules.Now;_draft.UpdatedAt=PlanRules.Now;_draft.PlanSchema=1;
         _busy=true;_submit.Content="保存中…";ValidateTitle();
-        try{if(_commit(_draft))_committed=true;else _error.Text="保存失败，填写内容已保留。请检查文件权限或稍后重试。";}catch(Exception ex){_error.Text="保存失败："+ex.Message;}finally{_busy=false;_submit.Content=_editing ? "保存":"添加";ValidateTitle();}
+        IsEnabled=false;
+        try{if(await _commit(_draft.Copy()))_committed=true;else _error.Text="保存失败，填写内容已保留。请检查文件权限或稍后重试。";}catch(Exception ex){_error.Text="保存失败："+ex.Message;}finally{_busy=false;IsEnabled=true;_submit.Content=_editing ? "保存":"添加";ValidateTitle();}
     }
     internal event Action? Closed;
     void IModuleDialog.OnClosed()=>Closed?.Invoke();

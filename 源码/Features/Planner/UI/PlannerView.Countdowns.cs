@@ -32,9 +32,9 @@ public sealed partial class PlannerView
     private void EditCountdown(CountdownItem? item)
     {
         if(_host==null||_countdownStore==null||IsEditing)return;
-        var card=new CountdownCard(item,_host,value=>{
+        var card=new CountdownCard(item,_host,async value=>{
             var list=_countdownStore.ReadCountdowns().Where(p=>p.Id!=item?.Id).ToList();if(value!=null)list.Add(value);
-            if(!_countdownStore.WriteCountdowns(list))return false;
+            if(!await _countdownStore.WriteCountdownsAsync(list))return false;
             _host.CloseDialog(_countdownEditor!);_countdownEditor=null;Render();_host.ShowStatus(value==null?"已删除重要日":"已保存重要日");return true;
         },()=>FocusAdd());card.Closed+=()=>{if(ReferenceEquals(_countdownEditor,card))_countdownEditor=null;};_countdownEditor=card;_host.ShowDialog(card);
     }

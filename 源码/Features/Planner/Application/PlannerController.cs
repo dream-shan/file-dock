@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 namespace FileDockDemo.Features.Planner;
 
 internal sealed class PlannerUndo
@@ -14,6 +16,8 @@ internal sealed class PlannerUndo
 internal sealed class PlannerController
 {
     private readonly IPlannerStore _store;
+    private readonly SemaphoreSlim _operations=new(1);
+    internal Task Pending {get;private set;}=Task.CompletedTask;
     internal PlannerController(IPlannerStore store)=>_store=store;
     private List<PlanItem> Copy()=>_store.Read().Select(p=>p.Copy()).ToList();
     internal IReadOnlyList<PlanItem> Items(bool managing,DateTime today)=>_store.Read()
@@ -25,33 +29,39 @@ internal sealed class PlannerController
         if(draft.Migrated && draft.ScheduledDate<PlanRules.Today)draft.ScheduledDate=PlanRules.Today;
         return draft;
     }
-    internal bool Save(PlanItem plan)
+    private Task<T> Execute<T>(Func<Task<T>> operation)
     {
-        var items=Copy();int index=items.FindIndex(p=>p.Id==plan.Id);
-        if(index<0)items.Add(plan.Copy());else items[index]=plan.Copy();
-        return _store.TryWrite(items,plan.Level);
+        var task=RunAsync(operation);Pending=Pending.IsCompleted?task:Task.WhenAll(Pending,task);return task;
     }
-    internal bool Reconcile(DateTime today)
+    private async Task<T> RunAsync<T>(Func<Task<T>> operation)
     {
-        var items=Copy();return !PlanRules.Reconcile(items,today) || _store.TryWrite(items);
+        await _operations.WaitAsync();try{return await operation();}finally{_operations.Release();}
     }
-    internal bool SetDone(string id,bool done)
+    internal Task<bool> SaveAsync(PlanItem plan)
     {
-        var items=Copy();var p=items.FirstOrDefault(p=>p.Id==id);if(p==null)return false;
-        PlanRules.SetDone(p,done);return _store.TryWrite(items);
+        var draft=plan.Copy();
+        return Execute(()=>{var items=Copy();int index=items.FindIndex(p=>p.Id==draft.Id);
+            if(index<0)items.Add(draft);else items[index]=draft;return _store.TryWriteAsync(items,draft.Level);});
     }
-    internal bool Delete(string id,out PlannerUndo? undo)
+    internal Task<bool> ReconcileAsync(DateTime today)=>Execute(()=>{
+        var items=Copy();return PlanRules.Reconcile(items,today)?_store.TryWriteAsync(items):Task.FromResult(true);
+    });
+    internal Task<bool> SetDoneAsync(string id,bool done)=>Execute(()=>{
+        var items=Copy();var p=items.FirstOrDefault(p=>p.Id==id);if(p==null)return Task.FromResult(false);
+        PlanRules.SetDone(p,done);return _store.TryWriteAsync(items);
+    });
+    internal Task<(bool Success,PlannerUndo? Undo)> DeleteAsync(string id)=>Execute<(bool,PlannerUndo?)>(async ()=>
     {
-        undo=null;var before=Copy();if(!before.Any(p=>p.Id==id))return false;
+        var before=Copy();if(!before.Any(p=>p.Id==id))return (false,null);
         var children=before.Where(p=>p.ParentId==id).Select(p=>p.Id).ToArray();
         var items=before.Where(p=>p.Id!=id).Select(p=>p.Copy()).ToList();
         foreach(var child in items.Where(p=>p.ParentId==id))child.ParentId=null;
-        if(!_store.TryWrite(items))return false;undo=new PlannerUndo(before,children);return true;
-    }
-    internal bool Undo(PlannerUndo undo)
+        return await _store.TryWriteAsync(items)?(true,new PlannerUndo(before,children)):(false,null);
+    });
+    internal Task<bool> UndoAsync(PlannerUndo undo)=>Execute(()=>
     {
         var items=Copy();foreach(var old in undo.Before){var now=items.FirstOrDefault(p=>p.Id==old.Id);
             if(now==null)items.Add(old.Copy());else if(undo.Children.Contains(now.Id))now.ParentId=old.ParentId;}
-        return _store.TryWrite(items);
-    }
+        return _store.TryWriteAsync(items);
+    });
 }

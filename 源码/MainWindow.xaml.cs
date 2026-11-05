@@ -72,6 +72,7 @@ public partial class MainWindow : Window
         _dataDirectory = dataDirectory;
         Storage = new StorageService(dataDirectory);
         State = Storage.Load();
+        _saves = new StateSaveCoordinator(State, Storage.Save, ReportSave);
         PageRailWindow.MigratePosition(State);
         _keepOpen = State.KeepOpen;
         _screen = Forms.Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == State.PanelScreen) ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
@@ -88,7 +89,7 @@ public partial class MainWindow : Window
         InitializeLiveFolder();
         InitializeTransfers();
         InitializePerformance();
-        _plannerModule=new PlannerModule(Planner,new AppStatePlannerStore(State,()=>Persist()),this);
+        _plannerModule=new PlannerModule(Planner,new AppStatePlannerStore(State,_saves.CommitAsync),this);
         InitializePages();
         ApplyTheme();
         SizeChanged += (_, _) => { QueueDesktopPresence(); };
@@ -181,7 +182,7 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
-    private void Window_Loaded(object sender, RoutedEventArgs e)
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         if (_loaded) return;
         _loaded = true;
@@ -191,6 +192,8 @@ public partial class MainWindow : Window
             if (State.Pins.Count == 0 && !File.Exists(System.IO.Path.Combine(_dataDirectory, "initialized")))
             {
                 AddPins(new[] { AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
+                await _pinOperations;
+                if (_saveFailed) return;
                 Directory.CreateDirectory(_dataDirectory);
                 File.WriteAllText(System.IO.Path.Combine(_dataDirectory, "initialized"), "1");
             }
@@ -203,19 +206,21 @@ public partial class MainWindow : Window
 
     internal void AddPins(IEnumerable<string> paths)
     {
-        int added = 0;
-        foreach (string raw in paths)
-        {
+        var requested=paths.ToArray();
+        QueuePinOperation(async()=>{
+        int added=0;
+        if(!await SavePinsAsync(pins=>{added=0;foreach (string raw in requested){
             if (string.IsNullOrWhiteSpace(raw)) continue;
             string path;
             try { path = System.IO.Path.GetFullPath(raw); } catch { continue; }
             string key = FileService.NormalizeKey(path);
-            if (State.Pins.Any(p => FileService.NormalizeKey(p.Path) == key)) continue;
-            State.Pins.Add(new PinnedEntry { Id = Guid.NewGuid().ToString("N"), Path = path, DisplayName = FileName(path), Order = State.Pins.Count });
+            if (pins.Any(p => FileService.NormalizeKey(p.Path) == key)) continue;
+            pins.Add(new PinnedEntry { Id = Guid.NewGuid().ToString("N"), Path = path, DisplayName = FileName(path), Order = pins.Count });
             added++;
-        }
-        Persist(); ApplyFilters(); SetStatus(added > 0 ? $"已固定 {added} 个项目。拖动卡片可调整顺序。" : "这些项目已在常用中。");
+        }}))return;
+        SetStatus(added > 0 ? $"已固定 {added} 个项目。拖动卡片可调整顺序。" : "这些项目已在常用中。");
         _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray());
+        });
     }
 
     private static string FileName(string path)
@@ -341,8 +346,8 @@ public partial class MainWindow : Window
         {
             AddMenu(menu, "修改显示名称…", () => RenameEntry(entry));
             AddMenu(menu, "重新定位…", () => RelocateEntry(entry));
-            AddMenu(menu, "移到最前", () => { var pin = State.Pins.First(p => p.Id == entry.Id); State.Pins.Remove(pin); State.Pins.Insert(0, pin); ReorderAndSave(); });
-            AddMenu(menu, "从常用移除", () => { State.Pins.RemoveAll(p => p.Id == entry.Id); ReorderAndSave(); SetStatus("已移除入口，原文件保留在原位置。"); });
+            AddMenu(menu, "移到最前", () => QueuePinOperation(async()=>{await SavePinsAsync(pins=>{var pin=pins.First(p=>p.Id==entry.Id);pins.Remove(pin);pins.Insert(0,pin);});}));
+            AddMenu(menu, "从常用移除", () => QueuePinOperation(async()=>{if(await SavePinsAsync(pins=>pins.RemoveAll(p=>p.Id==entry.Id)))SetStatus("已移除入口，原文件保留在原位置。");}));
         }
         else
         {
@@ -383,13 +388,17 @@ public partial class MainWindow : Window
             var panel = new StackPanel(); panel.Children.Add(input); panel.Children.Add(ok);
             var dialog = new Window { Title = "修改显示名称", Content = panel, Width = 340, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, Owner = this, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
             dialog.SetResourceReference(BackgroundProperty, "Surface"); dialog.SetResourceReference(ForegroundProperty, "Ink");
-            ok.Click += (_, _) => dialog.DialogResult = true;
+            bool saving=false;
+            ok.Click += async (_, _) => {if(saving||string.IsNullOrWhiteSpace(input.Text))return;saving=true;ok.IsEnabled=input.IsEnabled=false;
+                try{string name=input.Text.Trim();if(await SavePinsAsync(pins=>pins.First(p=>p.Id==entry.Id).DisplayName=name))dialog.DialogResult=true;}
+                finally{saving=false;ok.IsEnabled=input.IsEnabled=true;}};
+            dialog.Closing+=(_,e)=>{if(saving&&dialog.DialogResult!=true)e.Cancel=true;};
             dialog.Loaded += (_, _) => { input.Focus(); input.SelectAll(); };
-            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(input.Text)) { State.Pins.First(p => p.Id == entry.Id).DisplayName = input.Text.Trim(); Persist(); ApplyFilters(); }
+            dialog.ShowDialog();
         }
         finally { _inDialog = false; QueueDesktopPresence(); }
     }
-    private void RelocateEntry(EntryView entry)
+    private async void RelocateEntry(EntryView entry)
     {
         _inDialog = true;
         try
@@ -397,7 +406,7 @@ public partial class MainWindow : Window
             string? path = null;
             if (entry.Kind == "文件夹") { var d = new OpenFolderDialog { Title = "重新选择文件夹" }; if (d.ShowDialog(this) == true) path = d.FolderName; }
             else { var d = new OpenFileDialog { Title = "重新选择文件" }; if (d.ShowDialog(this) == true) path = d.FileName; }
-            if (path != null) { State.Pins.First(p => p.Id == entry.Id).Path = path; PruneDirectoryKinds(); Persist(); ApplyFilters(); _ = LoadKindsAsync(State.Pins.Select(p => p.Path).ToArray()); }
+            if (path != null) {string selected=path;QueuePinOperation(async()=>{if(await SavePinsAsync(pins=>pins.First(p=>p.Id==entry.Id).Path=selected))_ = LoadKindsAsync(State.Pins.Select(p=>p.Path).ToArray());});await _pinOperations;}
         }
         finally { _inDialog = false; QueueDesktopPresence(); }
     }
@@ -453,13 +462,14 @@ public partial class MainWindow : Window
     internal void MovePin(string id, string? targetId)
     {
         if (targetId == id) return;
-        var pin = State.Pins.FirstOrDefault(p => p.Id == id);
+        QueuePinOperation(async()=>{await SavePinsAsync(pins=>{
+        var pin = pins.FirstOrDefault(p => p.Id == id);
         if (pin == null) return;
-        State.Pins.Remove(pin);
-        int index = targetId == null ? State.Pins.Count : State.Pins.FindIndex(p => p.Id == targetId);
-        State.Pins.Insert(index < 0 ? State.Pins.Count : index, pin); ReorderAndSave();
+        pins.Remove(pin);
+        int index = targetId == null ? pins.Count : pins.FindIndex(p => p.Id == targetId);
+        pins.Insert(index < 0 ? pins.Count : index, pin);
+        });});
     }
-    private void ReorderAndSave() { PruneDirectoryKinds(); for (int i = 0; i < State.Pins.Count; i++) State.Pins[i].Order = i; Persist(); ApplyFilters(); }
 
     public void ExpandPanel()
     {
@@ -539,17 +549,18 @@ public partial class MainWindow : Window
         if (IsFilesPage && e.Key == Key.Enter && !PageButtons.Any(tab=>tab.IsKeyboardFocused)) { var entry = PinsList.SelectedItem as EntryView ?? _displayPins.FirstOrDefault(); if (entry != null) OpenEntry(entry); e.Handled = true; }
         if (e.Key == Key.Down && SearchBox.IsKeyboardFocused && PinsList.Items.Count > 0) { PinsList.SelectedIndex = 0; PinsList.Focus(); e.Handled = true; }
     }
-    private void Window_Closing(object? sender, CancelEventArgs e) { if(!_quitting && ActiveModuleDialog!=null){e.Cancel=true;ActiveModuleDialog.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
+    private void Window_Closing(object? sender, CancelEventArgs e) { if(_exitSaving){e.Cancel=true;return;}if(!_quitting && ActiveModuleDialog!=null){e.Cancel=true;ActiveModuleDialog.RequestClose();return;} if (!_quitting && !App.IsSelfTest) { e.Cancel = true; CollapsePanel(); } }
     private void DisplaySettingsChanged(object? sender, EventArgs e) {
         DiagnosticLog.Write("display-settings-changed");
         Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });
     }
     private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Ink"); }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
-    internal bool Persist() { try { Storage.Save(State); _saveFailed = false; return true; } catch (Exception ex) { _saveFailed = true; SetStatus("配置保存失败：" + ex.Message, true); return false; } }
-    public void Quit() { RecordDiagnosticState("user-exit-request"); _quitting = true; Persist(); Application.Current.Shutdown(); }
+    internal void Persist() => _saves.RequestSettingsSave();
+    public async void Quit() => await QuitAsync();
     public void DisposeResources()
     {
+        _saves.Dispose();
         _pageRailWindow?.DisposeRail();
         _plannerModule.Dispose();
         DisposeDiagnostics();

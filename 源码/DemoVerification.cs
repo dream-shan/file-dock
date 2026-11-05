@@ -46,6 +46,7 @@ internal static class DemoVerification
         Check((!dock.ShowInTaskbar && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x80) != 0 && (NativeMethods.GetExtendedWindowStyle(dock.Handle) & 0x40000) == 0), "Edge entry retains utility style after hiding and showing");
         dock.Hide();
         window.AddPins(new[] { project, note, budget, plan, note.ToUpperInvariant() });
+        await window.WaitForSavesAsync();
         Check(window.State.Pins.Count == 4, "Pin files/folders and deduplicate paths");
         Check(window.Storage.Load().Pins.Count == 4, "Persist and reload pin order");
         Check(File.Exists(note) && File.Exists(budget), "Pinning preserves source files");
@@ -422,7 +423,7 @@ internal static class DemoVerification
         }
         checks.Add($"PERF: 500-pin filter/layout median={timings.OrderBy(t => t).ElementAt(10):F2}ms max={timings.Max():F2}ms, realized={VisualTreeHelper.GetChildrenCount(pinPanel)}");
         SaveRender(window, Path.Combine(directory, "ui-500-pins.png"));
-        window.MovePin("perf-499", "perf-0"); window.UpdateLayout();
+        window.MovePin("perf-499", "perf-0"); await window.WaitForSavesAsync(); window.UpdateLayout();
         Check(window.State.Pins[0].Id == "perf-499" && ((EntryView)window.PinsList.Items[0]).Id == "perf-499",
             "Drag reorder path preserves pin identity and refreshes the virtualized first row");
         window.State.Pins = originalPins; window.ApplyFilters();
@@ -447,6 +448,7 @@ internal static class DemoVerification
         IconVerification.Run(window, Check);
         await EdgeRecoveryVerification.Run(window,Check);
         await FeatureVerification.Run(window, directory, Check);
+        await StatePersistenceVerification.Run(window,directory,Check);
         await PerformanceVerification.Run(window, directory, Check);
         await ThemeVerification.Run(window, directory, Check);
         await StabilityVerification.Run(window, directory, Check);

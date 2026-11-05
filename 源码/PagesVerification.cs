@@ -38,7 +38,7 @@ internal static class PagesVerification
             window.SelectPage("Planner");window.UpdateLayout();await Task.Delay(100);
             check(window.IsPlannerPage && window.PlannerSection.IsVisible && !window.PinsSection.IsVisible && !window.BrowserPanel.IsVisible && !window.PerformanceSection.IsVisible && !window.FileSearchSurface.IsVisible,"Planner owns a full independent page without file search or performance cards");
             check(window.PlannerPageTab.IsChecked==true && window.FilesPageTab.IsChecked==false && window.PerformancePageTab.IsChecked==false,"Exactly the planner tab is selected");
-            check(window.Storage.Load().SelectedPage=="Planner","Last planner page persists without altering plan schema");
+            await window.WaitForSavesAsync();check(window.Storage.Load().SelectedPage=="Planner","Last planner page persists without altering plan schema");
             check(window.PlannerMonitoring && !window.PerformanceActive && window.MemoryOnlyActive && !window.FolderWatcherActive,"Planner runs only its date timer and lightweight memory checks");
             Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="管理").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();await Task.Delay(100);
             var scroll=Visuals<ScrollViewer>(window.Planner).Single(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)=="PlannerScroll");scroll.ScrollToVerticalOffset(500);window.UpdateLayout();double offset=scroll.VerticalOffset;
@@ -97,9 +97,9 @@ internal static class PagesVerification
         window.FilesPageTab.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();
         check(!window.CaptureInteractionHeld && window.IsFilesPage,"Side tabs become usable after screenshot selection ends");
         check(window.IsFilesPage && window.PinsSection.Visibility==Visibility.Visible && window.PerformanceSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Visible,"File tab shows favorites and search without performance cards");
-        check(window.Storage.Load().SelectedPage=="Files","Last selected page survives settings reload");
+        await window.WaitForSavesAsync();check(window.Storage.Load().SelectedPage=="Files","Last selected page survives settings reload");
         check(window.PlannerSection.Visibility==Visibility.Collapsed && window.PinsList.ActualHeight>300,"File favorites use the full file page without a planner reservation");
-        CountdownVerification.Run(window,root,check);PlannerVerification.Run(window,root,check);
+        await CountdownVerification.Run(window,root,check);await PlannerVerification.Run(window,root,check);
         await VerifyPlannerPage(window,root,check);window.SelectPage("Files",false);
         string folder=Path.Combine(root,"page-switch-files");Directory.CreateDirectory(folder);
         for(int i=0;i<50;i++)File.WriteAllText(Path.Combine(folder,$"item-{i:00}.txt"),"fixture");
@@ -176,6 +176,6 @@ internal static class PagesVerification
         window.Width=380;window.Height=480;window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight<=window.PerformanceScroll.ViewportHeight+1 && window.MemoryCard.CapacityFits && window.VramCard.CapacityFits,"Independent performance page fits the compact window with complete capacity labels");
         DemoVerification.SaveRender(window,Path.Combine(root,"pages-performance-small.png"));
-        window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");CompactVerification.Run(window,root,check);
+        window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");await CompactVerification.Run(window,root,check);
     }
 }

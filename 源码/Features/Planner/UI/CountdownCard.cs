@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,11 +15,12 @@ internal sealed class CountdownCard : UserControl, IModuleDialog
     private readonly CheckBox _annual=new(){Content="每年重复"};
     private readonly TextBlock _error=new(){TextWrapping=TextWrapping.Wrap};
     private readonly IModuleHost _host;private readonly CountdownItem _item;
-    private readonly Action _return;private readonly Func<CountdownItem?,bool> _save;
+    private readonly Action _return;private readonly Func<CountdownItem?,Task<bool>> _save;
+    internal Task Pending {get;private set;}=Task.CompletedTask;
     private readonly string _original;private bool _sync,_busy,_invalidDays;
     private string Snapshot()=>_title.Text+"|"+_date.SelectedDate+"|"+_annual.IsChecked+"|"+_days.Text;
     public FrameworkElement View=>this;public bool HasChanges=>Snapshot()!=_original;
-    internal CountdownCard(CountdownItem? item,IModuleHost host,Func<CountdownItem?,bool> save,Action restore)
+    internal CountdownCard(CountdownItem? item,IModuleHost host,Func<CountdownItem?,Task<bool>> save,Action restore)
     {
         _host=host;_save=save;_return=restore;_item=item??new();
         SetResourceReference(ForegroundProperty,"Ink");KeyboardNavigation.SetTabNavigation(this,KeyboardNavigationMode.Cycle);
@@ -39,7 +41,8 @@ internal sealed class CountdownCard : UserControl, IModuleDialog
         _days.TextChanged+=(_,_)=>{if(_sync)return;_invalidDays=false;if(int.TryParse(_days.Text,out int days)&&days>=0 && days<=(DateTime.MaxValue.Date-DateTime.Today).Days){_sync=true;_date.SelectedDate=DateTime.Today.AddDays(days);_sync=false;_error.Text="";}else {_invalidDays=true;_error.Text="请输入有效的非负天数，或直接选择日期。";}};
         _date.DateValidationError+=(_,e)=>{e.ThrowException=false;_error.Text="日期格式无效，请重新选择。";};UpdateDays();_original=Snapshot();
     }
-    private void Commit(CountdownItem? item){if(_busy)return;_busy=true;try{if(!_save(item))_error.Text="保存失败，已填写的内容已保留。";}finally{_busy=false;}}
+    private void Commit(CountdownItem? item){if(!_busy)Pending=CommitAsync(item);}
+    private async Task CommitAsync(CountdownItem? item){_busy=true;IsEnabled=false;try{if(!await _save(item))_error.Text="保存失败，已填写的内容已保留。";}catch(Exception){_error.Text="保存失败，已填写的内容已保留。";}finally{_busy=false;IsEnabled=true;}}
     public void RequestClose(){if(!_busy&&(!HasChanges||_host.ConfirmDiscardChanges()))_host.CloseDialog(this);}
     internal event Action? Closed;public void OnClosed()=>Closed?.Invoke();public void FocusInitial()=>_title.Focus();public void RestoreFocus()=>_return();public void RefreshTheme(){}
     public void HandleWindowKey(KeyEventArgs e){if(e.Key==Key.Escape){RequestClose();e.Handled=true;}}

@@ -48,6 +48,7 @@ internal static class FeatureVerification
         check(ImageLoader.CacheCount <= 64, "Thumbnail cache stays bounded after browsing many images");
         window.GoHome(); window.SearchBox.Clear();
         window.AddPins(new[] { imagePath, tallPath });
+        await window.WaitForSavesAsync();
         var first = window.PinsList.Items.Cast<EntryView>().First(e => e.Path == imagePath);
         var second = window.PinsList.Items.Cast<EntryView>().First(e => e.Path == tallPath);
         window.SelectFile(first, true); window.SelectFile(second, true);
@@ -101,9 +102,9 @@ internal static class FeatureVerification
             try { window.DockMoved(left,top); }
             finally { dock.Invalidated-=onInvalidated; }
             check(invalidations > 0, "Dock positioning invalidates the cached entry surface even without a size or position change");
-            check(window.Storage.Load().DockSide == "Left", "Dragging to the left persists its side for restart");
+            await window.WaitForSavesAsync();check(window.Storage.Load().DockSide == "Left", "Dragging to the left persists its side for restart");
             window.DockMoved(right,top);
-            check(window.Storage.Load().DockSide == "Right" && ArrowOffset("entry-right-restored") < -scale,
+            await window.WaitForSavesAsync();check(window.Storage.Load().DockSide == "Right" && ArrowOffset("entry-right-restored") < -scale,
                 "Dragging back right restores the arrow and saves the new side");
         }
         finally

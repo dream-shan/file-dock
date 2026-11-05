@@ -6,6 +6,7 @@ public sealed class CountdownItem
     public string Title {get;set;}="";
     public DateTime Date {get;set;}=DateTime.Today;
     public bool Annual {get;set;}
+    internal CountdownItem Copy() => (CountdownItem)MemberwiseClone();
     // February 29 anniversaries use February 28 in non-leap years.
     public DateTime Next(DateTime today)
     {

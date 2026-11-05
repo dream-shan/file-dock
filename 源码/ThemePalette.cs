@@ -17,6 +17,9 @@ internal static class ThemePalette
         ("ContentSurface", "#80FAFBFD", "#6620252D"),
         ("PaneCard", "#80F0F3F8", "#662A313C"), ("PaneInput", "#AAF0F3F8", "#AA2A313C"),
         ("PaneOutline", "#3056657B", "#30AFBACB"),
+        // The rail is a separate transparent window, without the shell underlay.
+        ("TabSurface", "#B3F0F3F8", "#B32A313C"),
+        ("TabSelected", "#CCFAFBFD", "#CC20252D"), ("TabHover", "#CCE8EFFC", "#CC354358"),
         ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
         ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
         ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),

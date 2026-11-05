@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace FileDockDemo;
 internal static class PagesVerification
@@ -159,6 +160,15 @@ internal static class PagesVerification
             {
                 window.SetThemeMode(nextTheme);
                 window.SelectPage("Files",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-files-{nextSide}-{nextTheme}.png"));
+                var rail=window.PageTabsWindow!;rail.UpdateLayout();
+                var railBitmap=new RenderTargetBitmap((int)rail.ActualWidth,(int)rail.ActualHeight,96,96,PixelFormats.Pbgra32);railBitmap.Render(rail);
+                byte RailAlpha(Point point){var data=new byte[4];railBitmap.CopyPixels(new Int32Rect((int)point.X,(int)point.Y,1,1),data,4,0);return data[3];}
+                var tabs=new[]{window.FilesPageTab,window.PlannerPageTab,window.PerformancePageTab};
+                check(tabs.All(tab=>RailAlpha(tab.TranslatePoint(new Point(10,8),rail)) is >=175 and <=210) && RailAlpha(new Point(16,48))==0,
+                    $"All three tab backgrounds are translucent with clear gaps on {nextSide} in {nextTheme}");
+                check(rail.Opacity==1 && tabs.All(tab=>tab.Opacity==1 && tab.Foreground is SolidColorBrush brush && brush.Color.A==255),
+                    $"Tab icons retain full opacity on {nextSide} in {nextTheme}");
+                DemoVerification.SaveRender(rail,Path.Combine(root,$"rail-{nextSide}-{nextTheme}.png"));
                 window.SelectPage("Planner",false);window.UpdateLayout();DemoVerification.SaveRender(window,Path.Combine(root,$"pages-planner-{nextSide}-{nextTheme}.png"));
                 window.SelectPage("Performance",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-performance-{nextSide}-{nextTheme}.png"));
             }

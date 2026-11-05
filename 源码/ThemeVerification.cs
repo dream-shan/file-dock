@@ -15,6 +15,31 @@ namespace FileDockDemo;
 
 internal static class ThemeVerification
 {
+    private static void VerifyHeaderContrast(MainWindow window,string root,Action<bool,string> check)
+    {
+        string mode=window.State.ThemeMode;int transparency=window.State.EmptyAreaTransparency;
+        static Color Blend(Color top,Color bottom){double a=top.A/255d;return Color.FromRgb((byte)Math.Round(top.R*a+bottom.R*(1-a)),(byte)Math.Round(top.G*a+bottom.G*(1-a)),(byte)Math.Round(top.B*a+bottom.B*(1-a)));}
+        static double Contrast(Color a,Color b){static double L(Color c){static double C(byte v){double x=v/255d;return x<=.04045?x/12.92:Math.Pow((x+.055)/1.055,2.4);}return .2126*C(c.R)+.7152*C(c.G)+.0722*C(c.B);}double x=L(a),y=L(b);return(Math.Max(x,y)+.05)/(Math.Min(x,y)+.05);}
+        try
+        {
+            foreach(string theme in new[]{"Dark","Light"})
+            {
+                window.SetThemeMode(theme);window.SetEmptyAreaTransparency(85,false);window.UpdateLayout();
+                foreach(var backdrop in new[]{(Name:"white",Color:Colors.White),(Name:"black",Color:Colors.Black)})
+                {
+                    var shell=Blend(((SolidColorBrush)window.PanelSurface.Background).Color,backdrop.Color);
+                    var buttons=new[]{window.KeepOpenButton,window.SettingsButton,window.CollapseButton};
+                    check(buttons.All(button=>{var plate=(Border)button.Template.FindName("ButtonBorder",button);var fill=Blend(((SolidColorBrush)plate.Background).Color,shell);return Contrast(((SolidColorBrush)button.Foreground).Color,fill)>=3 && Contrast(ThemePalette.Brush("Accent").Color,fill)>=3;}),
+                        $"Header icons and active pin retain 3:1 non-text contrast over {backdrop.Name} in {theme} at maximum shell transparency");
+                    var header=new RenderTargetBitmap((int)window.ActualWidth,64,96,96,PixelFormats.Pbgra32);header.Render(window);
+                    var visual=new DrawingVisual();using(var drawing=visual.RenderOpen()){drawing.DrawRectangle(new SolidColorBrush(backdrop.Color),null,new Rect(0,0,header.PixelWidth,64));drawing.DrawImage(header,new Rect(0,0,header.PixelWidth,64));}
+                    var preview=new RenderTargetBitmap(header.PixelWidth,64,96,96,PixelFormats.Pbgra32);preview.Render(visual);
+                    var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(preview));using var file=File.Create(Path.Combine(root,$"header-{theme}-{backdrop.Name}.png"));encoder.Save(file);
+                }
+            }
+        }
+        finally{window.SetEmptyAreaTransparency(transparency,false);window.SetThemeMode(mode);}
+    }
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
     internal static async Task Run(MainWindow window, string root, Action<bool,string> check)
     {
@@ -25,6 +50,7 @@ internal static class ThemeVerification
         {
             check(JsonSerializer.Deserialize<AppState>("{\"Pins\":[]}")!.ThemeMode == "System" && ThemePalette.Normalize("unknown") == "System", "Old and unknown theme settings safely default to system without losing pins");
             TransparencyVerification.Run(window,root,check);
+            VerifyHeaderContrast(window,root,check);
             window.GoHome(); window.ExpandPanel(); window.SetThemeMode("System");
             check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,250,251,253), "System light application theme applies to the panel");
             window.CpuCard.Set(17, "theme validation", 60, true); int history = window.CpuCard.HistoryCount;
@@ -56,7 +82,7 @@ internal static class ThemeVerification
             window.SettingsButton.Focus();
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             var focusBorder = (Border)window.SettingsButton.Template.FindName("ButtonBorder",window.SettingsButton);
-            check(window.SettingsButton.IsKeyboardFocused && focusBorder.Background is SolidColorBrush { Color.A: 0 }, "Focus alone leaves the settings button background transparent after a menu closes");
+            check(window.SettingsButton.IsKeyboardFocused && focusBorder.Background==ThemePalette.Brush("HeaderButtonSurface"), "Focus alone preserves the normal settings button surface after a menu closes");
             check(window.SettingsButton.FocusVisualStyle != null && window.KeepOpenButton.FocusVisualStyle == window.SettingsButton.FocusVisualStyle,
                 "Header buttons share a keyboard-navigation focus visual without changing their background");
             DemoVerification.SaveRender(window, Path.Combine(root,"theme-home-dark.png"));

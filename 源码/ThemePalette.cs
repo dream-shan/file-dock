@@ -20,6 +20,7 @@ internal static class ThemePalette
         // The rail is a separate transparent window, without the shell underlay.
         ("TabSurface", "#B3F0F3F8", "#B32A313C"),
         ("TabSelected", "#CCFAFBFD", "#CC20252D"), ("TabHover", "#CCE8EFFC", "#CC354358"),
+        ("HeaderButtonSurface", "#CCFAFBFD", "#CC20252D"),
         ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
         ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
         ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),

@@ -63,6 +63,11 @@
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
             <Setter Property="FontSize" Value="14" />
         </Style>
+        <Style TargetType="Button" x:Key="HeaderIconButton" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Background" Value="{DynamicResource HeaderButtonSurface}" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+            <Setter Property="FontSize" Value="15" />
+        </Style>
         <Style TargetType="TextBlock" x:Key="SectionHeading">
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -124,11 +129,11 @@
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="KeepOpenButton" Style="{StaticResource IconButton}" Content="&#xE718;"
+                    <Button x:Name="KeepOpenButton" Style="{StaticResource HeaderIconButton}" Content="&#xE718;"
                             ToolTip="保持展开" AutomationProperties.Name="保持展开" />
-                    <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Content="&#xE713;"
+                    <Button x:Name="SettingsButton" Style="{StaticResource HeaderIconButton}" Content="&#xE713;"
                             ToolTip="设置" AutomationProperties.Name="设置" Margin="2,0" />
-                    <Button x:Name="CollapseButton" Style="{StaticResource IconButton}" Content="&#xE76C;"
+                    <Button x:Name="CollapseButton" Style="{StaticResource HeaderIconButton}" Content="&#xE76C;"
                             ToolTip="收起到屏幕边缘" AutomationProperties.Name="收起" />
                 </StackPanel>
             </Grid></Border>

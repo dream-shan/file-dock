@@ -544,7 +544,7 @@ public partial class MainWindow : Window
         DiagnosticLog.Write("display-settings-changed");
         Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });
     }
-    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Muted"); }
+    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Ink"); }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
     internal bool Persist() { try { Storage.Save(State); _saveFailed = false; return true; } catch (Exception ex) { _saveFailed = true; SetStatus("配置保存失败：" + ex.Message, true); return false; } }
     public void Quit() { RecordDiagnosticState("user-exit-request"); _quitting = true; Persist(); Application.Current.Shutdown(); }

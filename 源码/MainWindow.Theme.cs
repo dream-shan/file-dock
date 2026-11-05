@@ -24,7 +24,7 @@ public partial class MainWindow
         GpuCard.ApplyTheme(ThemePalette.Brush("GpuAccent"));
         MemoryCard.ApplyTheme(ThemePalette.Brush("MemoryAccent"));
         VramCard.ApplyTheme(ThemePalette.Brush("VramAccent"));
-        UpdateKeepOpen(); ApplyNativeTheme(); ApplyMemoryAppearance(false);
+        ApplyGlassMaterial(); UpdateKeepOpen(); ApplyNativeTheme(); ApplyMemoryAppearance(false);
     }
 
     private void QueueThemeRefresh()

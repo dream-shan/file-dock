@@ -64,7 +64,6 @@
             <Setter Property="FontSize" Value="14" />
         </Style>
         <Style TargetType="Button" x:Key="HeaderIconButton" BasedOn="{StaticResource IconButton}">
-            <Setter Property="Background" Value="{DynamicResource HeaderButtonSurface}" />
             <Setter Property="Foreground" Value="{DynamicResource Ink}" />
             <Setter Property="FontSize" Value="15" />
         </Style>
@@ -82,23 +81,38 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder" Background="{DynamicResource ContentSurface}" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent">
-                            <ContentPresenter />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" BorderThickness="1" BorderBrush="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                            <Border x:Name="SelectionMark" Width="3" Height="19" CornerRadius="1.5" Margin="1,0,0,0"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center" Background="{DynamicResource Accent}"
+                                    Visibility="Hidden" IsHitTestVisible="False" />
+                        </Grid>
                         <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsChosen}" Value="True">
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Selection}" />
-                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Hover}" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource FileHover}" />
                             </Trigger>
+                            <DataTrigger Binding="{Binding IsChosen}" Value="True">
+                                <Setter TargetName="SelectionMark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource FileSelection}" />
+                            </DataTrigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Button" x:Key="FileRowButton" BasedOn="{StaticResource QuietButton}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value><ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate></Setter.Value>
             </Setter>
         </Style>
     </Window.Resources>
@@ -121,10 +135,10 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image x:Name="AppLogo" Source="Assets/FileDock-dark.png" Width="27" Height="27" Margin="0,0,9,0" RenderOptions.BitmapScalingMode="HighQuality" />
-                    <TextBlock Text="文件坞" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"
+                    <Image x:Name="AppLogo" Source="Assets/FileDock-dark.png" Width="21" Height="21" Margin="0,0,8,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="文件坞" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"
                                VerticalAlignment="Center" />
-                    <Border Background="{DynamicResource Badge}" CornerRadius="4" Padding="5,2" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{x:Static local:App.VersionLabel}">
+                    <Border Padding="1" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip="{x:Static local:App.VersionLabel}">
                         <TextBlock x:Name="ReleaseBadge" Text="RC" FontFamily="Segoe UI" FontSize="8" FontWeight="Bold" Foreground="{DynamicResource BadgeText}" />
                     </Border>
                 </StackPanel>
@@ -138,7 +152,7 @@
                 </StackPanel>
             </Grid></Border>
 
-            <Border x:Name="FileSearchSurface" Grid.Row="1" Background="{DynamicResource PaneInput}" CornerRadius="11" BorderBrush="{DynamicResource Border}" BorderThickness="1"
+            <Border x:Name="FileSearchSurface" Grid.Row="1" Background="{DynamicResource FileHover}" CornerRadius="10" BorderBrush="{DynamicResource PaneOutline}" BorderThickness="1"
                     Padding="12,0" Height="40" Margin="0,0,0,10">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -177,7 +191,7 @@
                     <RowDefinition Height="36" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" BorderBrush="{DynamicResource PaneOutline}" BorderThickness="0,0,0,1" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
                         HorizontalAlignment="Right" ToolTip="添加常用文件或文件夹" />
                 <Grid Grid.Row="1">
@@ -195,15 +209,15 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Button HorizontalAlignment="Stretch" Height="60" Margin="0,1,2,1" Tag="{Binding}" Click="Item_Open"
-                                         Background="Transparent" Style="{StaticResource QuietButton}"
-                                        Padding="10,8" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding DisplayName}">
+                                         Style="{StaticResource FileRowButton}"
+                                        Padding="5,8" AutomationProperties.Name="{Binding DisplayName}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="42" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="18" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Background="{DynamicResource IconSurface}" Width="32" Height="36" CornerRadius="7" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Border Width="32" Height="36" HorizontalAlignment="Left" VerticalAlignment="Center">
                                             <local:EntryThumbnail />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -268,7 +282,7 @@
                     <Button x:Name="FolderHomeButton" Grid.Column="1" Style="{StaticResource QuietButton}" Content="我的常用" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" ToolTip="回到我的常用" />
                     <Button x:Name="FolderRefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="刷新当前文件夹" AutomationProperties.Name="刷新当前文件夹" />
                 </Grid>
-                <Border Grid.Row="1" Background="{DynamicResource ContentSurface}" CornerRadius="8" Padding="10,7" Margin="0,0,0,8">
+                <Border Grid.Row="1" BorderBrush="{DynamicResource PaneOutline}" BorderThickness="0,0,0,1" Padding="5,7" Margin="0,0,0,8">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="35" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <Path Data="M 1,6 L 1,3 Q 1,1 3,1 L 11,1 L 14,5 L 26,5 Q 28,5 28,7 L 28,21 Q 28,23 26,23 L 3,23 Q 1,23 1,21 Z M 1,8 L 28,8" Stroke="{DynamicResource FolderStroke}" StrokeThickness="1.5" Fill="{DynamicResource FolderFill}" Width="27" Height="25" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
@@ -295,10 +309,10 @@
                              ItemContainerStyle="{StaticResource PlainItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Tag="{Binding}" Click="Item_Open" Background="Transparent" Style="{StaticResource QuietButton}" Padding="10,9" MinHeight="60" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding DisplayName}">
+                                <Button Tag="{Binding}" Click="Item_Open" Style="{StaticResource FileRowButton}" Padding="5,9" MinHeight="60" AutomationProperties.Name="{Binding DisplayName}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <Border Width="32" Height="36" Background="{DynamicResource IconSurface}" CornerRadius="7" HorizontalAlignment="Left">
+                                        <Border Width="32" Height="36" HorizontalAlignment="Left">
                                             <local:EntryThumbnail />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,9,0">
@@ -340,11 +354,15 @@
                     <Setter Property="Cursor" Value="Hand" /><Setter Property="FontFamily" Value="Segoe MDL2 Assets" /><Setter Property="FontSize" Value="15" />
                     <Setter Property="FocusVisualStyle" Value="{StaticResource QuietFocusVisual}" />
                     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="TabSurface" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="TabSurface" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource PaneOutline}" BorderThickness="1" CornerRadius="8">
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border x:Name="TabMark" Background="{DynamicResource Accent}" Width="10" Height="2" CornerRadius="1"
+                                        VerticalAlignment="Bottom" Margin="0,0,0,5" Visibility="Hidden" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True"><Setter Property="Width" Value="32" /><Setter Property="Background" Value="{DynamicResource TabSelected}" /><Setter Property="Foreground" Value="{DynamicResource Accent}" /><Setter TargetName="TabSurface" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger>
+                            <Trigger Property="IsChecked" Value="True"><Setter Property="Width" Value="32" /><Setter Property="Background" Value="{DynamicResource TabSelected}" /><Setter Property="Foreground" Value="{DynamicResource Accent}" /><Setter TargetName="TabMark" Property="Visibility" Value="Visible" /></Trigger>
                             <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsMouseOver" Value="True" /><Condition Property="IsChecked" Value="False" /></MultiTrigger.Conditions><Setter Property="Background" Value="{DynamicResource TabHover}" /></MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate></Setter.Value></Setter>

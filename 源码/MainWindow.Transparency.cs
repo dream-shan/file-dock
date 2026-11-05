@@ -6,7 +6,11 @@ using System.Windows.Media;
 namespace FileDockDemo;
 public partial class MainWindow
 {
-    internal byte BlankAlpha=>(byte)Math.Round(255*(1-Math.Clamp(State.EmptyAreaTransparency,0,85)/100d));
+    // On older layered windows the background is sharp. Limit transmission there
+    // so the same foreground stays readable even over a white document.
+    internal static byte PanelTintAlpha(int transparency, bool layered) => (byte)Math.Round(255 * (1 -
+        Math.Clamp(transparency, 0, 85) / 100d * (layered ? 0.26 : 1)));
+    internal byte BlankAlpha => PanelTintAlpha(State.EmptyAreaTransparency, AllowsTransparency);
     private void ApplyBlankTransparency()
     {
         var color=ThemePalette.Brush("Surface").Color;color.A=BlankAlpha;

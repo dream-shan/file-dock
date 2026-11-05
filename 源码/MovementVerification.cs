@@ -10,8 +10,9 @@ internal static class MovementVerification
 {
     internal static void Run(MainWindow window, string root, Action<bool,string> check)
     {
-        check(window.AllowsTransparency && WindowChrome.GetWindowChrome(window)==null && window.Opacity==1,
-            "Panel uses per-pixel backgrounds while retaining full content opacity");
+        check(window.AllowsTransparency == !OperatingSystem.IsWindowsVersionAtLeast(10,0,22621)
+            && WindowChrome.GetWindowChrome(window)==null && window.Opacity==1,
+            "Panel selects the appropriate native host while retaining full content opacity");
         check(window.PinsSection.Children.OfType<TextBlock>().Any(x => x.Text == "我的常用" && MainWindow.IsMovementSurface(x)) &&
             window.PerformanceSection.Children.OfType<TextBlock>().Any(x => x.Text == "电脑状态" && MainWindow.IsMovementSurface(x)),
             "Section headings provide additional movement surfaces");

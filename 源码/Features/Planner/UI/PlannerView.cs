@@ -52,7 +52,7 @@ public sealed partial class PlannerView : UserControl
         var b=new Button{Content=text,Padding=new Thickness(8,6,8,6),Margin=new Thickness(1)};
         b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;
     }
-    private void Header(UIElement element,bool background=true){var plate=new Border{Child=element,CornerRadius=new CornerRadius(6)};if(background)plate.SetResourceReference(Border.BackgroundProperty,"ContentSurface");DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
+    private void Header(UIElement element){var plate=new Border{Child=element};DockPanel.SetDock(plate,Dock.Top);if(_root.Children.Count>0 && _root.Children[_root.Children.Count-1] is ScrollViewer)_root.Children.Insert(_root.Children.Count-1,plate);else _root.Children.Add(plate);}
     internal void Render()
     {
         if(_controller==null)return;

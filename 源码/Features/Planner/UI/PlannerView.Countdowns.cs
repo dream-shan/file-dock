@@ -12,7 +12,7 @@ public sealed partial class PlannerView
         if(_countdownStore==null)return;
         var panel=new StackPanel{Margin=new Thickness(0,0,0,12)};
         var heading=new DockPanel();var add=Button("＋ 添加",()=>EditCountdown(null));AutomationProperties.SetAutomationId(add,"CountdownAdd");DockPanel.SetDock(add,Dock.Right);heading.Children.Add(add);
-        var toggle=Button((_datesCollapsed?"› ":"⌄ ")+"重要日",()=>{_datesCollapsed=!_datesCollapsed;Render();});toggle.FontWeight=FontWeights.SemiBold;toggle.FontSize=14;toggle.HorizontalContentAlignment=HorizontalAlignment.Left;heading.Children.Add(toggle);heading.SetResourceReference(BackgroundProperty,"ContentSurface");panel.Children.Add(heading);
+        var toggle=Button((_datesCollapsed?"› ":"⌄ ")+"重要日",()=>{_datesCollapsed=!_datesCollapsed;Render();});toggle.FontWeight=FontWeights.SemiBold;toggle.FontSize=14;toggle.HorizontalContentAlignment=HorizontalAlignment.Left;heading.Children.Add(toggle);panel.Children.Add(heading);
         if(!_datesCollapsed)
         {
             var items=_countdownStore.ReadCountdowns().Where(p=>_allDates||p.Annual||p.Days(PlanRules.Today)>=0).OrderBy(p=>p.Days(PlanRules.Today)<0).ThenBy(p=>p.Next(PlanRules.Today)).ToArray();
@@ -27,7 +27,7 @@ public sealed partial class PlannerView
             panel.Children.Add(new ScrollViewer{Content=rows,MaxHeight=_allDates?150:112,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
             if(_countdownStore.ReadCountdowns().Count>2||_allDates||_countdownStore.ReadCountdowns().Any(p=>!p.Annual&&p.Days(PlanRules.Today)<0))panel.Children.Add(Button(_allDates?"收起":"查看全部 / 管理",()=>{_allDates=!_allDates;Render();}));
         }
-        Header(panel,false);
+        Header(panel);
     }
     private void EditCountdown(CountdownItem? item)
     {

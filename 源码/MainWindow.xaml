@@ -110,7 +110,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border CornerRadius="8" Background="{DynamicResource ContentSurface}" Margin="0,0,0,16"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
+            <Border Background="Transparent" Margin="0,0,0,16"><Grid Grid.Row="0" Background="Transparent" Tag="PanelDrag">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -172,11 +172,11 @@
                     <RowDefinition Height="36" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="我的常用" Style="{StaticResource SectionHeading}" />
                 <Button x:Name="AddButton" Content="＋ 添加" Style="{StaticResource QuietButton}" Foreground="{DynamicResource Accent}"
                         HorizontalAlignment="Right" ToolTip="添加常用文件或文件夹" />
                 <Grid Grid.Row="1">
-                    <TextBlock Background="{DynamicResource ContentSurface}" VerticalAlignment="Top" HorizontalAlignment="Center" x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="{DynamicResource Muted}"
+                    <TextBlock Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center" x:Name="PinsEmptyText" Text="点击“＋ 添加”，选择常用文件或文件夹" Foreground="{DynamicResource Muted}"
                                FontSize="11" TextAlignment="Center" TextWrapping="Wrap" Margin="10,17" Visibility="Visible" />
                     <ListBox x:Name="PinsList" Background="Transparent" BorderThickness="0" Padding="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -225,7 +225,7 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="35" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{DynamicResource ContentSurface}" CornerRadius="6" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
+                <Border Grid.Row="0" Background="Transparent" Tag="PanelDrag" /><TextBlock Tag="PanelDrag" Text="电脑状态" Style="{StaticResource SectionHeading}" />
                 <TextBlock x:Name="PerformanceHint" Text="实时更新 · 1 秒" FontSize="9" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 <ScrollViewer x:Name="PerformanceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <Grid MinHeight="258">
@@ -237,7 +237,7 @@
                         <local:PerformanceCard x:Name="VramCard" Label="显存" Ring="True" Accent="#C38A3A" Grid.Row="2" Grid.Column="1" Margin="4,0,0,0" MinHeight="86" />
                     </Grid>
                 </ScrollViewer>
-                <Border x:Name="NetworkBar" Grid.Row="2" Background="{DynamicResource PaneCard}" CornerRadius="8" Padding="10,4" Margin="0,7,0,0">
+                <Border x:Name="NetworkBar" Grid.Row="2" Background="Transparent" Padding="0,4" Margin="0,7,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <TextBlock Text="实时网速" FontSize="9" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -254,7 +254,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid Background="{DynamicResource ContentSurface}" Margin="0,0,0,10">
+                <Grid Background="Transparent" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="FolderBackButton" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="返回（Alt + ←）" AutomationProperties.Name="返回" />
@@ -276,7 +276,7 @@
                         </StackPanel>
                     </Grid>
                 </Border>
-                <Grid Background="{DynamicResource ContentSurface}" Grid.Row="2" Margin="0,0,0,6">
+                <Grid Background="Transparent" Grid.Row="2" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <TextBlock x:Name="FolderCountText" Text="文件夹内容" FontSize="11" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <ComboBox x:Name="FolderFilterComboBox" Grid.Column="1" Width="80" Height="28" SelectedIndex="0" FontSize="12" Foreground="{DynamicResource Muted}" AutomationProperties.Name="当前文件夹类型筛选">
@@ -310,7 +310,7 @@
                 </Grid>
             </Grid>
 
-            <Border Grid.Row="5" Background="{DynamicResource ContentSurface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="0,9,0,0" CornerRadius="0"><Grid>
+            <Border Grid.Row="5" Background="Transparent" BorderBrush="{DynamicResource PaneOutline}" BorderThickness="0,1,0,0" Padding="0,9,0,0"><Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />

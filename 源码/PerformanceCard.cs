@@ -126,6 +126,7 @@ public sealed class PerformanceCard : Border
     internal void ApplyTheme(Brush accent)
     {
         SetResourceReference(BackgroundProperty, "PaneCard");
+        SetResourceReference(BorderBrushProperty,"PaneOutline");
         _label.SetResourceReference(TextBlock.ForegroundProperty, "Ink");
         _temperature.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         _detail.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
@@ -136,7 +137,7 @@ public sealed class PerformanceCard : Border
 
     public PerformanceCard()
     {
-        CornerRadius = new CornerRadius(10); Background = new SolidColorBrush(Color.FromRgb(243, 246, 252)); Padding = new Thickness(12, 6, 12, 6);
+        CornerRadius = new CornerRadius(10); Background = new SolidColorBrush(Color.FromRgb(243, 246, 252)); BorderThickness=new Thickness(1); Padding = new Thickness(11, 5, 11, 5);
         var grid = _grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });

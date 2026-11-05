@@ -12,8 +12,11 @@ internal static class ThemePalette
     private static bool? _dark;
     internal static Func<bool>? SystemAppsDarkForVerification;
     private static readonly (string Key, string Light, string Dark)[] Colors = {
-        ("ContentSurface", "#E6FAFBFD", "#E620252D"),
-        ("PaneCard", "#F2F0F3F8", "#F22A313C"), ("PaneInput", "#F2F0F3F8", "#F22A313C"),
+        // These are background fills only. At the default 40% shell opacity,
+        // cards compose to 64-70% opacity and inputs to 80%; text stays opaque.
+        ("ContentSurface", "#80FAFBFD", "#6620252D"),
+        ("PaneCard", "#80F0F3F8", "#662A313C"), ("PaneInput", "#AAF0F3F8", "#AA2A313C"),
+        ("PaneOutline", "#3056657B", "#30AFBACB"),
         ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
         ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
         ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),

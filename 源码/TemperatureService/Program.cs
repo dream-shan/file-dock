@@ -1,14 +1,11 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
-using LibreHardwareMonitor.Hardware;
 
 namespace FileDockTemperature;
 
@@ -19,18 +16,21 @@ internal sealed class TemperatureService : ServiceBase
 {
     private readonly CancellationTokenSource _stop = new();
     private Task? _worker;
-    private Computer? _computer;
-    private IHardware[] _cpus = Array.Empty<IHardware>();
-    private double _temperature = double.NaN;
-    private long _samples;
-    private readonly Stopwatch _sinceSample = Stopwatch.StartNew();
+    private readonly CpuTemperatureSampler _sampler = new(
+        () => new ComputerTemperatureHardware(), new TemperatureDiagnosticLog().Write);
 
     public TemperatureService()
     {
         ServiceName = "FileDockTemperature";
         CanStop = true; CanShutdown = true; AutoLog = false;
     }
-    public static void Main() => Run(new TemperatureService());
+    public static int Main(string[] args)
+    {
+        if (args.Length == 2 && args[0] == "--self-test")
+            return TemperatureRecoveryVerification.Run(args[1]);
+        Run(new TemperatureService());
+        return 0;
+    }
     protected override void OnStart(string[] args) => _worker = Task.Run(Serve);
     protected override void OnShutdown() => OnStop();
     protected override void OnStop()
@@ -64,10 +64,10 @@ internal sealed class TemperatureService : ServiceBase
                     var request = new byte[1];
                     if (await pipe.ReadAsync(request, 0, 1, deadline.Token).ConfigureAwait(false) != 1 || request[0] > 1) continue;
                     deadline.CancelAfter(8000);
-                    if (request[0] == 1 && (_samples == 0 || _sinceSample.ElapsedMilliseconds >= 1000)) Sample();
+                    if (request[0] == 1) _sampler.Sample();
                     var response = new byte[16];
-                    Buffer.BlockCopy(BitConverter.GetBytes(_temperature), 0, response, 0, 8);
-                    Buffer.BlockCopy(BitConverter.GetBytes(_samples), 0, response, 8, 8);
+                    Buffer.BlockCopy(BitConverter.GetBytes(_sampler.Temperature), 0, response, 0, 8);
+                    Buffer.BlockCopy(BitConverter.GetBytes(_sampler.Samples), 0, response, 8, 8);
                     await pipe.WriteAsync(response, 0, response.Length, deadline.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { }
@@ -77,28 +77,6 @@ internal sealed class TemperatureService : ServiceBase
             }
         }
         catch (OperationCanceledException) { }
-        finally { _computer?.Close(); }
-    }
-    private void Sample()
-    {
-        try
-        {
-            if (_computer == null)
-            {
-                _computer = new Computer { IsCpuEnabled = true };
-                _computer.Open();
-                _cpus = _computer.Hardware.Where(h => h.HardwareType == HardwareType.Cpu).ToArray();
-            }
-            foreach (var cpu in _cpus) cpu.Update();
-            var temperatures = _cpus.SelectMany(h => h.Sensors)
-                .Where(s => s.SensorType == SensorType.Temperature && s.Value > 0 && s.Value <= 130).ToArray();
-            var sensor = temperatures.FirstOrDefault(s => s.Name.IndexOf("Tctl/Tdie", StringComparison.OrdinalIgnoreCase) >= 0)
-                ?? temperatures.FirstOrDefault(s => s.Name.IndexOf("Package", StringComparison.OrdinalIgnoreCase) >= 0)
-                ?? temperatures.FirstOrDefault(s => s.Name.IndexOf("Tdie", StringComparison.OrdinalIgnoreCase) >= 0)
-                ?? temperatures.FirstOrDefault();
-            _temperature = sensor?.Value ?? double.NaN;
-        }
-        catch { _temperature = double.NaN; }
-        finally { _samples++; _sinceSample.Restart(); }
+        finally { _sampler.Dispose(); }
     }
 }

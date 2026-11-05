@@ -84,7 +84,7 @@ Windows 桌面文件坞：贴边唤出，快速浏览与递归搜索常用文件
 .\TemperatureService\Install.ps1 -SourceDirectory .\TemperatureService
 ~~~
 
-正常启动文件坞之后不需要管理员权限。本次更名不改变温度服务；已安装且正常运行的服务无需重装。源码构建者改用 `源码\TemperatureService\Install.ps1 -SourceDirectory .\重建输出\TemperatureService`。
+正常启动文件坞之后不需要管理员权限。温度服务新增硬件初始化与更新失败后的资源清理和恢复：后续采样请求按 2、5、15、30 秒退避重试，无请求时不重试；读取成功但没有有效温度时不反复重建硬件对象。要使用本轮修复，已安装的服务需用新构建组件运行上述安装命令更新；源码构建者改用 `源码\TemperatureService\Install.ps1 -SourceDirectory .\重建输出\TemperatureService`。故障诊断仅在服务目录的 `Diagnostics` 中保留两个最多 64 KB 的文件，每 30 秒至多写入一次阶段、异常类型和错误码，不记录异常消息或私人路径。
 
 卸载服务时，退出文件坞后在管理员 PowerShell 运行：
 
@@ -128,6 +128,8 @@ sc.exe delete FileDockTemperature
 待办通过 `Contracts/ModuleContracts` 申请弹窗、关闭确认、状态提示和焦点恢复，通过 `IPlannerStore` 提交数据；`Infrastructure/AppStatePlannerStore` 接回现有 AppState、原子 JSON 保存及备份。模块内部不访问 MainWindow、AppState 或磁盘路径。文件和性能仍沿用原结构，留待下一轮拆分。
 
 ## 本候选版变化
+
+- 温度服务在硬件初始化或更新抛出异常后清理对象，并在后续请求中退避重试；新增不访问真实硬件的恢复、采样节流和诊断限频/轮转自测，接入现有验收脚本。此修复需更新已安装的温度服务后生效。
 
 - 顶部固定、设置和收起按钮增加独立半透明底色与高对比图标，提高白色或明亮背景下的辨识度；标题栏保持通透，图钉选中状态和键盘焦点继续独立显示。
 

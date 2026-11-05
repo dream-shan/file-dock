@@ -7,6 +7,10 @@ $exe = (Resolve-Path -LiteralPath $Executable).Path
 $result = [IO.Path]::GetFullPath($ResultDirectory)
 if (Test-Path -LiteralPath $result) { throw 'Use a new test directory; existing data will not be overwritten.' }
 New-Item -ItemType Directory -Path $result | Out-Null
+$service = Join-Path (Split-Path $exe -Parent) 'TemperatureService\FileDockTemperature.exe'
+if (!(Test-Path -LiteralPath $service)) { throw 'Temperature service self-test executable is missing.' }
+& $service --self-test $result
+if ($LASTEXITCODE -ne 0) { throw 'Temperature service recovery self-test failed.' }
 $process = Start-Process -FilePath $exe -ArgumentList @('--self-test', ('"' + $result + '"')) -WindowStyle Hidden -PassThru
 try {
     if (!$process.WaitForExit(180000)) {

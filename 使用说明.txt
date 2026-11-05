@@ -27,7 +27,7 @@ GPU 温度、显存及显卡匹配目前适配 NVIDIA；其他厂商、同型号
 CPU 温度需另外安装官方 PawnIO 驱动和包内 TemperatureService 服务；文件功能无需这些组件。
 先从 https://pawnio.eu/ 安装签名驱动，再以管理员身份打开 PowerShell，进入解压目录运行：
 .\TemperatureService\Install.ps1 -SourceDirectory .\TemperatureService
-已安装且正常工作的温度服务，本次无需重装。详细依赖、权限及卸载见 README.md。
+本轮修复温度硬件初始化/更新失败后的恢复；要启用修复，已安装的服务需使用新构建组件更新。详细依赖、权限及卸载见 README.md。
 
 升级与回退
 先从菜单退出旧程序，并备份整个旧目录（尤其是 Data）。解压新版到原目录，保留原 Data。

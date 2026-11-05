@@ -70,7 +70,7 @@ jobs:
           if (!$changes) { throw 'Candidate release notes missing from verified package.' }
           $body = @("# 文件坞 File Dock $env:RELEASE_TAG", '', $changes, '',
             'Windows x64：解压完整 ZIP 后运行 FileDock.exe；无需另装 .NET。',
-            'CPU 温度组件需另行安装，步骤见包内 README.md；已有正常运行的服务本次无需重装。',
+            'CPU 温度组件需另行安装；已有服务需更新组件才能启用硬件故障恢复修复，步骤见包内 README.md。',
             '升级前退出旧版并备份 Data；旧 FileDockDemo.exe 改名和启动项迁移说明见 README.md。',
             '使用 SHA256SUMS.txt 核对 ZIP。主程序未作 Windows 代码签名，校验和不等同于签名。',
             "源码提交：$($manifest.commit)。build-info.json 包含逐文件哈希。") -join "`n"

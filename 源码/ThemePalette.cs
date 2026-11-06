@@ -20,8 +20,7 @@ internal static class ThemePalette
         // The rail is a separate transparent window, without the shell underlay.
         ("TabSurface", "#B3F0F3F8", "#B32A313C"),
         ("TabSelected", "#CCFAFBFD", "#CC20252D"), ("TabHover", "#CCE8EFFC", "#CC354358"),
-        ("FileSelection", "#40507ACB", "#405D8BCC"),
-        ("FileHover", "#18334A72", "#1AF0F5FF"),
+        ("HeaderHover", "#18345480", "#18E3EEFF"), ("HeaderPressed", "#30345480", "#30E3EEFF"),
         ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
         ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
         ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),
@@ -53,6 +52,8 @@ internal static class ThemePalette
                 var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? item.Dark : item.Light));
                 brush.Freeze(); Application.Current.Resources[item.Key] = brush;
             }
+            Application.Current.Resources["HeaderHaloColor"] = dark
+                ? Color.FromRgb(12, 18, 28) : System.Windows.Media.Colors.White;
             _dark = dark;
         }
         if (!_installed)

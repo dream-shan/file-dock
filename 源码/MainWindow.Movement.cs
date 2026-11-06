@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shell;
 
@@ -18,40 +17,15 @@ public partial class MainWindow
 
     private void InitializeMovement()
     {
-        // DWM draws desktop acrylic only behind a non-layered top-level HWND.
-        AllowsTransparency = !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621);
-        if (!AllowsTransparency)
-        {
-            ResizeMode = ResizeMode.NoResize; // The panel has its own resize grip.
-            SourceInitialized += (_, _) => ApplyGlassMaterial();
-        }
+        // Per-pixel background composition; drag surfaces and the resize thumb remain active.
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
-    [StructLayout(LayoutKind.Sequential)]
-    private struct FrameMargins { public int Left, Right, Top, Bottom; }
-    [DllImport("dwmapi.dll")] private static extern int DwmExtendFrameIntoClientArea(IntPtr window, ref FrameMargins margins);
-    internal bool HasDesktopAcrylic { get; private set; }
-
-    private void ApplyGlassMaterial()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (AllowsTransparency || handle == IntPtr.Zero || HwndSource.FromHwnd(handle)?.CompositionTarget is not { } target) return;
-        int dark = IsDarkTheme ? 1 : 0;
-        int desktopAcrylic = 3; // DWMSBT_TRANSIENTWINDOW
-        var margins = new FrameMargins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
-        _ = DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
-        HasDesktopAcrylic = DwmExtendFrameIntoClientArea(handle, ref margins) >= 0 &&
-            DwmSetWindowAttribute(handle, 38, ref desktopAcrylic, sizeof(int)) >= 0;
-        target.BackgroundColor = HasDesktopAcrylic ? Colors.Transparent : ThemePalette.Brush("Surface").Color;
-        ApplyBlankTransparency();
-    }
-
     private void ApplyNativeCorners(IntPtr handle)
     {
         // The custom region owns the complete silhouette, including tab cutouts.
         int round = 1, noBorder = unchecked((int)0xFFFFFFFE), noFrame = 1;
-        if (AllowsTransparency) _ = DwmSetWindowAttribute(handle, 2, ref noFrame, sizeof(int));
+        _ = DwmSetWindowAttribute(handle, 2, ref noFrame, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 34, ref noBorder, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 33, ref round, sizeof(int)); // Older Windows may ignore this preference.
     }

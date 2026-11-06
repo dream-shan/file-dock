@@ -24,10 +24,10 @@ internal sealed class CountdownCard : UserControl, IModuleDialog
     {
         _host=host;_save=save;_return=restore;_item=item??new();
         SetResourceReference(ForegroundProperty,"Ink");KeyboardNavigation.SetTabNavigation(this,KeyboardNavigationMode.Cycle);
-        AutomationProperties.SetAutomationId(this,"CountdownDialog");AutomationProperties.SetName(this,item==null?"添加重要日":"编辑重要日");
+        AutomationProperties.SetAutomationId(this,"CountdownDialog");AutomationProperties.SetName(this,item==null?"添加重要日期":"编辑重要日期");
         var root=new DockPanel();Content=root;
         Button Btn(string text,Action action){var b=new Button{Content=text,Padding=new Thickness(10,6,10,6),Margin=new Thickness(3)};b.SetResourceReference(StyleProperty,"QuietButton");b.Click+=(_,_)=>action();return b;}
-        var head=new DockPanel{Margin=new Thickness(0,0,0,14)};var close=Btn("×",RequestClose);AutomationProperties.SetName(close,"关闭");DockPanel.SetDock(close,Dock.Right);head.Children.Add(close);head.Children.Add(new TextBlock{Text=item==null?"添加重要日":"编辑重要日",FontSize=16,FontWeight=FontWeights.SemiBold});DockPanel.SetDock(head,Dock.Top);root.Children.Add(head);
+        var head=new DockPanel{Margin=new Thickness(0,0,0,14)};var close=Btn("×",RequestClose);AutomationProperties.SetName(close,"关闭");DockPanel.SetDock(close,Dock.Right);head.Children.Add(close);head.Children.Add(new TextBlock{Text=item==null?"添加重要日期":"编辑重要日期",FontSize=16,FontWeight=FontWeights.SemiBold});DockPanel.SetDock(head,Dock.Top);root.Children.Add(head);
         var footer=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,16,0,0)};
         if(item!=null)footer.Children.Add(Btn("删除",()=>Commit(null)));
         footer.Children.Add(Btn("取消",RequestClose));var submit=Btn("保存",()=>{if(_invalidDays||string.IsNullOrWhiteSpace(_title.Text)||_date.SelectedDate==null||!DateTime.TryParse(_date.Text,out _)){_error.Text="请输入名称并选择有效日期。";return;}Commit(new CountdownItem{Id=_item.Id,Title=_title.Text.Trim(),Date=_date.SelectedDate.Value.Date,Annual=_annual.IsChecked==true});});AutomationProperties.SetAutomationId(submit,"CountdownSave");submit.SetResourceReference(ForegroundProperty,"Accent");footer.Children.Add(submit);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);

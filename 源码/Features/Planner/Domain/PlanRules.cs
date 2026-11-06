@@ -19,7 +19,7 @@ internal static class PlanRules
     internal static bool DoneToday(PlanItem p,DateTime day)=>p.Done && p.DoneDate?.Date==day.Date;
     internal static string ScheduleLabel(PlanItem p)=>p.Kind=="once" ? "一次性 · "+p.ScheduledDate.ToString("M月d日") : p.RepeatRule switch {
         "weekdays"=>"每周 "+string.Join("、",Enumerable.Range(0,7).Where(i=>(p.Weekdays&(1<<i))!=0).Select(i=>new[]{"一","二","三","四","五","六","日"}[i])),
-        "cycle"=>$"出现 {p.ActiveDays} 天 · 休息 {p.RestDays} 天",_=>"每天"};
+        "cycle"=>$"连续 {p.ActiveDays} 天 · 休息 {p.RestDays} 天",_=>"每天"};
     internal static bool Reconcile(List<PlanItem> items,DateTime today)
     {
         bool changed=items.RemoveAll(p=>p.ScheduleSchema==1 && !p.Migrated && p.Kind=="once" && p.ScheduledDate.Date<today.Date)>0;

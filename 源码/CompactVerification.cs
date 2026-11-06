@@ -26,6 +26,13 @@ internal static class CompactVerification
             w.State.Plans=Enumerable.Range(0,12).Select(i=>new PlanItem{Title="待办 "+i,ScheduleSchema=1,Kind="repeat"}).ToList();w.SelectPage("Planner",false);w.Planner.Render();w.UpdateLayout();
             var scroll=All<ScrollViewer>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerScroll");var add=All<Button>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerQuickAdd");var point=add.TranslatePoint(new Point(),w.Planner);
             check(scroll.ViewportHeight>45&&point.Y+add.ActualHeight<=w.Planner.ActualHeight+1,"Two important dates leave a usable todo viewport and visible add action");DemoVerification.SaveRender(w,Path.Combine(root,"compact-planner-filled.png"));
+            w.Height=480;w.UpdateLayout();point=add.TranslatePoint(new Point(),w.Planner);
+            check(scroll.ViewportHeight>30 && point.Y+add.ActualHeight<=w.Planner.ActualHeight+1,
+                "Minimum-height agenda keeps two date cards, a scrollable checklist and the add action accessible");
+            check(All<TextBlock>(w.Planner).Any(t=>t.Text=="安排") && All<TextBlock>(w.Planner).Any(t=>t.Text=="今日清单") &&
+                All<TextBlock>(w.Planner).Count(t=>t.Text==DateTime.Today.ToString("M月d日 ddd",System.Globalization.CultureInfo.GetCultureInfo("zh-CN")))==1,
+                "Agenda has a single date heading and separate checklist hierarchy");
+            DemoVerification.SaveRender(w,Path.Combine(root,"agenda-minimum.png"));
         }finally{w.State.Plans=plans;w.State.Countdowns=dates;w.State.PanelWidth=sw;w.State.PanelHeight=sh;w.Width=width;w.Height=height;w.Planner.Render();w.SelectPage(page,false);w.Persist();}
     }
 }

@@ -40,7 +40,7 @@ internal static class PagesVerification
             check(window.PlannerPageTab.IsChecked==true && window.FilesPageTab.IsChecked==false && window.PerformancePageTab.IsChecked==false,"Exactly the planner tab is selected");
             await window.WaitForSavesAsync();check(window.Storage.Load().SelectedPage=="Planner","Last planner page persists without altering plan schema");
             check(window.PlannerMonitoring && !window.PerformanceActive && window.MemoryOnlyActive && !window.FolderWatcherActive,"Planner runs only its date timer and lightweight memory checks");
-            Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="管理").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();await Task.Delay(100);
+            Visuals<Button>(window.Planner).First(b=>(b.Content as string)=="全部待办").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));window.UpdateLayout();await Task.Delay(100);
             var scroll=Visuals<ScrollViewer>(window.Planner).Single(v=>System.Windows.Automation.AutomationProperties.GetAutomationId(v)=="PlannerScroll");scroll.ScrollToVerticalOffset(500);window.UpdateLayout();double offset=scroll.VerticalOffset;
             check(offset>0,"Independent planner scrolls a long management list");
             window.SelectPage("Files",false);await Task.Delay(100);

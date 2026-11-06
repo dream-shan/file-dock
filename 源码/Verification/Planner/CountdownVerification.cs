@@ -22,7 +22,12 @@ internal static class CountdownVerification
         var storage=new StorageService(Path.Combine(root,"countdown-store"));var state=new AppState();using var saves=new StateSaveCoordinator(state,storage.Save,_=>{});var store=new AppStatePlannerStore(state,saves.CommitAsync);
         check(await store.WriteCountdownsAsync(new[]{item})&&storage.Load().Countdowns.Single().Date==item.Date,"Important dates survive JSON storage round trip");var failed=new AppStatePlannerStore(state,(_,_)=>Task.FromResult(false));check(!await failed.WriteCountdownsAsync(Array.Empty<CountdownItem>())&&state.Countdowns.Count==1,"Failed countdown save restores previous data");
         w.SelectPage("Planner",false);w.Planner.Render();w.UpdateLayout();
-        void Click(string id){All<Button>(w).First(b=>AutomationProperties.GetAutomationId(b)==id).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();}
+        void Click(string id)
+        {
+            var add=All<Button>(w).First(b=>AutomationProperties.GetAutomationId(b)=="PlannerAdd");
+            add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));w.UpdateLayout();
+            var menu=add.ContextMenu!;menu.Items.OfType<MenuItem>().First(m=>AutomationProperties.GetAutomationId(m)==id).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));menu.IsOpen=false;w.UpdateLayout();
+        }
         Click("CountdownAdd");var card=w.ActiveModuleDialog as CountdownCard;check(card!=null,"Important-date add action opens its own editor");
         var days=All<TextBox>(card!).First(b=>AutomationProperties.GetAutomationId(b)=="CountdownDays");days.Text="100";
         check(All<DatePicker>(card!).Single().SelectedDate==DateTime.Today.AddDays(100),"Entering remaining days updates the target date");

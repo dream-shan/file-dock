@@ -10,6 +10,8 @@
 **/bin/
 **/obj/
 /重建输出/
+/TemperatureService/
+/运行时许可/microsoft.*.TXT
 /publish/
 /artifacts/
 

@@ -51,7 +51,7 @@ internal static class PagesVerification
             window.CollapsePanel();check(!window.PlannerMonitoring,"Collapsed planner pauses date checks");window.ExpandPanel();await Task.Delay(100);
             check(window.IsPlannerPage && window.PlannerMonitoring,"Revealing planner restores its selected page and date timer");
             window.Width=380;window.Height=480;window.UpdateLayout();
-            var add=Visuals<Button>(window.Planner).First(b=>System.Windows.Automation.AutomationProperties.GetAutomationId(b)=="PlannerQuickAdd");
+            var add=Visuals<Button>(window.Planner).First(b=>System.Windows.Automation.AutomationProperties.GetAutomationId(b)=="PlannerAdd");
             var point=add.TranslatePoint(new Point(),window.Planner);
             check(point.Y>=0 && point.Y+add.ActualHeight<=window.Planner.ActualHeight+1 && scroll.ViewportHeight>100,"Compact planner keeps the add action visible outside the scrolling list");
             DemoVerification.SaveRender(window,Path.Combine(root,"pages-planner-small.png"));

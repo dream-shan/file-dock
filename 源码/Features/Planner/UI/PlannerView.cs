@@ -101,14 +101,12 @@ public sealed partial class PlannerView : UserControl
         RenderedDay=PlanRules.Today;if(!reconciled)Header(Label("清理保存失败，原有计划已保留。",true));
         var manage=Button(_manage ? "返回今天":"全部待办",()=>{_manage=!_manage;Render();});manage.FontSize=11;AutomationProperties.SetAutomationId(manage,"PlanManage");DockPanel.SetDock(manage,Dock.Right);heading.Children.Add(manage);
         var title=Label(_manage ? "全部待办":"今日清单");title.FontSize=14;title.FontWeight=FontWeights.SemiBold;heading.Children.Add(title);Header(heading);
-        var add=Button("＋ 添加待办",()=>Edit(null));AutomationProperties.SetAutomationId(add,"PlannerQuickAdd");add.SetResourceReference(ForegroundProperty,"Accent");add.HorizontalAlignment=HorizontalAlignment.Stretch;add.HorizontalContentAlignment=HorizontalAlignment.Left;add.Padding=new Thickness(12,7,12,7);
-        var body=new DockPanel();DockPanel.SetDock(add,Dock.Bottom);body.Children.Add(add);
         var list=new StackPanel();
 
         var items=_controller.Items(_manage,PlanRules.Today);
         foreach(var p in items)Row(list,p);if(items.Count==0)list.Children.Add(Label(_manage ? "暂无计划":"今天暂无待办",true));
-        _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");body.Children.Add(_scroll);
-        _listSurface=new Border{Child=body,CornerRadius=new CornerRadius(10),VerticalAlignment=VerticalAlignment.Top};_listSurface.SetResourceReference(Border.BackgroundProperty,"ContentSurface");_root.Children.Add(_listSurface);
+        _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");
+        _listSurface=new Border{Child=_scroll,CornerRadius=new CornerRadius(10),VerticalAlignment=VerticalAlignment.Top};_listSurface.SetResourceReference(Border.BackgroundProperty,"ContentSurface");_root.Children.Add(_listSurface);
         var scroll=_scroll;if(!reveal)_ = Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(_scroll,scroll))scroll.ScrollToVerticalOffset(offset);});
     }
     private void Row(Panel list,PlanItem p)
@@ -134,7 +132,7 @@ public sealed partial class PlannerView : UserControl
         var card=new PlanCard(draft,item!=null,Commit,()=>{CloseEditor();Render();},_host,FocusAdd,item==null?null:()=>{DeletePlan(item);return _operationTask;});
         card.Closed+=()=>{if(ReferenceEquals(_editor,card))_editor=null;};_editor=card;_host.ShowDialog(card);
     }
-    internal void FocusAdd(){foreach(var child in Visuals(this))if(child is Button b && AutomationProperties.GetAutomationId(b)=="PlannerQuickAdd"){b.Focus();break;}}
+    internal void FocusAdd(){foreach(var child in Visuals(this))if(child is Button b && AutomationProperties.GetAutomationId(b)=="PlannerAdd"){b.Focus();break;}}
     private static IEnumerable<DependencyObject> Visuals(DependencyObject p){yield return p;for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++)foreach(var c in Visuals(VisualTreeHelper.GetChild(p,i)))yield return c;}
     private void ToggleDone(PlanItem p,bool done)=>RunOperation(async()=>{if(_controller==null)return;bool saved=await _controller.SetDoneAsync(p.Id,done);Render();await _renderTask;if(!saved)Header(Button("保存失败 · 重试",()=>ToggleDone(p,done)));});
     private void RunOperation(Func<Task> operation){if(!_operationTask.IsCompleted)return;_operationTask=RunOperationAsync(operation);}

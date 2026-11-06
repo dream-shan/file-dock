@@ -24,8 +24,10 @@ internal static class CompactVerification
             check(w.PerformanceScroll.ExtentHeight<=w.PerformanceScroll.ViewportHeight+1&&w.MemoryCard.CapacityFits&&w.VramCard.CapacityFits,"Compact performance page fits all cards and capacity labels");
             w.State.Countdowns=new(){new CountdownItem{Title="考试",Date=DateTime.Today.AddDays(100)},new CountdownItem{Title="生日",Date=DateTime.Today.AddDays(200),Annual=true}};
             w.State.Plans=Enumerable.Range(0,12).Select(i=>new PlanItem{Title="待办 "+i,ScheduleSchema=1,Kind="repeat"}).ToList();w.SelectPage("Planner",false);w.Planner.Render();w.UpdateLayout();
-            var scroll=All<ScrollViewer>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerScroll");var add=All<Button>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerQuickAdd");var point=add.TranslatePoint(new Point(),w.Planner);
-            check(scroll.ViewportHeight>45&&point.Y+add.ActualHeight<=w.Planner.ActualHeight+1,"Two important dates leave a usable todo viewport and visible add action");DemoVerification.SaveRender(w,Path.Combine(root,"compact-planner-filled.png"));
+            var scroll=All<ScrollViewer>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerScroll");var add=All<Button>(w.Planner).Single(v=>AutomationProperties.GetAutomationId(v)=="PlannerAdd");var point=add.TranslatePoint(new Point(),w.Planner);
+            check(scroll.ViewportHeight>45&&point.Y+add.ActualHeight<=w.Planner.ActualHeight+1 &&
+                !All<Button>(w.Planner).Any(b=>(b.Content as string)=="＋ 添加待办"),
+                "Two important dates leave a usable todo viewport with a single top-level add action");DemoVerification.SaveRender(w,Path.Combine(root,"compact-planner-filled.png"));
             w.Height=480;w.UpdateLayout();point=add.TranslatePoint(new Point(),w.Planner);
             check(scroll.ViewportHeight>30 && point.Y+add.ActualHeight<=w.Planner.ActualHeight+1,
                 "Minimum-height agenda keeps two date cards, a scrollable checklist and the add action accessible");

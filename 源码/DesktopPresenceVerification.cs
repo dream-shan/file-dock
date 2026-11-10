@@ -33,7 +33,7 @@ internal static class DesktopPresenceVerification
         string data = Path.Combine(directory, "desktop-mode-config"); Directory.CreateDirectory(data);
         File.WriteAllText(Path.Combine(data,"state.json"), "{\"Version\":1,\"State\":{\"KeepOpen\":true}}");
         var storage = new StorageService(data); var state = storage.Load();
-        check(state.AutoDesktop && state.KeepOpen, "Old configuration enables desktop mode without discarding the existing pin");
+        check(state.AutoDesktop && state.KeepOpen && !state.AlwaysOnTop, "Old configuration keeps the pin and defaults to normal window stacking");
         state.AutoDesktop = false; storage.Save(state);
         check(!storage.Load().AutoDesktop, "The desktop behavior setting persists when disabled");
 
@@ -44,6 +44,18 @@ internal static class DesktopPresenceVerification
             ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Topmost = true };
         try
         {
+            var foreground = NativeMethods.GetForegroundWindow();
+            window.ShowPanel(activate:false);
+            check(NativeMethods.GetForegroundWindow()==foreground && (NativeMethods.GetExtendedWindowStyle(panel)&8)==0,
+                "Passive reveal preserves foreground focus and uses normal window stacking");
+            bool keepOpen = window.State.KeepOpen;
+            window.SetAlwaysOnTop(true);
+            check((NativeMethods.GetExtendedWindowStyle(panel)&8)!=0 && window.State.KeepOpen==keepOpen,
+                "Always-on-top can be enabled independently of the keep-open pin");
+            window.SetAlwaysOnTop(false);
+            await window.WaitForSavesAsync();
+            check((NativeMethods.GetExtendedWindowStyle(panel)&8)==0 && !window.Storage.Load().AlwaysOnTop,
+                "Turning off always-on-top restores and saves normal window stacking");
             NativeMethods.SetCaptureTopmost(panel, false); fixture.Show(); await Task.Delay(80);
             IntPtr other = new WindowInteropHelper(fixture).Handle;
             check(NativeMethods.IsPanelOccluded(panel, true) == true, "Native overlap detection sees a visible window above the panel");

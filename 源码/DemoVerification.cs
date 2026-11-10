@@ -150,14 +150,19 @@ internal static class DemoVerification
             "Opening a shortcut from folder contents preserves launch arguments and working directory");
         Check(AtFolder(project) && window.IsVisible && window.BrowserPanel.Visibility == Visibility.Visible,
             "Opening a file preserves the browsed folder when keep-open is enabled");
+        window.Hide();
+        var beforeRestore = NativeMethods.GetForegroundWindow();
+        window.RestoreAfterFileDrag(DragDropEffects.Copy, window.State.KeepOpen);
+        Check(AtFolder(project) && window.IsVisible && NativeMethods.GetForegroundWindow()==beforeRestore,
+            "A pinned copy restores its browsed folder without taking foreground focus");
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-standard.png"));
         window.Width=380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-small.png"));
-        Check(window.FolderList.ActualHeight > 80 && window.FolderBackButton.IsVisible && window.FolderUpButton.IsVisible &&
+        Check(window.FolderList.ActualHeight >= 5*46 && window.FolderBackButton.IsVisible && window.FolderUpButton.IsVisible &&
             window.FolderHomeButton.IsVisible && window.FolderRefreshButton.IsVisible,
-            "Minimum window size preserves folder contents and navigation");
+            "Minimum window size reserves space for five compact file rows and navigation");
         window.Width=430; window.Height = 650;
         window.GoHome();
 

@@ -126,13 +126,13 @@ public partial class MainWindow : Window
         _trayIcon = CreateTrayIcon();
         _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞 · Ctrl+Alt+Space", Visible = !App.IsSelfTest };
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("打开文件坞", null, (_, _) => Dispatcher.Invoke(ExpandPanel));
+        menu.Items.Add("打开文件坞", null, (_, _) => QueueTrayReveal());
         menu.Items.Add("收起到屏幕边缘", null, (_, _) => Dispatcher.Invoke(CollapsePanel));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(Quit));
         _tray.ContextMenuStrip = menu;
         ApplyNativeTheme();
-        _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Dispatcher.Invoke(ExpandPanel); };
+        _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) QueueTrayReveal(); };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += TrayPreferenceChanged;
         if (!App.IsSelfTest)
@@ -420,6 +420,9 @@ public partial class MainWindow : Window
         var autoDesktop = new MenuItem { Header = "桌面自动展开，遮挡时收起", IsCheckable = true, IsChecked = State.AutoDesktop };
         autoDesktop.Click += (_, _) => SetAutoDesktop(autoDesktop.IsChecked);
         menu.Items.Add(autoDesktop);
+        var alwaysOnTop = new MenuItem { Header = "始终置顶", IsCheckable = true, IsChecked = State.AlwaysOnTop };
+        alwaysOnTop.Click += (_, _) => SetAlwaysOnTop(alwaysOnTop.IsChecked);
+        menu.Items.Add(alwaysOnTop);
         menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
         AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.PanelDocked=true; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
@@ -471,14 +474,28 @@ public partial class MainWindow : Window
         });});
     }
 
-    public void ExpandPanel()
+    private void QueueTrayReveal() =>
+        Dispatcher.BeginInvoke(() => ShowPanel(activate: false), DispatcherPriority.ApplicationIdle);
+
+    public void ExpandPanel() => ShowPanel(activate: true);
+
+    internal void ShowPanel(bool activate, bool reposition = true)
     {
-        if (UpdateCaptureVisibility()) return;
+        if (_quitting || UpdateCaptureVisibility()) return;
         _desktopPresence.Reveal();
+        _passiveRevealForeground = activate ? IntPtr.Zero : NativeMethods.GetForegroundWindow();
         RememberMemoryForeground();
         RecordDiagnosticState("expand-request");
-        _isCollapsed = false; _dock?.Hide(); PositionPanel(); Show(); Activate(); if (IsFilesPage) SearchBox.Focus(); else if(IsPlannerPage) Planner.FocusAdd(); else Focus();
-        NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
+        _isCollapsed = false; _dock?.Hide();
+        if (reposition) PositionPanel();
+        Show();
+        if (activate)
+        {
+            Activate();
+            if (IsFilesPage) SearchBox.Focus(); else if (IsPlannerPage) Planner.FocusAdd(); else Focus();
+        }
+        UpdatePageRail();
+        NativeMethods.RaisePanelWithoutActivation(new WindowInteropHelper(this).Handle, State.AlwaysOnTop);
         UpdatePerformanceActivity();
     }
     internal void CollapsePanel() => CollapsePanelCore(manual: true);
@@ -487,6 +504,7 @@ public partial class MainWindow : Window
         if (!_quitting && UpdateCaptureVisibility()) return;
         if (manual)
         {
+            _passiveRevealForeground = IntPtr.Zero;
             IntPtr foreground = NativeMethods.GetForegroundWindow();
             _desktopPresence.Dismiss(!NativeMethods.IsDesktopSurface(foreground) && !NativeMethods.IsOwnDesktopWindow(foreground));
         }

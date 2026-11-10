@@ -11,15 +11,18 @@ public partial class MainWindow
     private readonly DesktopPresence _desktopPresence = new();
     private DispatcherTimer? _desktopPresenceTimer;
     private IntPtr _desktopVisibilityHook, _desktopMinimizeHook;
+    private IntPtr _passiveRevealForeground;
     internal long DesktopPresenceChecks { get; private set; }
     internal bool DesktopPresencePending => _desktopPresenceTimer?.IsEnabled == true;
 
     private void InitializeDesktopPresence()
     {
         ShowActivated = false;
-        if (!State.AutoDesktop) return;
-        // The explicit ExpandPanel path promotes/activates on demand.
-        if (!_keepOpen) Topmost = false;
+        SourceInitialized += (_, _) =>
+        {
+            if (State.AlwaysOnTop)
+                NativeMethods.SetCaptureTopmost(new WindowInteropHelper(this).Handle, true);
+        };
     }
 
     private void WatchDesktopPresence()
@@ -49,15 +52,12 @@ public partial class MainWindow
         { QueueDesktopPresence(); return; }
         IntPtr foreground = NativeMethods.GetForegroundWindow();
         if (foreground == IntPtr.Zero) return;
+        if (IsVisible && _passiveRevealForeground == foreground) return;
+        _passiveRevealForeground = IntPtr.Zero;
         bool own = NativeMethods.IsOwnDesktopWindow(foreground);
         _desktopPresence.Observe(NativeMethods.IsDesktopSurface(foreground), own);
         IntPtr handle = new WindowInteropHelper(this).Handle;
-        if (_keepOpen || (_desktopPresence.ManuallyRevealed && own))
-        {
-            if (IsVisible && !_desktopPresence.Dismissed && (NativeMethods.GetExtendedWindowStyle(handle) & 8) == 0)
-                NativeMethods.RaiseWithoutActivation(handle);
-            return;
-        }
+        if (_keepOpen || (State.AlwaysOnTop && IsVisible) || (_desktopPresence.ManuallyRevealed && own)) return;
         if (_desktopPresence.Dismissed) return;
         NativeMethods.SetDesktopZOrder(handle, foreground);
         bool? blocked = NativeMethods.IsPanelOccluded(handle);
@@ -69,7 +69,9 @@ public partial class MainWindow
         {
             _isCollapsed = false; _dock?.Hide(); PositionPanel();
             Show(); // ShowActivated=false: do not focus, reset selection or move the cursor.
-            NativeMethods.SetDesktopZOrder(handle, foreground);
+            UpdatePageRail();
+            if (State.AlwaysOnTop) NativeMethods.RaisePanelWithoutActivation(handle, true);
+            else NativeMethods.SetDesktopZOrder(handle, foreground);
             UpdatePerformanceActivity(); RecordDiagnosticState("desktop-auto-expanded");
         }
     }
@@ -78,13 +80,12 @@ public partial class MainWindow
     {
         if (App.IsSelfTest || !State.AutoDesktop || _captureActive) return;
         _desktopPresence.Reveal();
-        NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
     }
 
     private void QueueAfterPanelInteraction()
     {
         if (State.AutoDesktop) QueueDesktopPresence();
-        else if (!_keepOpen && !_inDialog && !_dragging && !IsActive && !AnyMenuOpen() && !App.IsSelfTest)
+        else if (!_keepOpen && !State.AlwaysOnTop && !_inDialog && !_dragging && !IsActive && !AnyMenuOpen() && !App.IsSelfTest)
             CollapsePanel();
     }
 
@@ -92,11 +93,18 @@ public partial class MainWindow
     {
         State.AutoDesktop = enabled; Persist();
         if (enabled) QueueDesktopPresence();
-        else
-        {
-            _desktopPresenceTimer?.Stop();
-            if (IsVisible && !_captureActive) NativeMethods.RaiseWithoutActivation(new WindowInteropHelper(this).Handle);
-        }
+        else _desktopPresenceTimer?.Stop();
+    }
+
+    internal void SetAlwaysOnTop(bool enabled)
+    {
+        State.AlwaysOnTop = enabled;
+        UpdatePageRail();
+        IntPtr handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero && !_captureInteractionHeld)
+            NativeMethods.SetCaptureTopmost(handle, enabled);
+        Persist();
+        QueueDesktopPresence();
     }
 
     private void DisposeDesktopPresence()

@@ -69,9 +69,14 @@ internal static partial class NativeMethods
     // stealing focus from the foreground application or polling every second.
     [DllImport("user32.dll")] internal static extern bool EnableWindow(IntPtr window, bool enabled);
     [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr window);
-    internal static bool SetCaptureTopmost(IntPtr window,bool topmost) => SetWindowPos(window,new IntPtr(topmost ? -1 : -2),0,0,0,0,0x0013);
+    // Change the target window's band without reordering its owner.
+    private const uint KeepOwnerOrder = 0x0200;
+    internal static bool SetCaptureTopmost(IntPtr window,bool topmost) =>
+        SetWindowPos(window,new IntPtr(topmost ? -1 : -2),0,0,0,0,0x0013 | KeepOwnerOrder);
     internal static bool RaiseWithoutActivation(IntPtr window) =>
         SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, 0x0013);
+    internal static bool RaisePanelWithoutActivation(IntPtr window, bool topmost) =>
+        SetWindowPos(window, topmost ? new IntPtr(-1) : IntPtr.Zero, 0, 0, 0, 0, 0x0013 | KeepOwnerOrder);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
     [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);

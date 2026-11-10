@@ -91,6 +91,7 @@ public partial class MainWindow
         if (entry.IsPinned && paths.Length == 1) data.SetData("FileDockPin", entry.Id);
         data.SetData("FileDockSource", true);
         _dragBounds = new Rect(PointToScreen(new Point()), PointToScreen(new Point(ActualWidth, ActualHeight)));
+        bool keepVisibleAfterDrag = _keepOpen || State.AlwaysOnTop;
         DragDropEffects result = DragDropEffects.None;
         try { result = DragDrop.DoDragDrop(this, data, DragDropEffects.Copy); }
         catch (Exception ex) { SetStatus("拖拽未完成：" + ex.Message, true); }
@@ -100,11 +101,16 @@ public partial class MainWindow
             // OLE can return while the canceling Escape key is still down. Do
             // not let the same key close the panel we have just restored.
             if (result == DragDropEffects.None) _ignoreDragEscapeUntil = Environment.TickCount64 + 400;
-            if (_dragHidden) { if (result == DragDropEffects.None) ExpandPanel(); else CollapsePanel(); }
+            if (_dragHidden) RestoreAfterFileDrag(result, keepVisibleAfterDrag);
             _dragHidden = false;
             Dispatcher.BeginInvoke(() => { _dragging = false; QueueDesktopPresence(); }, DispatcherPriority.Background);
         }
         e.Handled = true;
+    }
+    internal void RestoreAfterFileDrag(DragDropEffects result, bool keepVisible)
+    {
+        if (result == DragDropEffects.None || keepVisible) ShowPanel(activate: false, reposition: false);
+        else CollapsePanel();
     }
     private void Transfer_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
     {

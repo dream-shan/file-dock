@@ -108,6 +108,7 @@ public sealed class StorageService
 
     private static void Validate(AppState state)
     {
+        DesktopPresence.NormalizeMode(state);
         state.PanelWidth=Math.Clamp(state.PanelWidth,380,4000);state.PanelHeight=Math.Clamp(state.PanelHeight,480,4000);
         state.EmptyAreaTransparency=Math.Clamp(state.EmptyAreaTransparency,0,85);
         state.Countdowns??=[];

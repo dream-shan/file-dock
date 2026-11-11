@@ -33,6 +33,8 @@ public sealed class AppState
     public bool KeepOpen { get; set; }
     public bool AlwaysOnTop { get; set; }
     public bool AutoDesktop { get; set; } = true;
+    public PanelDisplayMode? DisplayMode { get; set; }
+    public PanelDisplayMode UnpinnedMode { get; set; } = PanelDisplayMode.Automatic;
     public string SelectedPage { get; set; } = "Performance";
     public string ThemeMode { get; set; } = "System";
     internal AppState Copy()

@@ -151,7 +151,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="KeepOpenButton" Style="{StaticResource HeaderIconButton}" Content="&#xE718;"
-                            ToolTip="保持展开" AutomationProperties.Name="保持展开" />
+                            ToolTip="固定置顶：切换应用仍显示" AutomationProperties.Name="固定置顶" />
                     <Button x:Name="SettingsButton" Style="{StaticResource HeaderIconButton}" Content="&#xE713;"
                             ToolTip="设置" AutomationProperties.Name="设置" Margin="2,0" />
                     <Button x:Name="CollapseButton" Style="{StaticResource HeaderIconButton}" Content="&#xE76C;"

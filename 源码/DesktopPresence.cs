@@ -5,33 +5,48 @@ using System.Text;
 
 namespace FileDockDemo;
 
-// State survives Hide/Show; only explicit intent or a return to the desktop
-// clears a manual dismissal. Native events never activate the panel.
+public enum PanelDisplayMode { Automatic, Manual, Pinned }
+
+internal readonly record struct PanelDisplayDecision(bool Visible, bool Topmost);
+
+// One policy for panel visibility and stacking. A manual dismissal is sticky
+// until an explicit reveal; application and desktop events never clear it.
 internal sealed class DesktopPresence
 {
     internal bool Dismissed { get; private set; }
     internal bool ManuallyRevealed { get; private set; }
-    private bool _awayAfterDismiss;
-    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; _awayAfterDismiss = false; }
-    internal void Dismiss(bool externalApp)
-    { Dismissed = true; ManuallyRevealed = false; _awayAfterDismiss = externalApp; }
-    internal void Observe(bool desktop, bool ownWindow)
+    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; }
+    internal void Dismiss() { Dismissed = true; ManuallyRevealed = false; }
+    internal void Observe(bool ownWindow)
+    { if (!ownWindow) ManuallyRevealed = false; }
+    internal PanelDisplayDecision Decide(PanelDisplayMode mode, bool visible, bool blocked, bool interacting, bool fullscreen)
     {
-        if (ownWindow) return;
-        ManuallyRevealed = false;
-        if (!desktop) _awayAfterDismiss = true;
-        else if (_awayAfterDismiss) { Dismissed = false; _awayAfterDismiss = false; }
+        if (Dismissed) return new(false, false);
+        if (mode == PanelDisplayMode.Pinned) return new(true, true);
+        bool revealed = ManuallyRevealed && interacting;
+        if (fullscreen && !revealed) return new(false, false);
+        return new(mode == PanelDisplayMode.Manual ? visible && revealed : revealed || !blocked, revealed);
     }
-    internal bool WantVisible(bool visible, bool pinned, bool blocked, bool ownWindow)
+
+    internal static void NormalizeMode(AppState state)
     {
-        if (Dismissed) return false;
-        if (pinned || (ManuallyRevealed && ownWindow)) return visible;
-        return !blocked;
+        if (state.DisplayMode == null)
+            state.UnpinnedMode = state.AutoDesktop ? PanelDisplayMode.Automatic : PanelDisplayMode.Manual;
+        state.DisplayMode ??= state.KeepOpen || state.AlwaysOnTop ? PanelDisplayMode.Pinned :
+            state.AutoDesktop ? PanelDisplayMode.Automatic : PanelDisplayMode.Manual;
+        if (!Enum.IsDefined(state.DisplayMode.Value)) state.DisplayMode = PanelDisplayMode.Automatic;
+        if (state.UnpinnedMode is not (PanelDisplayMode.Automatic or PanelDisplayMode.Manual))
+            state.UnpinnedMode = PanelDisplayMode.Automatic;
+        // Keep legacy fields coherent for older installations and rollback.
+        state.KeepOpen = state.AlwaysOnTop = state.DisplayMode == PanelDisplayMode.Pinned;
+        state.AutoDesktop = (state.DisplayMode == PanelDisplayMode.Pinned ? state.UnpinnedMode : state.DisplayMode) == PanelDisplayMode.Automatic;
     }
 }
 
 internal static partial class NativeMethods
 {
+    [StructLayout(LayoutKind.Sequential)] internal struct PointerPoint { public int X, Y; }
+    [DllImport("user32.dll")] internal static extern IntPtr WindowFromPoint(PointerPoint point);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out WindowRect value, int size);
@@ -83,5 +98,12 @@ internal static partial class NativeMethods
             SetWindowPos(panel, foreground, 0, 0, 0, 0, 0x0013);
         else if (IsDesktopSurface(foreground) && !IsAboveForeground(panel))
             SetWindowPos(panel, IntPtr.Zero, 0, 0, 0, 0, 0x0013);
+    }
+
+    internal static bool IsFullscreenOnPanelScreen(IntPtr foreground, IntPtr panel)
+    {
+        if (!IsDesktopBlocker(foreground) || !FrameBounds(foreground, out var rect)) return false;
+        var screen = System.Windows.Forms.Screen.FromHandle(panel).Bounds;
+        return rect.Left <= screen.Left && rect.Top <= screen.Top && rect.Right >= screen.Right && rect.Bottom >= screen.Bottom;
     }
 }

@@ -91,7 +91,7 @@ public partial class MainWindow
         if (entry.IsPinned && paths.Length == 1) data.SetData("FileDockPin", entry.Id);
         data.SetData("FileDockSource", true);
         _dragBounds = new Rect(PointToScreen(new Point()), PointToScreen(new Point(ActualWidth, ActualHeight)));
-        bool keepVisibleAfterDrag = _keepOpen || State.AlwaysOnTop;
+        bool keepVisibleAfterDrag = IsPinned;
         DragDropEffects result = DragDropEffects.None;
         try { result = DragDrop.DoDragDrop(this, data, DragDropEffects.Copy); }
         catch (Exception ex) { SetStatus("拖拽未完成：" + ex.Message, true); }
@@ -110,7 +110,7 @@ public partial class MainWindow
     internal void RestoreAfterFileDrag(DragDropEffects result, bool keepVisible)
     {
         if (result == DragDropEffects.None || keepVisible) ShowPanel(activate: false, reposition: false);
-        else CollapsePanel();
+        else { CollapsePanelCore(manual: false); QueueDesktopPresence(); }
     }
     private void Transfer_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
     {

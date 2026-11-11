@@ -50,7 +50,7 @@ public partial class MainWindow : Window
     internal bool PlannerMonitoring=>_plannerModule.IsMonitoring;
     private readonly string _dataDirectory;
     private List<EntryView> _displayPins = new();
-    private bool _loaded, _quitting, _keepOpen, _isCollapsed, _inDialog, _menuOpen;
+    private bool _loaded, _quitting, _isCollapsed, _inDialog, _menuOpen;
     private readonly Dictionary<string, bool> _directoryKinds = new(StringComparer.OrdinalIgnoreCase);
     internal int CachedPathKindCount => _directoryKinds.Count;
     private bool _dragging, _saveFailed;
@@ -74,7 +74,7 @@ public partial class MainWindow : Window
         State = Storage.Load();
         _saves = new StateSaveCoordinator(State, Storage.Save, ReportSave);
         PageRailWindow.MigratePosition(State);
-        _keepOpen = State.KeepOpen;
+        DesktopPresence.NormalizeMode(State);
         _screen = Forms.Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == State.PanelScreen) ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
@@ -94,7 +94,7 @@ public partial class MainWindow : Window
         ApplyTheme();
         SizeChanged += (_, _) => { QueueDesktopPresence(); };
         SearchBox.TextChanged += (_, _) => ApplyFilters();
-        KeepOpenButton.Click += (_, _) => { _keepOpen = !_keepOpen; State.KeepOpen = _keepOpen; UpdateKeepOpen(); Persist(); QueueDesktopPresence(); };
+        KeepOpenButton.Click += (_, _) => SetDisplayMode(IsPinned ? State.UnpinnedMode : PanelDisplayMode.Pinned);
         CollapseButton.Click += (_, _) => CollapsePanel();
         SettingsButton.Click += (_, _) => OpenSettings();
         PinsList.ContextMenuOpening += Items_ContextMenuOpening;
@@ -313,7 +313,7 @@ public partial class MainWindow : Window
             await RunSta(() => { FileService.Open(entry.Path); return true; });
             if (request != _openRequestVersion || _quitting) return;
             SetStatus("已请求系统打开：" + entry.DisplayName);
-            if (!_keepOpen && !_saveFailed) CollapsePanel();
+            if (!IsPinned && !_saveFailed) CollapsePanelCore(manual: false);
         }
         catch (Exception ex) { if (request == _openRequestVersion && !_quitting) SetStatus("无法打开。可右键重新定位。" + ex.Message, true); }
     }
@@ -417,12 +417,15 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(CreateTransparencyMenu());
         AddMenu(menu, "恢复默认大小", ResetPanelSize);
-        var autoDesktop = new MenuItem { Header = "桌面自动展开，遮挡时收起", IsCheckable = true, IsChecked = State.AutoDesktop };
-        autoDesktop.Click += (_, _) => SetAutoDesktop(autoDesktop.IsChecked);
-        menu.Items.Add(autoDesktop);
-        var alwaysOnTop = new MenuItem { Header = "始终置顶", IsCheckable = true, IsChecked = State.AlwaysOnTop };
-        alwaysOnTop.Click += (_, _) => SetAlwaysOnTop(alwaysOnTop.IsChecked);
-        menu.Items.Add(alwaysOnTop);
+        var display = new MenuItem { Header = "显示模式" };
+        foreach (var (mode, label) in new[] { (PanelDisplayMode.Automatic, "自动：无遮挡显示，遮挡时收起"),
+            (PanelDisplayMode.Manual, "手动：主动唤出，点击外部收起"), (PanelDisplayMode.Pinned, "固定置顶：切换应用仍显示") })
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = State.DisplayMode == mode };
+            item.Click += (_, _) => SetDisplayMode(mode);
+            display.Items.Add(item);
+        }
+        menu.Items.Add(display);
         menu.Items.Add(new Separator());
         AddMenu(menu, "添加文件夹…", AddFolderDialog);
         AddMenu(menu, "贴到左侧", () => { State.PanelLeft = State.PanelTop = null; State.PanelDocked=true; State.DockSide = "Left"; PositionPanel(); PositionDock(); Persist(); });
@@ -440,7 +443,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(startup);
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启后，打开文件和失去焦点都保持展开。\n\n性能页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n性能页展开时每 1 秒更新，CPU 温度每秒读取；收起或切换到文件页时每 2 秒只检查内存，其他指标暂停。\n内存卡片可点击整理，圆环动画完成后即可再次点击；占用过高时入口变红。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启固定置顶，切换应用仍显示；取消图钉恢复此前模式。\n设置 → 显示模式：自动、手动、固定置顶。手动收起后仅主动唤出才恢复。\n\n性能页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n性能页展开时每 1 秒更新，CPU 温度每秒读取；收起或切换到文件页时每 2 秒只检查内存，其他指标暂停。\n内存卡片可点击整理，圆环动画完成后即可再次点击；占用过高时入口变红。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }
@@ -491,11 +494,11 @@ public partial class MainWindow : Window
         Show();
         if (activate)
         {
-            Activate();
+            if (!Activate()) _passiveRevealForeground = NativeMethods.GetForegroundWindow();
             if (IsFilesPage) SearchBox.Focus(); else if (IsPlannerPage) Planner.FocusAdd(); else Focus();
         }
         UpdatePageRail();
-        NativeMethods.RaisePanelWithoutActivation(new WindowInteropHelper(this).Handle, State.AlwaysOnTop);
+        ApplyPanelDisplay(new PanelDisplayDecision(true, true), reposition: false);
         UpdatePerformanceActivity();
     }
     internal void CollapsePanel() => CollapsePanelCore(manual: true);
@@ -505,8 +508,7 @@ public partial class MainWindow : Window
         if (manual)
         {
             _passiveRevealForeground = IntPtr.Zero;
-            IntPtr foreground = NativeMethods.GetForegroundWindow();
-            _desktopPresence.Dismiss(!NativeMethods.IsDesktopSurface(foreground) && !NativeMethods.IsOwnDesktopWindow(foreground));
+            _desktopPresence.Dismiss();
         }
         RecordDiagnosticState(manual ? "collapse-request" : "desktop-auto-collapsed");
         if (App.IsSelfTest) { _isCollapsed = true; Hide(); return; }
@@ -572,7 +574,7 @@ public partial class MainWindow : Window
         DiagnosticLog.Write("display-settings-changed");
         Dispatcher.BeginInvoke(() => { PositionPanel(); PositionDock(); UpdateTrayIcon(); QueueDesktopPresence(); RecordDiagnosticState("display-state"); });
     }
-    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = _keepOpen ? "已保持展开，点击取消" : "保持展开"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, _keepOpen ? "Accent" : "Ink"); }
+    private void UpdateKeepOpen() { KeepOpenButton.ToolTip = IsPinned ? "已固定置顶，切换应用仍显示；点击取消" : "固定置顶：切换应用仍显示"; KeepOpenButton.SetResourceReference(Control.ForegroundProperty, IsPinned ? "Accent" : "Ink"); System.Windows.Automation.AutomationProperties.SetName(KeepOpenButton, IsPinned ? "取消固定置顶" : "固定置顶"); }
     internal void SetStatus(string text, bool error = false) { if (_saveFailed && !error) return; StatusText.Text = text; StatusText.SetResourceReference(TextBlock.ForegroundProperty, error ? "Error" : "Muted"); StatusText.ToolTip = text; }
     internal void Persist() => _saves.RequestSettingsSave();
     public async void Quit() => await QuitAsync();

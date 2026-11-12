@@ -19,6 +19,7 @@ public partial class MainWindow
     private bool _controlClick, _preserveGroup, _dragHidden;
     private Rect _dragBounds;
     private long _ignoreDragEscapeUntil;
+    private long _selectionRevision;
     private readonly SemaphoreSlim _clipboardWorker = new(1);
     private CancellationTokenSource? _copyRequest;
     internal int SelectedFileCount => _selectedPaths.Count;
@@ -38,7 +39,10 @@ public partial class MainWindow
     }
     internal void ClearFileSelection()
     {
-        _selectedPaths.Clear(); UpdateFileSelection();
+        _selectionRevision++;
+        _selectedPaths.Clear();
+        PinsList.SelectedItem = null; FolderList.SelectedItem = null;
+        UpdateFileSelection();
     }
     private void UpdateFileSelection()
     {
@@ -48,11 +52,15 @@ public partial class MainWindow
     }
     private void ReconcileFileSelection()
     {
-        _selectedPaths.IntersectWith(VisibleEntries().Select(e => e.Path)); UpdateFileSelection();
+        int previousCount = _selectedPaths.Count;
+        _selectedPaths.IntersectWith(VisibleEntries().Select(e => e.Path));
+        if (previousCount != _selectedPaths.Count) _selectionRevision++;
+        UpdateFileSelection();
     }
     private async void CopySelection_Click(object sender,RoutedEventArgs e) => await CopySelectedFilesAsync();
     internal void SelectFile(EntryView entry, bool toggle)
     {
+        _selectionRevision++;
         if (!toggle) _selectedPaths.Clear();
         if (!toggle || !_selectedPaths.Remove(entry.Path)) _selectedPaths.Add(entry.Path);
         UpdateFileSelection();
@@ -60,21 +68,42 @@ public partial class MainWindow
     private void Entries_MouseDown(object sender, MouseButtonEventArgs e)
     {
         var entry = FindEntry(e.OriginalSource as DependencyObject);
-        if (entry == null) return;
+        if (entry == null)
+        {
+            // Scrollbar and thumb interaction must not clear a selection.
+            var source = e.OriginalSource as DependencyObject;
+            while (source != null && source != sender)
+            {
+                if (source is System.Windows.Controls.Primitives.ScrollBar or System.Windows.Controls.Primitives.Thumb) return;
+                source = source is System.Windows.Media.Visual ? System.Windows.Media.VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
+            }
+            ClearFileSelection();
+            return;
+        }
         _dragEntry = entry; _dragStart = e.GetPosition(this); _dragging = false;
-        _controlClick = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        BeginFileSelection(entry, (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+        ((ListBox)sender).Focus(); ((ListBox)sender).CaptureMouse();
+        e.Handled = true;
+    }
+    internal void BeginFileSelection(EntryView entry, bool control)
+    {
+        _controlClick = control;
         _preserveGroup = _selectedPaths.Contains(entry.Path) && _selectedPaths.Count > 1;
         if (_controlClick) SelectFile(entry, true);
         else if (!_selectedPaths.Contains(entry.Path)) SelectFile(entry, false);
-        ((ListBox)sender).Focus(); ((ListBox)sender).CaptureMouse();
-        e.Handled = true;
     }
     private void Entries_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_dragEntry == null) return;
         var entry = _dragEntry; _dragEntry = null;
         ((ListBox)sender).ReleaseMouseCapture(); e.Handled = true;
-        if (!_dragging && !_controlClick && !_preserveGroup) OpenEntry(entry);
+        if (!_dragging && CompleteFileClick(entry)) OpenEntry(entry);
+    }
+    internal bool CompleteFileClick(EntryView entry)
+    {
+        if (_controlClick) return false;
+        if (_preserveGroup) { SelectFile(entry, false); return false; }
+        return true;
     }
     private void Entries_MouseMove(object sender, MouseEventArgs e)
     {
@@ -128,10 +157,11 @@ public partial class MainWindow
         return data;
     }
 
-    private async Task CopySelectedFilesAsync(bool imageOnly = false)
+    internal async Task CopySelectedFilesAsync(bool imageOnly = false, Action<DataObject>? writeClipboard = null)
     {
         string[] paths = SelectedPaths();
         if (paths.Length == 0) return;
+        long selectionRevision = _selectionRevision;
         _copyRequest?.Cancel(); _copyRequest?.Dispose();
         var request = _copyRequest = new CancellationTokenSource();
         var token = request.Token;
@@ -167,9 +197,16 @@ public partial class MainWindow
             }
             token.ThrowIfCancellationRequested();
             for (int retry = 0; ; retry++)
-                try { token.ThrowIfCancellationRequested(); Clipboard.SetDataObject(data, true); break; }
+                try
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (writeClipboard != null) writeClipboard(data);
+                    else Clipboard.SetDataObject(data, true);
+                    break;
+                }
                 catch (System.Runtime.InteropServices.COMException) when (retry < 3) { await Task.Delay(60, token); }
             SetStatus(imageOnly ? "已复制图片内容，可以粘贴到支持图片的页面。" : $"已复制 {paths.Length} 个文件，可在目标位置 Ctrl+V 粘贴。");
+            if (selectionRevision == _selectionRevision) ClearFileSelection();
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { SetStatus("复制失败：" + ex.Message, true); }

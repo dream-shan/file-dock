@@ -64,6 +64,39 @@ internal static class FeatureVerification
         var data = MainWindow.BuildFileData(new[] { imagePath, tallPath });
         check(data.GetFileDropList()!.Count == 2 && data.GetFileDropList()![0] == imagePath, "Native transfer exposes complete Unicode file paths as a file list");
         check(data.GetData("Preferred DropEffect") is MemoryStream effect && BitConverter.ToInt32(effect.ToArray()) == 1, "Native transfer requests copy and keeps original files");
+        first = window.PinsList.Items.Cast<EntryView>().First(e => e.Path == imagePath);
+        second = window.PinsList.Items.Cast<EntryView>().First(e => e.Path == tallPath);
+        window.SelectFile(second, true);
+        window.BeginFileSelection(first, false);
+        check(window.SelectedFileCount == 2, "Pressing a selected group member preserves the whole group for dragging");
+        check(!window.CompleteFileClick(first) && window.SelectedFileCount == 1 && first.IsChosen && !second.IsChosen,
+            "Releasing a group member without dragging selects only it without opening");
+        window.BeginFileSelection(second, false);
+        check(window.SelectedFileCount == 1 && second.IsChosen && !first.IsChosen, "Pressing an unselected file replaces the old selection before dragging");
+        check(window.CompleteFileClick(second), "Ordinary single file clicks retain click-to-open behavior");
+        window.BeginFileSelection(first, true);
+        check(!window.CompleteFileClick(first) && window.SelectedFileCount == 2, "Ctrl clicks extend selection without opening files");
+        DataObject? copied = null;
+        await window.CopySelectedFilesAsync(writeClipboard: value => copied = value);
+        check(window.SelectedFileCount == 0 && !first.IsChosen && !second.IsChosen && !window.CopySelectionButton.IsVisible,
+            "Successful copying clears highlights and hides the copy action");
+        check(copied?.GetFileDropList()?.Count == 2, "Clearing selection leaves the copied file payload intact for pasting");
+        window.SelectFile(first, false);
+        await window.CopySelectedFilesAsync(writeClipboard: _ => throw new InvalidOperationException("test clipboard failure"));
+        check(window.SelectedFileCount == 1 && first.IsChosen, "Failed copying preserves selection for retry");
+        await window.CopySelectedFilesAsync(writeClipboard: _ => window.SelectFile(second, false));
+        check(window.SelectedFileCount == 1 && second.IsChosen && !first.IsChosen, "A completed image copy never clears a newer selection");
+        window.SelectFile(first, true);
+        await window.CopySelectedFilesAsync(writeClipboard: _ => { window.ClearFileSelection(); window.SelectFile(first, false); window.SelectFile(second, true); });
+        check(window.SelectedFileCount == 2, "Reselecting the same paths during copying is treated as a new selection");
+        window.PinsList.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+            { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent, Source = new System.Windows.Controls.Primitives.ScrollBar() });
+        check(window.SelectedFileCount == 2, "Scrollbar clicks do not clear the selected group");
+        window.PinsList.SelectedItem = first;
+        window.PinsList.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+            { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent, Source = window.PinsList });
+        check(window.SelectedFileCount == 0 && window.PinsList.SelectedItem == null && !first.IsChosen && !second.IsChosen,
+            "Clearing selection also removes the native list selection used by keyboard copy");
         await window.NavigateToFolderAsync(folder);
         check(window.SelectedFileCount == 0, "Folder navigation clears prior selection");
         var dock = window.DockEntry;

@@ -81,6 +81,10 @@ internal static class FeatureVerification
         check(window.SelectedFileCount == 0 && !first.IsChosen && !second.IsChosen && !window.CopySelectionButton.IsVisible,
             "Successful copying clears highlights and hides the copy action");
         check(copied?.GetFileDropList()?.Count == 2, "Clearing selection leaves the copied file payload intact for pasting");
+        window.BeginFileSelection(second, true);
+        await window.CopySelectedFilesAsync(writeClipboard: value => copied = value);
+        check(copied?.GetFileDropList()?.Cast<string>().SequenceEqual(new[]{tallPath}) == true && window.SelectedFileCount == 0,
+            "The next Ctrl-selected copy batch contains no files from the previous batch");
         window.SelectFile(first, false);
         await window.CopySelectedFilesAsync(writeClipboard: _ => throw new InvalidOperationException("test clipboard failure"));
         check(window.SelectedFileCount == 1 && first.IsChosen, "Failed copying preserves selection for retry");
@@ -89,6 +93,43 @@ internal static class FeatureVerification
         window.SelectFile(first, true);
         await window.CopySelectedFilesAsync(writeClipboard: _ => { window.ClearFileSelection(); window.SelectFile(first, false); window.SelectFile(second, true); });
         check(window.SelectedFileCount == 2, "Reselecting the same paths during copying is treated as a new selection");
+        int attempts = 0;
+        DataObject? delayedPayload = null;
+        var delayedCopy = window.CopySelectedFilesAsync(writeClipboard: value => {
+            if (attempts++ == 0) throw new System.Runtime.InteropServices.COMException("Clipboard temporarily busy");
+            delayedPayload = value;
+        });
+        check(!delayedCopy.IsCompleted, "Clipboard contention leaves the original copy pending for a real asynchronous retry");
+        window.BeginFileSelection(second, true);
+        check(window.SelectedFileCount == 1 && second.IsChosen && !first.IsChosen,
+            "Starting a Ctrl selection during a pending copy starts a clean batch");
+        window.BeginFileSelection(first, true);
+        check(window.SelectedFileCount == 2, "Further Ctrl clicks extend the new batch instead of resetting it");
+        window.SelectFile(first, true);
+        await delayedCopy;
+        check(delayedPayload?.GetFileDropList()?.Count == 2 && window.SelectedFileCount == 1 && second.IsChosen && !first.IsChosen,
+            "The pending copy keeps its original payload and never clears or merges the newer selection");
+        await window.CopySelectedFilesAsync(writeClipboard: value => copied = value);
+        check(copied?.GetFileDropList()?.Cast<string>().SequenceEqual(new[]{tallPath}) == true,
+            "Copying the newer batch replaces the old clipboard payload without appending files");
+
+        window.SelectFile(first, false); window.SelectFile(second, true);
+        long dragRevision = window.FileSelectionRevision;
+        var dragPayload = MainWindow.BuildFileData(new[]{imagePath,tallPath});
+        window.CompleteFileDrag(DragDropEffects.Copy, false, dragRevision);
+        check(window.SelectedFileCount == 0 && !first.IsChosen && !second.IsChosen && dragPayload.GetFileDropList()!.Count == 2,
+            "A successful external drag clears selection without changing the transferred file list");
+        window.BeginFileSelection(second, true);
+        check(window.SelectedFileCount == 1 && !first.IsChosen, "The next Ctrl drag batch excludes the previous files");
+        dragRevision = window.FileSelectionRevision;
+        window.CompleteFileDrag(DragDropEffects.None, false, dragRevision);
+        check(window.SelectedFileCount == 1 && second.IsChosen, "Cancelled or rejected external drops preserve selection for retry");
+        window.CompleteFileDrag(DragDropEffects.Copy, true, dragRevision);
+        check(window.SelectedFileCount == 1, "Internal favorites reordering does not end a file transfer batch");
+        window.SelectFile(first, false);
+        window.CompleteFileDrag(DragDropEffects.Copy, false, dragRevision);
+        check(window.SelectedFileCount == 1 && first.IsChosen, "An older drag completion never clears a newer selection");
+        window.SelectFile(second, true);
         window.PinsList.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
             { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent, Source = new System.Windows.Controls.Primitives.ScrollBar() });
         check(window.SelectedFileCount == 2, "Scrollbar clicks do not clear the selected group");

@@ -460,6 +460,7 @@ public partial class MainWindow : Window
     {
         if (CurrentFolderPath == null && e.Data.GetData("FileDockPin") is string id)
         {
+            _internalPinDrop = _dragging && e.Data.GetData("FileDockSource") is true;
             var target = FindEntry(e.OriginalSource as DependencyObject);
             MovePin(id, target?.Id);
         }

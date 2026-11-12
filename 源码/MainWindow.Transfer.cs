@@ -16,10 +16,12 @@ namespace FileDockDemo;
 public partial class MainWindow
 {
     private readonly HashSet<string> _selectedPaths = new(StringComparer.OrdinalIgnoreCase);
-    private bool _controlClick, _preserveGroup, _dragHidden;
+    private bool _controlClick, _preserveGroup, _dragHidden, _internalPinDrop;
     private Rect _dragBounds;
     private long _ignoreDragEscapeUntil;
     private long _selectionRevision;
+    private long? _copySelectionRevision;
+    internal long FileSelectionRevision => _selectionRevision;
     private readonly SemaphoreSlim _clipboardWorker = new(1);
     private CancellationTokenSource? _copyRequest;
     internal int SelectedFileCount => _selectedPaths.Count;
@@ -60,6 +62,7 @@ public partial class MainWindow
     private async void CopySelection_Click(object sender,RoutedEventArgs e) => await CopySelectedFilesAsync();
     internal void SelectFile(EntryView entry, bool toggle)
     {
+        PrepareNewFileSelection();
         _selectionRevision++;
         if (!toggle) _selectedPaths.Clear();
         if (!toggle || !_selectedPaths.Remove(entry.Path)) _selectedPaths.Add(entry.Path);
@@ -87,6 +90,7 @@ public partial class MainWindow
     }
     internal void BeginFileSelection(EntryView entry, bool control)
     {
+        PrepareNewFileSelection();
         _controlClick = control;
         _preserveGroup = _selectedPaths.Contains(entry.Path) && _selectedPaths.Count > 1;
         if (_controlClick) SelectFile(entry, true);
@@ -113,9 +117,10 @@ public partial class MainWindow
         var entry = _dragEntry;
         if (!_selectedPaths.Contains(entry.Path)) SelectFile(entry, false);
         // Releasing capture can synchronously raise MouseMove again.
-        _dragging = true; _dragHidden = false;
+        _dragging = true; _dragHidden = false; _internalPinDrop = false;
         ((ListBox)sender).ReleaseMouseCapture();
         string[] paths = SelectedPaths();
+        long selectionRevision = _selectionRevision;
         var data = BuildFileData(paths);
         if (entry.IsPinned && paths.Length == 1) data.SetData("FileDockPin", entry.Id);
         data.SetData("FileDockSource", true);
@@ -127,6 +132,8 @@ public partial class MainWindow
         finally
         {
             _dragEntry = null;
+            CompleteFileDrag(result, _internalPinDrop, selectionRevision);
+            _internalPinDrop = false;
             // OLE can return while the canceling Escape key is still down. Do
             // not let the same key close the panel we have just restored.
             if (result == DragDropEffects.None) _ignoreDragEscapeUntil = Environment.TickCount64 + 400;
@@ -135,6 +142,23 @@ public partial class MainWindow
             Dispatcher.BeginInvoke(() => { _dragging = false; QueueDesktopPresence(); }, DispatcherPriority.Background);
         }
         e.Handled = true;
+    }
+    private void PrepareNewFileSelection()
+    {
+        // A slow image copy owns a snapshot. The first subsequent selection is
+        // a new batch even before the clipboard operation has completed.
+        if (_copySelectionRevision == _selectionRevision) ClearFileSelection();
+    }
+    private void CompleteFileTransfer(long selectionRevision)
+    {
+        if (selectionRevision == _selectionRevision) ClearFileSelection();
+    }
+    internal void CompleteFileDrag(DragDropEffects result, bool internalDrop, long selectionRevision)
+    {
+        // Reordering a favorite is not an external file transfer. None also
+        // covers cancellation, rejection and failure, which preserve selection.
+        if (!internalDrop && (result & DragDropEffects.Copy) != 0)
+            CompleteFileTransfer(selectionRevision);
     }
     internal void RestoreAfterFileDrag(DragDropEffects result, bool keepVisible)
     {
@@ -164,6 +188,7 @@ public partial class MainWindow
         long selectionRevision = _selectionRevision;
         _copyRequest?.Cancel(); _copyRequest?.Dispose();
         var request = _copyRequest = new CancellationTokenSource();
+        _copySelectionRevision = selectionRevision;
         var token = request.Token;
         bool singleImage = paths.Length == 1 && VisibleEntries().Any(e => string.Equals(e.Path, paths[0], StringComparison.OrdinalIgnoreCase) && e.Kind == "图片");
         try
@@ -206,10 +231,11 @@ public partial class MainWindow
                 }
                 catch (System.Runtime.InteropServices.COMException) when (retry < 3) { await Task.Delay(60, token); }
             SetStatus(imageOnly ? "已复制图片内容，可以粘贴到支持图片的页面。" : $"已复制 {paths.Length} 个文件，可在目标位置 Ctrl+V 粘贴。");
-            if (selectionRevision == _selectionRevision) ClearFileSelection();
+            CompleteFileTransfer(selectionRevision);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { SetStatus("复制失败：" + ex.Message, true); }
+        finally { if (ReferenceEquals(_copyRequest, request)) _copySelectionRevision = null; }
     }
     private static BitmapSource? LoadClipboardImage(string path)
     {

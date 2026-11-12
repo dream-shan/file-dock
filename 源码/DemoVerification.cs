@@ -100,6 +100,17 @@ internal static class DemoVerification
         await window.OpenEntryAsync(new EntryView { Path = project, DisplayName = "项目资料", Kind = "文档" });
         Check(AtFolder(project) && window.IsVisible && window.BrowserPanel.Visibility == Visibility.Visible && FolderEntries().Length == 6,
             "Opening a folder displays its immediate contents inside the visible panel");
+        Check(window.FolderUpButton.Visibility==Visibility.Collapsed && !window.FolderUpButton.IsEnabled,
+            "A folder opened from favorites hides and disables the up action");
+        await window.GoUpAsync();
+        Check(AtFolder(project), "The shared Alt-Up action cannot leave the favorites entry root");
+        Check(window.Breadcrumbs.Children.OfType<Button>().First().Content as string=="我的常用" &&
+            window.Breadcrumbs.Children.OfType<Button>().Count()==2,
+            "Breadcrumbs start at favorites and exclude physical parents above the entry root");
+        await window.GoBackAsync();
+        Check(window.CurrentFolderPath==null && window.PinsList.Items.Count==4,
+            "Back from a directly opened entry returns to the configured favorites");
+        await window.OpenEntryAsync(new EntryView { Path=project, DisplayName="项目资料", IsPinned=true });
         Check(FolderEntry(child).Kind == "文件夹" && FolderEntry(extensionless).Kind != "文件夹",
             "Directory names with dots and files without extensions use actual filesystem types");
 
@@ -118,11 +129,16 @@ internal static class DemoVerification
 
         await window.OpenEntryAsync(FolderEntry(child));
         Check(AtFolder(child) && FolderEntries().Length == 1 && FolderEntry(childNote).Path == childNote, "Opening a child folder replaces the browser contents");
+        Check(window.FolderUpButton.Visibility==Visibility.Visible && window.FolderUpButton.IsEnabled,
+            "Entering a child folder reveals the up action");
         await window.GoBackAsync();
         Check(AtFolder(project) && FolderEntries().Length == 6, "Back restores the previous folder");
         await window.OpenEntryAsync(FolderEntry(child));
         await window.GoUpAsync();
         Check(AtFolder(project) && FolderEntries().Length == 6, "Up navigates to the parent directory");
+        Check(window.FolderUpButton.Visibility==Visibility.Collapsed, "Up hides again when the entry root is reached");
+        await window.GoUpAsync();
+        Check(AtFolder(project), "Repeated up at the entry root never opens the disk parent");
         window.GoHome();
         Check(window.CurrentFolderPath == null && window.BrowserPanel.Visibility == Visibility.Collapsed && window.PinsList.Items.Count == 4,
             "Home restores pinned entries without changing them");
@@ -160,7 +176,7 @@ internal static class DemoVerification
         window.Width=380; window.Height = 480;
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         SaveRender(window, Path.Combine(directory, "folder-small.png"));
-        Check(window.FolderList.ActualHeight >= 5*46 && window.FolderBackButton.IsVisible && window.FolderUpButton.IsVisible &&
+        Check(window.FolderList.ActualHeight >= 5*46 && window.FolderBackButton.IsVisible && !window.FolderUpButton.IsVisible &&
             window.FolderHomeButton.IsVisible && window.FolderRefreshButton.IsVisible,
             "Minimum window size reserves space for five compact file rows and navigation");
         window.Width=430; window.Height = 650;
@@ -252,6 +268,13 @@ internal static class DemoVerification
         await window.OpenEntryAsync(FolderEntry(foundFolder));
         Check(AtFolder(foundFolder) && FolderEntries().Length == 1 && FolderEntry(foundFolderNote).Path == foundFolderNote,
             "Opening a recursive folder result navigates to that exact folder inside the panel");
+        await window.GoUpAsync();
+        Check(AtFolder(branchA) && window.FolderUpButton.IsVisible,
+            "Up from a deep search result follows its parent inside the original entry");
+        await window.GoUpAsync();
+        await window.GoUpAsync();
+        Check(AtFolder(searchRoot) && !window.FolderUpButton.IsVisible,
+            "A search result retains the original entry boundary after repeated up actions");
         await window.NavigateToFolderAsync(searchRoot);
         await SearchTree("递归启动验证");
         File.Delete(browserMarker);

@@ -14,6 +14,7 @@ public partial class MainWindow
 {
     internal string? CurrentFolderPath { get; private set; }
     private readonly Stack<string> _folderBack = new();
+    private string? _folderRoot;
     private List<EntryView> _folderEntries = new();
     private CancellationTokenSource? _folderCancellation;
     private int _folderRequestVersion, _openRequestVersion;
@@ -49,6 +50,11 @@ public partial class MainWindow
         var cancellation = _folderCancellation = new CancellationTokenSource();
         var token = cancellation.Token;
         if (CurrentFolderPath == null) _homeSearch = SearchBox.Text;
+        if (CurrentFolderPath == null || !IsInBrowserRoot(fullPath))
+        {
+            _folderRoot = fullPath;
+            _folderBack.Clear();
+        }
         else if (addHistory && FileService.NormalizeKey(CurrentFolderPath) != FileService.NormalizeKey(fullPath)) _folderBack.Push(CurrentFolderPath);
         CurrentFolderPath = fullPath;
         UpdatePerformanceActivity();
@@ -59,7 +65,8 @@ public partial class MainWindow
         UpdateFolderSearchHint();
         FolderTitle.Text = FileName(fullPath);
         FolderPathText.Text = fullPath;
-        FolderUpButton.IsEnabled = ParentPath(fullPath) != null;
+        FolderUpButton.IsEnabled = CanGoUp;
+        FolderUpButton.Visibility = CanGoUp ? Visibility.Visible : Visibility.Collapsed;
         FolderRefreshButton.IsEnabled = false;
         BuildBreadcrumbs(fullPath);
         if (!preserveSearch) { SearchBox.Clear(); FolderFilterComboBox.SelectedIndex = 0; }
@@ -131,7 +138,8 @@ public partial class MainWindow
 
     internal async Task GoUpAsync()
     {
-        if (CurrentFolderPath != null && ParentPath(CurrentFolderPath) is string parent) await NavigateToFolderAsync(parent);
+        if (CanGoUp && ParentPath(CurrentFolderPath!) is string parent && IsInBrowserRoot(parent))
+            await NavigateToFolderAsync(parent);
     }
 
     internal void GoHome()
@@ -143,6 +151,7 @@ public partial class MainWindow
         ++_openRequestVersion;
         CancelFolderLoad();
         CurrentFolderPath = null;
+        _folderRoot = null;
         UpdatePerformanceActivity();
         _folderBack.Clear();
         _folderEntries.Clear();
@@ -165,12 +174,30 @@ public partial class MainWindow
     }
 
     private static string? ParentPath(string path) => Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(path));
+    private bool CanGoUp => CurrentFolderPath != null && _folderRoot != null &&
+        FileService.NormalizeKey(CurrentFolderPath) != FileService.NormalizeKey(_folderRoot);
+
+    private bool IsInBrowserRoot(string path)
+    {
+        if (_folderRoot == null) return false;
+        string relative = Path.GetRelativePath(_folderRoot, path);
+        return !Path.IsPathRooted(relative) && relative != ".." &&
+            !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
 
     private void BuildBreadcrumbs(string path)
     {
         Breadcrumbs.Children.Clear();
         var ancestors = new Stack<string>();
-        for (string? item = path; item != null; item = ParentPath(item)) ancestors.Push(item);
+        for (string? item = path; item != null && IsInBrowserRoot(item); item = ParentPath(item))
+            ancestors.Push(item);
+        var home = new Button { Content = "我的常用", Style = (Style)FindResource("QuietButton"),
+            FontSize = 10, Padding = new Thickness(4, 2, 4, 2) };
+        home.Click += (_, _) => GoHome();
+        Breadcrumbs.Children.Add(home);
+        var homeSeparator = new TextBlock { Text = "›", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) };
+        homeSeparator.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        Breadcrumbs.Children.Add(homeSeparator);
         while (ancestors.TryPop(out string? item))
         {
             string target = item;

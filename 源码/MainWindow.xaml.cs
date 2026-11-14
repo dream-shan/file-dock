@@ -122,12 +122,17 @@ public partial class MainWindow : Window
             SetStatus("快捷键已被占用，可通过贴边标签或托盘打开。", true);
             HotkeyHint.Text = "快捷键冲突 · 请用贴边入口";
         }
+        InitializeWindowPinning();
         _dock = new DockTabWindow(this);
         _trayIcon = CreateTrayIcon();
         _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞 · Ctrl+Alt+Space", Visible = !App.IsSelfTest };
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("打开文件坞", null, (_, _) => QueueTrayReveal());
         menu.Items.Add("收起到屏幕边缘", null, (_, _) => Dispatcher.Invoke(CollapsePanel));
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add("窗口置顶管理…", null, (_, _) => Dispatcher.Invoke(OpenWindowPinning));
+        menu.Items.Add("选择窗口置顶 / 取消", null, (_, _) => Dispatcher.Invoke(PickPinWindow));
+        menu.Items.Add("取消全部窗口置顶", null, (_, _) => Dispatcher.Invoke(UnpinAllWindows));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(Quit));
         _tray.ContextMenuStrip = menu;
@@ -176,6 +181,7 @@ public partial class MainWindow : Window
         if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
         if(msg==0x0232 && _loaded && !_movingPanel && !_quitting){Width=ActualWidth;Height=ActualHeight;if(State.PanelDocked==true)PositionPanel();RememberPanelSize();QueueDesktopPresence();}
         if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
+        if (msg == 0x0312 && wParam.ToInt32() == WindowPinHotkeyId) { if (!_exitSaving && _windowPicker == null && !_captureInteractionHeld && _windowPinning != null) NotifyWindowPin(_windowPinning.Toggle(NativeMethods.GetForegroundWindow())); handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x031E || msg == 0x031A) Dispatcher.BeginInvoke(UpdatePageRail);
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
@@ -416,6 +422,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(CreateTransparencyMenu());
+        AddMenu(menu, "窗口置顶…", OpenWindowPinning);
         AddMenu(menu, "恢复默认大小", ResetPanelSize);
         var display = new MenuItem { Header = "显示模式" };
         foreach (var (mode, label) in new[] { (PanelDisplayMode.Automatic, "自动：无遮挡显示，遮挡时收起"),
@@ -581,6 +588,7 @@ public partial class MainWindow : Window
     public async void Quit() => await QuitAsync();
     public void DisposeResources()
     {
+        DisposeWindowPinning();
         _saves.Dispose();
         _pageRailWindow?.DisposeRail();
         _plannerModule.Dispose();

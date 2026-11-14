@@ -109,6 +109,8 @@ public sealed class StorageService
     private static void Validate(AppState state)
     {
         DesktopPresence.NormalizeMode(state);
+        if(state.WindowPinKey<1||state.WindowPinKey>254||(state.WindowPinModifiers&3)==0||(state.WindowPinModifiers&~15u)!=0)
+        {state.WindowPinKey=0x54;state.WindowPinModifiers=3;}
         state.PanelWidth=Math.Clamp(state.PanelWidth,380,4000);state.PanelHeight=Math.Clamp(state.PanelHeight,480,4000);
         state.EmptyAreaTransparency=Math.Clamp(state.EmptyAreaTransparency,0,85);
         state.Countdowns??=[];

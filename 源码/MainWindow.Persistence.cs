@@ -57,7 +57,7 @@ public partial class MainWindow
                 "配置仍未保存。\n\n是：重试保存\n否：放弃尚未保存的设置并退出\n取消：返回程序", "文件坞",
                 MessageBoxButton.YesNoCancel,MessageBoxImage.Warning,MessageBoxResult.Cancel) switch {
                     MessageBoxResult.Yes=>SaveExitChoice.Retry,MessageBoxResult.No=>SaveExitChoice.Discard,_=>SaveExitChoice.Cancel});
-            if(saved){_exitSaving=false;_quitting=true;Application.Current.Shutdown();}
+            if(saved && RestorePinnedWindowsForExit()){_exitSaving=false;_quitting=true;Application.Current.Shutdown();}
         }
         finally
         {

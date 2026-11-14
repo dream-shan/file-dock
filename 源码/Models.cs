@@ -16,6 +16,9 @@ public sealed class PinnedEntry
 
 public sealed class AppState
 {
+    public bool WindowPinHotkeyEnabled {get;set;}=true;
+    public uint WindowPinModifiers {get;set;}=3;
+    public int WindowPinKey {get;set;}=0x54;
     public List<CountdownItem> Countdowns {get;set;}=[];
     public List<PlanItem> Plans { get; set; } = [];
     public int EmptyAreaTransparency {get;set;}=60;

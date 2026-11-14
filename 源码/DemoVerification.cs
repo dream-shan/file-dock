@@ -475,6 +475,7 @@ internal static class DemoVerification
 
         IconVerification.Run(window, Check);
         await EdgeRecoveryVerification.Run(window,Check);
+        WindowPinningVerification.Run(window,directory,Check);
         await FeatureVerification.Run(window, directory, Check);
         await StatePersistenceVerification.Run(window,directory,Check);
         await PerformanceVerification.Run(window, directory, Check);

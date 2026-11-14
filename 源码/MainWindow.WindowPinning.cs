@@ -44,6 +44,7 @@ public partial class MainWindow
         if(_windowPinning==null||_windowPicker!=null)return;
         if(!IsVisible)ExpandPanel();
         SelectPage("Tools");
+        if(IsToolsPage)_toolsView?.ShowDetails();
     }
     private void NotifyWindowPin(string message)
     {

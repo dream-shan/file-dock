@@ -43,7 +43,8 @@ public partial class MainWindow
             if (IsVisible && !IsPinned && !_captureActive && code >= 0 && message.ToInt32() is 0x0201 or 0x0204 or 0x0207 or 0x020B)
             {
                 var point = Marshal.PtrToStructure<NativeMethods.PointerPoint>(data);
-                if (!NativeMethods.IsOwnDesktopWindow(NativeMethods.WindowFromPoint(point)))
+                IntPtr target = NativeMethods.TopLevelWindowAtPoint(point);
+                if (target != IntPtr.Zero && !NativeMethods.IsOwnDesktopWindow(target))
                     Dispatcher.BeginInvoke(ObserveOutsideClick, DispatcherPriority.Background);
             }
             return NativeMethods.CallNextHookEx(_outsideClickHook, code, message, data);
@@ -55,11 +56,14 @@ public partial class MainWindow
             SetStatus("外部点击通知不可用，仍可通过切换窗口、Esc 或快捷键收起。", true);
     }
 
-    private void ObserveOutsideClick()
+    internal void ObserveOutsideClick()
     {
-        if (!IsVisible || IsPinned || _captureActive || _inDialog || _dragging || _movingPanel || AnyMenuOpen()) return;
+        if (_quitting || !IsVisible || IsPinned || UpdateCaptureVisibility() || _inDialog || _dragging ||
+            _movingPanel || AnyMenuOpen() || _memoryAction.Busy) return;
         _passiveRevealForeground = IntPtr.Zero;
-        _desktopPresence.Observe(false);
+        _desktopPresence.OutsideInteraction();
+        CollapsePanelCore(manual: false);
+        RecordDiagnosticState("outside-click-hidden");
         QueueDesktopPresence();
     }
 
@@ -82,10 +86,10 @@ public partial class MainWindow
         bool passiveReveal = IsVisible && _passiveRevealForeground == foreground;
         if (!passiveReveal) _passiveRevealForeground = IntPtr.Zero;
         bool own = NativeMethods.IsOwnDesktopWindow(foreground);
-        _desktopPresence.Observe(own || passiveReveal);
+        _desktopPresence.Observe(own || passiveReveal, NativeMethods.IsDesktopSurface(foreground));
         IntPtr handle = new WindowInteropHelper(this).Handle;
         bool blocked = false;
-        if (State.DisplayMode == PanelDisplayMode.Automatic && !_desktopPresence.Dismissed &&
+        if (State.DisplayMode == PanelDisplayMode.Automatic && !_desktopPresence.Dismissed && !_desktopPresence.WaitingForDesktop &&
             !(_desktopPresence.ManuallyRevealed && (own || passiveReveal)))
         {
             NativeMethods.SetDesktopZOrder(handle, foreground);

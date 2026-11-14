@@ -15,14 +15,21 @@ internal sealed class DesktopPresence
 {
     internal bool Dismissed { get; private set; }
     internal bool ManuallyRevealed { get; private set; }
-    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; }
+    internal bool WaitingForDesktop { get; private set; }
+    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; WaitingForDesktop = false; }
     internal void Dismiss() { Dismissed = true; ManuallyRevealed = false; }
-    internal void Observe(bool ownWindow)
-    { if (!ownWindow) ManuallyRevealed = false; }
+    internal void OutsideInteraction() { ManuallyRevealed = false; WaitingForDesktop = true; }
+    internal void Observe(bool ownWindow, bool desktop = false)
+    {
+        if (ownWindow) return;
+        if (desktop) { ManuallyRevealed = false; WaitingForDesktop = false; }
+        else if (ManuallyRevealed) OutsideInteraction();
+    }
     internal PanelDisplayDecision Decide(PanelDisplayMode mode, bool visible, bool blocked, bool interacting, bool fullscreen)
     {
         if (Dismissed) return new(false, false);
         if (mode == PanelDisplayMode.Pinned) return new(true, true);
+        if (WaitingForDesktop) return new(false, false);
         bool revealed = ManuallyRevealed && interacting;
         if (fullscreen && !revealed) return new(false, false);
         return new(mode == PanelDisplayMode.Manual ? visible && revealed : revealed || !blocked, revealed);
@@ -47,6 +54,11 @@ internal static partial class NativeMethods
 {
     [StructLayout(LayoutKind.Sequential)] internal struct PointerPoint { public int X, Y; }
     [DllImport("user32.dll")] internal static extern IntPtr WindowFromPoint(PointerPoint point);
+    internal static IntPtr TopLevelWindowAtPoint(PointerPoint point)
+    {
+        IntPtr window = WindowFromPoint(point);
+        return window == IntPtr.Zero ? IntPtr.Zero : GetAncestor(window, 2);
+    }
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out WindowRect value, int size);

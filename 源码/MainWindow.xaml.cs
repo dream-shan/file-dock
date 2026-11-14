@@ -422,7 +422,6 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(CreateTransparencyMenu());
-        AddMenu(menu, "窗口置顶…", OpenWindowPinning);
         AddMenu(menu, "恢复默认大小", ResetPanelSize);
         var display = new MenuItem { Header = "显示模式" };
         foreach (var (mode, label) in new[] { (PanelDisplayMode.Automatic, "自动：无遮挡显示，遮挡时收起"),

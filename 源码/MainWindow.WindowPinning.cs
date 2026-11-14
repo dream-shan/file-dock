@@ -7,6 +7,7 @@ namespace FileDockDemo;
 public partial class MainWindow
 {
     private WindowPinningModule? _windowPinning;
+    private WindowPinningView? _toolsView;
     private WindowPicker? _windowPicker;
     private const int WindowPinHotkeyId=0x4F12;
     private bool _pinHotkeyRegistered;
@@ -15,6 +16,11 @@ public partial class MainWindow
     {
         _windowPinning=new WindowPinningModule(new PinNative(),!App.IsSelfTest);
         RegisterPinHotkey();
+        _toolsView=new WindowPinningView(this,_windowPinning,PickPinWindow,State.WindowPinHotkeyEnabled,
+            State.WindowPinModifiers,State.WindowPinKey,SavePinHotkey,_pinRegistrationStatus);
+        ToolsSection.Content=_toolsView.View;
+        ToolsSection.IsVisibleChanged+=(_,_)=>{if(ToolsSection.IsVisible)_toolsView?.OnShown();else _toolsView?.OnHidden();};
+        if(ToolsSection.IsVisible)_toolsView.OnShown();
     }
     private void RegisterPinHotkey()
     {
@@ -37,8 +43,7 @@ public partial class MainWindow
     {
         if(_windowPinning==null||_windowPicker!=null)return;
         if(!IsVisible)ExpandPanel();
-        OpenModuleDialog(new WindowPinningView(this,_windowPinning,PickPinWindow,State.WindowPinHotkeyEnabled,
-            State.WindowPinModifiers,State.WindowPinKey,SavePinHotkey,_pinRegistrationStatus));
+        SelectPage("Tools");
     }
     private void NotifyWindowPin(string message)
     {
@@ -66,7 +71,7 @@ public partial class MainWindow
     }
     private void DisposeWindowPinning()
     {
-        _windowPicker?.Close();_windowPinning?.Dispose();
+        _windowPicker?.Close();_toolsView?.OnClosed();_windowPinning?.Dispose();
         if(_pinHotkeyRegistered&&_source!=null)NativeMethods.UnregisterHotKey(_source.Handle,WindowPinHotkeyId);
         _pinHotkeyRegistered=false;
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Windows;
 using System.Windows.Interop;
@@ -11,6 +12,12 @@ namespace FileDockDemo;
 
 internal static class WindowPinningVerification
 {
+    private static IEnumerable<T> FindControls<T>(DependencyObject root) where T:DependencyObject
+    {
+        if(root is T found)yield return found;
+        foreach(var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach(var nested in FindControls<T>(child))yield return nested;
+    }
     private sealed class Desktop : IPinDesktop
     {
         internal readonly Dictionary<IntPtr,PinTarget> Targets=new();
@@ -42,10 +49,18 @@ internal static class WindowPinningVerification
         module.Toggle(b);desktop.Targets.Remove(b);module.Refresh();
         check(module.Items.Count==0,"Closed windows are removed from session records");
         desktop.Targets[b]=new(b,2,3,"test","文字窗口");desktop.Top.Remove(b);module.Toggle(b);
-        var view=new WindowPinningView(host,module,()=>{},true,3,0x54,(_,_,_)=>"saved","快捷键已启用：Ctrl + Alt + T");
+        int picks=0;
+        var view=new WindowPinningView(host,module,()=>picks++,true,3,0x54,(_,_,_)=>"saved","快捷键已启用：Ctrl + Alt + T");
         var surface=view.View;surface.Width=300;
         var frame=new System.Windows.Controls.Border{Child=surface,Padding=new Thickness(16),Width=332};frame.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty,"Surface");
         frame.Measure(new Size(332,700));frame.Arrange(new Rect(0,0,332,frame.DesiredSize.Height));frame.UpdateLayout();
+        var pick=FindControls<System.Windows.Controls.Button>(surface).Single(b=>Equals(b.Content,"选择窗口"));
+        pick.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        check(picks==1,"Tools card starts window selection directly");
+        var pins=FindControls<System.Windows.Controls.Expander>(surface).First();view.OnShown();
+        module.Remove(b);check(Equals(pins.Header,"已置顶 0 个窗口"),"Visible tools card refreshes pinned window count");
+        view.OnHidden();module.Toggle(b);check(Equals(pins.Header,"已置顶 0 个窗口"),"Hidden tools card pauses window-list updates");
+        view.OnShown();check(Equals(pins.Header,"已置顶 1 个窗口"),"Returning to tools refreshes the pinned window count");
         var bitmap=new RenderTargetBitmap(332,(int)Math.Ceiling(frame.ActualHeight),96,96,PixelFormats.Pbgra32);bitmap.Render(frame);
         var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=File.Create(Path.Combine(directory,"window-pinning.png")))png.Save(stream);
         view.OnClosed();

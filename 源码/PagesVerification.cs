@@ -83,6 +83,10 @@ internal static class PagesVerification
         check(restored.Plans.Count==4 && restored.Plans[3].ParentId==week.Id && restored.Plans[3].Notes=="Notes" && restored.PlannerLevel==1,"Plan hierarchy, notes and selected level survive storage reload");
         check(new AppState().Plans.Count==0 && new AppState().PlannerLevel==3,"Existing settings default to empty daily planner");
         check(new AppState().SelectedPage=="Performance","New settings default to Performance without modifying existing pins or theme");
+        window.SelectPage("Tools");window.UpdateLayout();
+        check(window.State.SelectedPage=="Tools","Tools is an independent selectable page");
+        check(window.ToolsPageTab.IsChecked==true && window.ToolsSection.Visibility==Visibility.Visible && window.PerformanceSection.Visibility==Visibility.Collapsed && window.PlannerSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Collapsed,"Tools tab displays only the tools page");
+        await window.WaitForSavesAsync();check(window.Storage.Load().SelectedPage=="Tools","Tools selection persists across restart");
         window.ExpandPanel();window.GoHome();window.SelectPage("Performance");window.EnablePerformanceForVerification();window.EnableMemoryForVerification();
         check(!window.IsFilesPage && window.PerformanceSection.Visibility==Visibility.Visible && window.PinsSection.Visibility==Visibility.Collapsed && window.FileSearchSurface.Visibility==Visibility.Collapsed,
             "Performance tab hides file controls and gives metrics an independent page");
@@ -147,7 +151,7 @@ internal static class PagesVerification
             check(mainHandle!=railHandle && Math.Abs(mainRect.Left-bodyBounds.X)<=1 && Math.Abs(mainRect.Right-mainRect.Left-window.PanelSurface.ActualWidth*scale)<=1,"Capture HWND rectangle exactly matches main body and has a separate rail HWND");
             check(right ? Math.Abs(railRect.Left-mainRect.Right+P(2))<=1 : Math.Abs(railRect.Right-mainRect.Left-P(2))<=1,"Separate tabs attach to the main body on the correct side");
             window.SelectPage("Planner",false);window.UpdateLayout();
-            check(Math.Abs(window.PageTabsWindow!.ActualHeight-148)<1 && window.PageJoin.Margin.Top==52,"Rail height and selected seam derive from all three tabs");
+            check(Math.Abs(window.PageTabsWindow!.ActualHeight-200)<1 && window.PageJoin.Margin.Top==52,"Rail height and selected seam derive from all four tabs");
             IntPtr railRegion=CreateRectRgn(0,0,0,0);
             try{check(GetWindowRgn(railHandle,railRegion)>0 && PtInRegion(railRegion,P(16),P(126)) && !PtInRegion(railRegion,P(16),P(48)) && !PtInRegion(railRegion,P(16),P(100)),"Rail shape contains the third tab and leaves both gaps transparent");}finally{DeleteObject(railRegion);}
             window.BeginCaptureShortcut();check(window.PageTabsWindow!.IsVisible && !window.PageTabsWindow!.IsHitTestVisible,"Screenshot leaves side icons visible while blocking tab clicks");window.CancelCaptureShortcutPending();
@@ -163,17 +167,18 @@ internal static class PagesVerification
                 var rail=window.PageTabsWindow!;rail.UpdateLayout();
                 var railBitmap=new RenderTargetBitmap((int)rail.ActualWidth,(int)rail.ActualHeight,96,96,PixelFormats.Pbgra32);railBitmap.Render(rail);
                 byte RailAlpha(Point point){var data=new byte[4];railBitmap.CopyPixels(new Int32Rect((int)point.X,(int)point.Y,1,1),data,4,0);return data[3];}
-                var tabs=new[]{window.FilesPageTab,window.PlannerPageTab,window.PerformancePageTab};
+                var tabs=new[]{window.FilesPageTab,window.PlannerPageTab,window.PerformancePageTab,window.ToolsPageTab};
                 check(tabs.All(tab=>RailAlpha(tab.TranslatePoint(new Point(10,8),rail)) is >=175 and <=210) && RailAlpha(new Point(16,48))==0,
-                    $"All three tab backgrounds are translucent with clear gaps on {nextSide} in {nextTheme}");
+                    $"All four tab backgrounds are translucent with clear gaps on {nextSide} in {nextTheme}");
                 check(rail.Opacity==1 && tabs.All(tab=>tab.Opacity==1 && tab.Foreground is SolidColorBrush brush && brush.Color.A==255),
                     $"Tab icons retain full opacity on {nextSide} in {nextTheme}");
                 DemoVerification.SaveRender(rail,Path.Combine(root,$"rail-{nextSide}-{nextTheme}.png"));
                 window.SelectPage("Planner",false);window.UpdateLayout();DemoVerification.SaveRender(window,Path.Combine(root,$"pages-planner-{nextSide}-{nextTheme}.png"));
                 window.SelectPage("Performance",false);DemoVerification.SaveRender(window,Path.Combine(root,$"pages-performance-{nextSide}-{nextTheme}.png"));
+                window.SelectPage("Tools",false);window.UpdateLayout();DemoVerification.SaveRender(window,Path.Combine(root,$"pages-tools-{nextSide}-{nextTheme}.png"));
             }
         }
-        window.Width=380;window.Height=480;window.UpdateLayout();
+        window.SelectPage("Performance",false);window.Width=380;window.Height=480;window.UpdateLayout();
         check(window.PerformanceScroll.ExtentHeight<=window.PerformanceScroll.ViewportHeight+1 && window.MemoryCard.CapacityFits && window.VramCard.CapacityFits,"Independent performance page fits the compact window with complete capacity labels");
         DemoVerification.SaveRender(window,Path.Combine(root,"pages-performance-small.png"));
         window.Width=430;window.Height=650;window.State.DockSide=side;window.SetThemeMode(theme);window.UpdatePageRail();window.SelectPage("Performance");await CompactVerification.Run(window,root,check);

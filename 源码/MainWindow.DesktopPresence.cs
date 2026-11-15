@@ -62,8 +62,8 @@ public partial class MainWindow
             _movingPanel || AnyMenuOpen() || _memoryAction.Busy) return;
         _passiveRevealForeground = IntPtr.Zero;
         _desktopPresence.OutsideInteraction();
-        CollapsePanelCore(manual: false);
-        RecordDiagnosticState("outside-click-hidden");
+        if (State.DisplayMode == PanelDisplayMode.Manual) CollapsePanelCore(manual: false);
+        RecordDiagnosticState("outside-click");
         QueueDesktopPresence();
     }
 
@@ -89,17 +89,20 @@ public partial class MainWindow
         _desktopPresence.Observe(own || passiveReveal, NativeMethods.IsDesktopSurface(foreground));
         IntPtr handle = new WindowInteropHelper(this).Handle;
         bool blocked = false;
-        if (State.DisplayMode == PanelDisplayMode.Automatic && !_desktopPresence.Dismissed && !_desktopPresence.WaitingForDesktop &&
+        if (State.DisplayMode == PanelDisplayMode.Automatic && !_desktopPresence.Dismissed &&
             !(_desktopPresence.ManuallyRevealed && (own || passiveReveal)))
         {
             NativeMethods.SetDesktopZOrder(handle, foreground);
-            bool? occluded = NativeMethods.IsPanelOccluded(handle);
+            bool? occluded = NativeMethods.IsPanelAreaOccupied(handle,
+                _pageRailWindow == null ? IntPtr.Zero : new WindowInteropHelper(_pageRailWindow).Handle);
             if (!occluded.HasValue) return;
             blocked = occluded.Value;
         }
         var decision = _desktopPresence.Decide(State.DisplayMode!.Value, IsVisible, blocked, own || passiveReveal,
             NativeMethods.IsFullscreenOnPanelScreen(foreground, handle));
-        ApplyPanelDisplay(decision);
+        if (IsVisible != decision.Visible || ((NativeMethods.GetExtendedWindowStyle(handle)&8)!=0) != decision.Topmost)
+            DiagnosticLog.Write("display-decision", $"mode={State.DisplayMode}; blocked={blocked}; own={own}; passive={passiveReveal}; visible={decision.Visible}; topmost={decision.Topmost}; dismissed={_desktopPresence.Dismissed}");
+        ApplyPanelDisplay(decision, reposition: false);
     }
 
     private void ApplyPanelDisplay(PanelDisplayDecision decision, bool reposition = true)

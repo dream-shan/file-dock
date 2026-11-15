@@ -20,6 +20,9 @@ public sealed class App : Application
     {
         if (args.Length == 2 && args[0] == "--launch-probe") { File.WriteAllText(args[1], Environment.CurrentDirectory); return 0; }
         if (args.Length == 2 && args[0] == "--memory-trim-probe") return MemoryTools.RunProbe(args[1]);
+        if (args.Length == 1 && args[0] == "--desktop-fixture") return DesktopInteractionVerification.RunFixture();
+        bool desktopTest = args.Length == 2 && args[0] == "--desktop-test";
+        if (desktopTest && Directory.Exists(Path.GetFullPath(args[1]))) return 2;
         IsSelfTest = args.Length > 0 && args[0] == "--self-test";
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) =>
@@ -31,11 +34,11 @@ public sealed class App : Application
         };
         if (!IsSelfTest)
         {
-            app._instanceMutex = new Mutex(true, "Local\\FileDockDemo.0.1", out bool first);
-            app._showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\FileDockDemo.Show.0.1");
+            app._instanceMutex = new Mutex(true, desktopTest ? "Local\\FileDockDemo.DesktopTest" : "Local\\FileDockDemo.0.1", out bool first);
+            app._showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, desktopTest ? "Local\\FileDockDemo.DesktopTest.Show" : "Local\\FileDockDemo.Show.0.1");
             if (!first) { app._showEvent.Set(); app._showEvent.Dispose(); app._instanceMutex.Dispose(); return 0; }
         }
-        string dataDirectory = IsSelfTest && args.Length > 1 ? Path.Combine(Path.GetFullPath(args[1]), "data") : Path.Combine(AppContext.BaseDirectory, "Data");
+        string dataDirectory = (IsSelfTest || desktopTest) && args.Length > 1 ? Path.Combine(Path.GetFullPath(args[1]), "data") : Path.Combine(AppContext.BaseDirectory, "Data");
         bool diagnosticReady = DiagnosticLog.Initialize(dataDirectory);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => {
             DiagnosticLog.Write("fatal-state", $"terminating={e.IsTerminating}");
@@ -70,10 +73,15 @@ public sealed class App : Application
         else
         {
             // Preserve legacy singleton names so renamed releases cannot run alongside older versions.
-            if (!StartupRegistration.MigrateLegacyPath())
+            if (!desktopTest && !StartupRegistration.MigrateLegacyPath())
                 window.SetStatus("旧开机启动路径未能更新，请在设置中重新开启开机启动。");
             app._showRegistration = ThreadPool.RegisterWaitForSingleObject(app._showEvent!, (_, _) => app.Dispatcher.BeginInvoke(() => { DiagnosticLog.Write("existing-instance-activation"); window.ExpandPanel(); }), null, -1, false);
-            app.Startup += (_, _) => window.Show();
+            app.Startup += async (_, _) => {
+                window.Show();
+                if (!desktopTest) return;
+                try { await DesktopInteractionVerification.Run(window, Path.GetFullPath(args[1])); app.Shutdown(0); }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString()); app.Shutdown(1); }
+            };
         }
         int result = app.Run();
         DiagnosticLog.Write("message-loop-return", $"exitCode={result}");

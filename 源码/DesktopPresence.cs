@@ -15,21 +15,19 @@ internal sealed class DesktopPresence
 {
     internal bool Dismissed { get; private set; }
     internal bool ManuallyRevealed { get; private set; }
-    internal bool WaitingForDesktop { get; private set; }
-    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; WaitingForDesktop = false; }
+    internal void Reveal() { Dismissed = false; ManuallyRevealed = true; }
     internal void Dismiss() { Dismissed = true; ManuallyRevealed = false; }
-    internal void OutsideInteraction() { ManuallyRevealed = false; WaitingForDesktop = true; }
+    internal void OutsideInteraction() { ManuallyRevealed = false; }
     internal void Observe(bool ownWindow, bool desktop = false)
     {
         if (ownWindow) return;
-        if (desktop) { ManuallyRevealed = false; WaitingForDesktop = false; }
+        if (desktop) { ManuallyRevealed = false; }
         else if (ManuallyRevealed) OutsideInteraction();
     }
     internal PanelDisplayDecision Decide(PanelDisplayMode mode, bool visible, bool blocked, bool interacting, bool fullscreen)
     {
         if (Dismissed) return new(false, false);
         if (mode == PanelDisplayMode.Pinned) return new(true, true);
-        if (WaitingForDesktop) return new(false, false);
         bool revealed = ManuallyRevealed && interacting;
         if (fullscreen && !revealed) return new(false, false);
         return new(mode == PanelDisplayMode.Manual ? visible && revealed : revealed || !blocked, revealed);
@@ -82,6 +80,28 @@ internal static partial class NativeMethods
         if (DwmGetWindowAttribute(window, 9, out rect, Marshal.SizeOf<WindowRect>()) != 0 || rect.Right <= rect.Left || rect.Bottom <= rect.Top)
             return GetWindowRect(window, out rect);
         return true;
+    }
+    [DllImport("user32.dll")] private static extern IntPtr GetTopWindow(IntPtr parent);
+    internal static bool? IsPanelAreaOccupied(IntPtr panel, IntPtr rail, bool includeOwnProcess = false)
+    {
+        if (!FrameBounds(panel, out var bounds)) return null;
+        WindowRect railBounds = default;
+        bool hasRail = rail != IntPtr.Zero && FrameBounds(rail, out railBounds);
+        static bool Intersects(WindowRect a, WindowRect b) =>
+            Math.Min(a.Right,b.Right)>Math.Max(a.Left,b.Left) && Math.Min(a.Bottom,b.Bottom)>Math.Max(a.Top,b.Top);
+        var seen = new HashSet<IntPtr>();
+        // Automatic mode reserves desktop space, even while hidden or temporarily
+        // topmost. Its result must not depend on the panel's current Z order.
+        IntPtr current = GetTopWindow(IntPtr.Zero);
+        for (int i=0; current!=IntPtr.Zero && i<1024; i++)
+        {
+            if (!seen.Add(current)) return null;
+            if (current!=panel && current!=rail && GetWindow(current,4)!=panel &&
+                IsDesktopBlocker(current,includeOwnProcess) && FrameBounds(current,out var r) &&
+                (Intersects(bounds,r) || (hasRail && Intersects(railBounds,r)))) return true;
+            current=GetWindow(current,2); // GW_HWNDNEXT
+        }
+        return current==IntPtr.Zero ? false : null;
     }
     internal static bool? IsPanelOccluded(IntPtr panel, bool includeOwnProcess = false)
     {

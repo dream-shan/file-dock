@@ -21,19 +21,19 @@ internal static class DesktopPresenceVerification
         check(Decide(PanelDisplayMode.Automatic,blocked:true,interacting:true)==new PanelDisplayDecision(true,true), "Explicit reveal temporarily floats above an application");
         policy.Observe(false);
         check(!Decide(PanelDisplayMode.Automatic,blocked:true).Visible, "Returning to another application ends the temporary reveal");
-        check(!Decide(PanelDisplayMode.Automatic).Visible,
-            "Leaving a revealed panel for another app hides it even when overlap detection reports clear");
+        check(Decide(PanelDisplayMode.Automatic).Visible,
+            "Leaving a revealed panel keeps uncovered space visible without desktop focus");
         for(int i=0;i<3;i++) policy.Observe(false);
-        check(!Decide(PanelDisplayMode.Automatic,visible:false).Visible,
-            "Repeated clear-overlap checks cannot reopen an externally dismissed panel");
+        check(Decide(PanelDisplayMode.Automatic,visible:false).Visible,
+            "An uncovered automatic panel recovers after external interaction");
         policy.Observe(false,desktop:true);
         check(Decide(PanelDisplayMode.Automatic,visible:false).Visible,
             "Returning to the actual desktop releases external-interaction suspension");
         policy.OutsideInteraction();
-        check(!Decide(PanelDisplayMode.Automatic).Visible,
-            "An external click hides an automatic panel even without an earlier activation");
+        check(Decide(PanelDisplayMode.Automatic)==new PanelDisplayDecision(true,false),
+            "An external click leaves uncovered automatic space visible without topmost");
         policy.Reveal();
-        check(!policy.WaitingForDesktop && Decide(PanelDisplayMode.Manual,interacting:true).Visible,
+        check(Decide(PanelDisplayMode.Manual,interacting:true).Visible,
             "Explicit reveal releases suspension for both tray and keyboard entry paths");
         policy.OutsideInteraction();
         check(Decide(PanelDisplayMode.Pinned,blocked:true)==new PanelDisplayDecision(true,true), "Pin stays expanded and topmost across application switches");
@@ -103,21 +103,24 @@ internal static class DesktopPresenceVerification
                 "Unpin restores and persists the previous manual mode");
             NativeMethods.SetCaptureTopmost(panel,false);await Task.Delay(80);
             IntPtr other=new WindowInteropHelper(fixture).Handle;
+            check(NativeMethods.IsPanelAreaOccupied(panel,IntPtr.Zero,true)==true,"Desktop area detects a separate window regardless of panel stacking");
             check(NativeMethods.IsPanelOccluded(panel,true)==true,"Native occlusion detects a visible overlapping window above the panel");
             check(NativeMethods.IsPanelOccluded(panel)==false,"Own process popups are excluded from desktop occlusion");
             fixture.Left=window.Left+window.ActualWidth+80;await Task.Delay(40);
             check(NativeMethods.IsPanelOccluded(panel,true)==false,"Native occlusion ignores non-overlapping windows");
+            check(NativeMethods.IsPanelAreaOccupied(panel,IntPtr.Zero,true)==false,"Desktop area allows a non-overlapping focused application");
             fixture.Left=window.Left+20;fixture.Hide();
             check(!NativeMethods.IsDesktopBlocker(other,true),"Hidden windows do not block desktop presence");
             fixture.Show();fixture.WindowState=WindowState.Minimized;await Task.Delay(40);
             check(!NativeMethods.IsDesktopBlocker(other,true),"Minimized windows do not block desktop presence");
             fixture.WindowState=WindowState.Normal;NativeMethods.SetCaptureTopmost(other,false);NativeMethods.RaiseWithoutActivation(panel);
             check(NativeMethods.IsPanelOccluded(panel,true)==false,"Windows beneath the panel do not count as occlusion");
+            check(NativeMethods.IsPanelAreaOccupied(panel,IntPtr.Zero,true)==true,"Automatic area detects applications underneath a temporary reveal");
             window.SetDisplayMode(PanelDisplayMode.Automatic);
             window.ShowPanel(activate:false);
             window.ObserveOutsideClick();
-            check(!window.IsVisible && !window.PageTabsWindow!.IsVisible,
-                "An external click after passive reveal immediately hides panel and tabs");
+            check(window.IsVisible && window.PageTabsWindow!.IsVisible,
+                "Automatic external click queues occupancy reconciliation without premature collapse");
             window.SetDisplayMode(PanelDisplayMode.Pinned);
             window.ShowPanel(activate:false);
             window.ObserveOutsideClick();

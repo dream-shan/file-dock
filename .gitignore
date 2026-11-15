@@ -12,6 +12,7 @@
 /重建输出/
 /TemperatureService/
 /运行时许可/microsoft.*.TXT
+/运行时许可/System.Numerics.Tensors-*.TXT
 /publish/
 /artifacts/
 

@@ -33,6 +33,9 @@ internal static class DemoVerification
         Check(!window.IsFilesPage && window.State.SelectedPage == "Performance","First launch defaults to the performance page");
         window.SelectPage("Applications",false);
         Check(window.State.SelectedPage=="Applications","Applications has its own selectable page");
+        window.SelectPage("Control",false);
+        Check(window.State.SelectedPage=="Control","Control center has its own selectable page");
+        await AudioControlVerification.Run(window,directory,Check);
         await ShortcutRegistryVerification.Run(Check);
         await ApplicationsVerification.Run(window,directory,Check);
         window.SelectPage("Files",false);

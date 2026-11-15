@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
         InitializeApplications();
+        InitializeControlCenter();
         Width=State.PanelWidth;Height=State.PanelHeight;
         InitializeMovement();
         InitializeDesktopPresence();
@@ -592,6 +593,7 @@ public partial class MainWindow : Window
     public void DisposeResources()
     {
         DisposeWindowPinning();
+        _controlCenter?.Dispose();
         _shortcuts?.Dispose();_applicationsView?.Dispose();
         _saves.Dispose();
         _pageRailWindow?.DisposeRail();

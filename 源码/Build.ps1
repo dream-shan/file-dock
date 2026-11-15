@@ -43,5 +43,12 @@ try {
             Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $notices "$pack-$name.TXT")
         }
     }
+    Copy-Item -LiteralPath (Join-Path $repo '运行时许可\NAudio-MIT.TXT') -Destination $notices
+    $tensors = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'System.Numerics.Tensors/*' })
+    if ($tensors.Count -ne 1) { throw 'Cannot identify the restored Tensors package.' }
+    $tensorsRoot = Join-Path $cache $tensors[0].ToLowerInvariant()
+    foreach ($name in @('LICENSE','THIRD-PARTY-NOTICES')) {
+        Copy-Item -LiteralPath (Join-Path $tensorsRoot "$name.TXT") -Destination (Join-Path $notices "System.Numerics.Tensors-$name.TXT")
+    }
     Write-Host "Built application and service: $output"
 } finally { Pop-Location }

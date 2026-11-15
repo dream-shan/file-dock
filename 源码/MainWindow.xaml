@@ -258,6 +258,7 @@
             <Grid x:Name="PlannerSection" Grid.Row="1" Grid.RowSpan="4" Visibility="Collapsed" Margin="0,0,0,12"><planner:PlannerView x:Name="Planner" /></Grid>
             <ContentControl x:Name="ToolsSection" Grid.Row="1" Grid.RowSpan="4" Visibility="Collapsed" Margin="0,0,0,12" />
             <ContentControl x:Name="ApplicationsSection" Grid.Row="1" Grid.RowSpan="4" Visibility="Collapsed" Margin="0,0,0,12" />
+            <ContentControl x:Name="ControlSection" Grid.Row="1" Grid.RowSpan="4" Visibility="Collapsed" Margin="0,0,0,12" />
 
             <Grid x:Name="PerformanceSection" Grid.Row="2" Grid.RowSpan="2" Margin="0,0,0,10">
                 <Grid.RowDefinitions>
@@ -383,6 +384,7 @@
             <ToggleButton x:Name="ApplicationsPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE71D;" Tag="Applications" Click="PageTab_Click" ToolTip="应用：固定程序入口" AutomationProperties.Name="应用页" />
             <ToggleButton x:Name="FilesPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE8B7;" Tag="Files" Click="PageTab_Click" ToolTip="文件：常用、浏览和搜索" AutomationProperties.Name="文件页" />
             <ToggleButton x:Name="PlannerPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE73A;" Tag="Planner" Click="PageTab_Click" ToolTip="安排：今日清单和重要日期" AutomationProperties.Name="安排页" />
+            <ToggleButton x:Name="ControlPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE713;" Tag="Control" Click="PageTab_Click" ToolTip="控制：声音与音频设备" AutomationProperties.Name="控制页" />
             <ToggleButton x:Name="PerformancePageTab" Style="{StaticResource PageTabStyle}" Content="&#xE9D9;" Tag="Performance" Click="PageTab_Click" ToolTip="性能：电脑状态" AutomationProperties.Name="性能页" />
             <ToggleButton x:Name="ToolsPageTab" Style="{StaticResource PageTabStyle}" Content="&#xE90F;" Tag="Tools" Click="PageTab_Click" ToolTip="工具：常用桌面工具" AutomationProperties.Name="工具页" />
         </StackPanel>

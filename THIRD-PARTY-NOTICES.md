@@ -26,6 +26,17 @@
 
 PawnIO 是由用户从 [官方网站](https://pawnio.eu/) 单独取得并安装的签名驱动，本仓库及下载包不包含该驱动。主程序不需管理员运行；安装温度服务和驱动需要管理员确认。
 
+## 声音控制组件
+
+主程序通过 NAudio 调用 Windows Core Audio，不安装额外的声音控制程序。版本与内容哈希见 `源码/packages.lock.json`。
+
+| 组件 | 版本 | 许可 | 项目 |
+| --- | --- | --- | --- |
+| NAudio.Wasapi / NAudio.Core | 3.3.0 | MIT | [NAudio](https://github.com/naudio/NAudio) |
+| System.Numerics.Tensors | 9.0.0 | MIT | [.NET Runtime](https://github.com/dotnet/runtime) |
+
+完整 NAudio 版权与许可文本保存在 `运行时许可/NAudio-MIT.TXT`。构建脚本将其及实际还原的 Tensors LICENSE、THIRD-PARTY-NOTICES 一起放入分发目录的 `运行时许可/`。
+
 ## 主程序运行时
 
 自包含 Windows x64 下载包使用 .NET / Windows Desktop Runtime 10.0.14，其版本在项目文件中锁定。构建脚本从这两个**实际还原的运行时包**复制其 LICENSE，以及 .NET Runtime 随包提供的 THIRD-PARTY-NOTICES，放入下载包的 `运行时许可/`。这些声明随二进制一起分发，不能仅保留文件坞自己的许可证。

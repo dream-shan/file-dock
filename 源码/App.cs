@@ -23,7 +23,8 @@ public sealed class App : Application
         if (args.Length == 1 && args[0] == "--desktop-fixture") return DesktopInteractionVerification.RunFixture();
         bool desktopTest = args.Length == 2 && args[0] == "--desktop-test";
         if (desktopTest && Directory.Exists(Path.GetFullPath(args[1]))) return 2;
-        IsSelfTest = args.Length > 0 && args[0] == "--self-test";
+        bool audioTest=args.Length==2&&args[0]=="--audio-test";
+        IsSelfTest = audioTest || args.Length > 0 && args[0] == "--self-test";
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) =>
         {
@@ -66,7 +67,7 @@ public sealed class App : Application
             window.Top = -10000;
             app.Startup += async (_, _) =>
             {
-                try { await DemoVerification.Run(window, Path.GetFullPath(args[1])); await window.WaitForSavesAsync(); app.Shutdown(0); }
+                try { if(audioTest)await AudioDeviceVerification.Run(window,Path.GetFullPath(args[1]));else await DemoVerification.Run(window, Path.GetFullPath(args[1])); await window.WaitForSavesAsync(); app.Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString()); app.Shutdown(1); }
             };
         }

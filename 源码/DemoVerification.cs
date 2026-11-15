@@ -28,7 +28,6 @@ internal static class DemoVerification
         string note = Path.Combine(fixture, "每周周报.txt"), budget = Path.Combine(fixture, "项目预算.csv"), plan = Path.Combine(fixture, "产品方案.txt");
         File.WriteAllText(note, "仅供演示版自动验证使用。\n"); File.WriteAllText(budget, "项目,金额\n设计,300\n"); File.WriteAllText(plan, "文件坞验证文件。\n");
         window.Show();
-        Check(window.FindName("ApplicationsPageTab") is System.Windows.Controls.Primitives.ToggleButton,"Independent applications navigation entry exists");
         Check(window.Width==380&&window.Height==500,"First launch uses compact default dimensions");
 
         Check(!window.IsFilesPage && window.State.SelectedPage == "Performance","First launch defaults to the performance page");
@@ -475,9 +474,6 @@ internal static class DemoVerification
         dock.Hide();
 
         IconVerification.Run(window, Check);
-        ApplicationsVerification.Run(Check);
-        await ShortcutVerification.Run(Check);
-        await ApplicationsIntegrationVerification.Run(window,directory,Check);
         await EdgeRecoveryVerification.Run(window,Check);
         WindowPinningVerification.Run(window,directory,Check);
         await FeatureVerification.Run(window, directory, Check);
@@ -499,7 +495,7 @@ internal static class DemoVerification
 
     // WScript.Shell saves through the system ANSI code page on some Windows images.
     // Use the Unicode shell interface so Chinese fixtures are also valid on English CI.
-    internal static void CreateProbeShortcut(string path, string marker, string workingDirectory)
+    private static void CreateProbeShortcut(string path, string marker, string workingDirectory)
     {
         object instance = Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"))!)!;
         try

@@ -40,8 +40,6 @@ public partial class MainWindow
     internal async Task<bool> WaitForSavesAsync()
     {
         await _pinOperations;
-        await _applicationOperations;
-        await _shortcutOperations;
         await Planner.WaitForIdleAsync();
         return await _saves.FlushAsync();
     }
@@ -53,7 +51,7 @@ public partial class MainWindow
         _exitSaving=true;bool enabled=IsEnabled;IsEnabled=false;_plannerModule.OnHidden();
         try
         {
-            await _pinOperations;await _applicationOperations;await _shortcutOperations;await Planner.WaitForIdleAsync();
+            await _pinOperations;await Planner.WaitForIdleAsync();
             if(ActiveModuleDialog!=null){ActiveModuleDialog.RequestClose();if(ActiveModuleDialog!=null)return;}
             bool saved=await _saves.FlushForExitAsync(()=>MessageBox.Show(this,
                 "配置仍未保存。\n\n是：重试保存\n否：放弃尚未保存的设置并退出\n取消：返回程序", "文件坞",

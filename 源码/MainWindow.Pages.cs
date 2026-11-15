@@ -12,7 +12,6 @@ public partial class MainWindow
     internal bool IsPlannerPage=>State.SelectedPage=="Planner";
     internal bool IsPerformancePage=>State.SelectedPage=="Performance";
     internal bool IsToolsPage=>State.SelectedPage=="Tools";
-    internal bool IsApplicationsPage=>State.SelectedPage=="Applications";
     private ToggleButton[] PageButtons=>PageRail.Children.OfType<ToggleButton>().ToArray();
     private int SelectedPageIndex=>Math.Max(0,Array.FindIndex(PageButtons,b=>b.Tag as string==State.SelectedPage));
     private bool _pagesReady;
@@ -47,7 +46,7 @@ public partial class MainWindow
         if (changed)
         {
             Activate();if (IsFilesPage) SearchBox.Focus(); else if(IsPlannerPage)Planner.FocusAdd();else Focus();
-            SetStatus(IsFilesPage ? "文件夹内浏览 · 文件单击打开" : IsPlannerPage ? "今日清单 · 点击编辑" : IsApplicationsPage ? "点击应用启动 · 右键管理" : IsToolsPage ? "常用桌面工具" : "实时电脑状态");
+            SetStatus(IsFilesPage ? "文件夹内浏览 · 文件单击打开" : IsPlannerPage ? "今日清单 · 点击编辑" : IsToolsPage ? "常用桌面工具" : "实时电脑状态");
             if (persist) Persist();
             if (IsFilesPage)
             {
@@ -68,14 +67,13 @@ public partial class MainWindow
         foreach(var tab in PageButtons)tab.IsChecked=tab.Tag as string==State.SelectedPage;
         PlannerSection.Visibility=IsPlannerPage?Visibility.Visible:Visibility.Collapsed;
         ToolsSection.Visibility=IsToolsPage?Visibility.Visible:Visibility.Collapsed;
-        ApplicationsSection.Visibility=IsApplicationsPage?Visibility.Visible:Visibility.Collapsed;
         FileSearchSurface.Visibility = IsFilesPage ? Visibility.Visible : Visibility.Collapsed;
         PinsSection.Visibility = IsFilesPage && CurrentFolderPath == null ? Visibility.Visible : Visibility.Collapsed;
         BrowserPanel.Visibility = IsFilesPage && CurrentFolderPath != null ? Visibility.Visible : Visibility.Collapsed;
         PerformanceSection.Visibility = IsPerformancePage ? Visibility.Visible : Visibility.Collapsed;
         CopySelectionButton.Visibility=IsFilesPage && _selectedPaths.Count>0 ? Visibility.Visible : Visibility.Collapsed;
         UpdatePerformanceActivity(); UpdateFolderWatcher(); UpdatePageRail();
-        if(IsPlannerPage)InteractionHint.Text="今日清单 · 点击编辑";else if(IsApplicationsPage)InteractionHint.Text="点击启动 · 右键管理";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else if(IsToolsPage)InteractionHint.Text="窗口置顶 · 点击选择";else UpdateFileSelection();
+        if(IsPlannerPage)InteractionHint.Text="今日清单 · 点击编辑";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else if(IsToolsPage)InteractionHint.Text="窗口置顶 · 点击选择";else UpdateFileSelection();
     }
     internal void UpdatePageRail()
     {

@@ -50,7 +50,7 @@ internal static class WindowPinningVerification
         check(module.Items.Count==0,"Closed windows are removed from session records");
         desktop.Targets[b]=new(b,2,3,"test","文字窗口");desktop.Top.Remove(b);module.Toggle(b);
         int picks=0;
-        var view=new WindowPinningView(host,module,()=>picks++,()=>{});
+        var view=new WindowPinningView(host,module,()=>picks++,true,3,0x54,(_,_,_)=>"saved","快捷键已启用：Ctrl + Alt + T");
         var surface=view.View;surface.Width=300;
         var frame=new System.Windows.Controls.Border{Child=surface,Padding=new Thickness(16),Width=332};frame.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty,"Surface");
         frame.Measure(new Size(332,700));frame.Arrange(new Rect(0,0,332,frame.DesiredSize.Height));frame.UpdateLayout();

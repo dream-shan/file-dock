@@ -91,7 +91,6 @@ public partial class MainWindow : Window
         InitializePerformance();
         _plannerModule=new PlannerModule(Planner,new AppStatePlannerStore(State,_saves.CommitAsync),this);
         InitializePages();
-        InitializeApplications();
         ApplyTheme();
         SizeChanged += (_, _) => { QueueDesktopPresence(); };
         SearchBox.TextChanged += (_, _) => ApplyFilters();
@@ -118,11 +117,15 @@ public partial class MainWindow : Window
         NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle); ApplyNativeCorners(new WindowInteropHelper(this).Handle);
         _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         _source?.AddHook(WindowProc);
-        InitializeShortcuts();
+        if (!NativeMethods.RegisterHotKey(_source!.Handle, NativeMethods.HotkeyId, 0x4003, 0x20))
+        {
+            SetStatus("快捷键已被占用，可通过贴边标签或托盘打开。", true);
+            HotkeyHint.Text = "快捷键冲突 · 请用贴边入口";
+        }
         InitializeWindowPinning();
         _dock = new DockTabWindow(this);
         _trayIcon = CreateTrayIcon();
-        _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞", Visible = !App.IsSelfTest };
+        _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞 · Ctrl+Alt+Space", Visible = !App.IsSelfTest };
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("打开文件坞", null, (_, _) => QueueTrayReveal());
         menu.Items.Add("收起到屏幕边缘", null, (_, _) => Dispatcher.Invoke(CollapsePanel));
@@ -177,14 +180,8 @@ public partial class MainWindow : Window
     {
         if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
         if(msg==0x0232 && _loaded && !_movingPanel && !_quitting){Width=ActualWidth;Height=ActualHeight;if(State.PanelDocked==true)PositionPanel();RememberPanelSize();QueueDesktopPresence();}
-        if (msg == 0x0312 && _shortcuts != null && _shortcuts.TryResolve(wParam.ToInt32(),out var command))
-        {
-            handled=true;
-            if(_shortcutWindow!=null){var binding=_shortcuts.GetBinding(command);if(binding!=null)_shortcutEditor?.CaptureRegistered(binding);return IntPtr.Zero;}
-            if(_inDialog||_exitSaving)return IntPtr.Zero;
-            if(command==ShortcutCommand.ToggleDock){RecordDiagnosticState("hotkey");if(!UpdateCaptureVisibility()){if(IsVisible)CollapsePanel();else ExpandPanel();}}
-            else if(!_exitSaving && _windowPicker==null && !_captureInteractionHeld && _windowPinning!=null)NotifyWindowPin(_windowPinning.Toggle(NativeMethods.GetForegroundWindow()));
-        }
+        if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
+        if (msg == 0x0312 && wParam.ToInt32() == WindowPinHotkeyId) { if (!_exitSaving && _windowPicker == null && !_captureInteractionHeld && _windowPinning != null) NotifyWindowPin(_windowPinning.Toggle(NativeMethods.GetForegroundWindow())); handled = true; }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x031E || msg == 0x031A) Dispatcher.BeginInvoke(UpdatePageRail);
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
@@ -425,7 +422,6 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
         menu.Items.Add(CreateTransparencyMenu());
-        AddMenu(menu, "快捷键…", OpenShortcutSettings);
         AddMenu(menu, "恢复默认大小", ResetPanelSize);
         var display = new MenuItem { Header = "显示模式" };
         foreach (var (mode, label) in new[] { (PanelDisplayMode.Automatic, "自动：无遮挡显示，遮挡时收起"),
@@ -453,7 +449,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(startup);
         menu.Items.Add(new Separator());
-        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\n设置 → 快捷键：修改或禁用唤出与窗口置顶组合键；Esc 收起。\n图钉开启固定置顶，切换应用仍显示；取消图钉恢复此前模式。\n设置 → 显示模式：自动、手动、固定置顶。手动收起后仅主动唤出才恢复。\n\n性能页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n性能页展开时每 1 秒更新，CPU 温度每秒读取；收起或切换到文件页时每 2 秒只检查内存，其他指标暂停。\n内存卡片可点击整理，圆环动画完成后即可再次点击；占用过高时入口变红。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
+        AddMenu(menu, "使用说明", () => { _inDialog = true; ShowThemedHelp("点击“＋ 添加”固定文件或文件夹；拖动常用卡片调整顺序。\n按住 Ctrl 点击多选；拖出面板复制，或 Ctrl+C 后在目标处 Ctrl+V。\n图片显示缩略图，悬停查看大图；右键可复制图片。\n使用本机 Snipaste 默认快捷键或系统截图快捷键时隐藏入口；截图结束后恢复。\n单击文件夹在面板内浏览，单击文件用默认应用打开。\n顶部可返回、上一级、回到常用；路径按钮可跳到祖先文件夹。\n浏览时输入关键词，自动搜索当前文件夹及所有子文件夹；清空搜索恢复当前层。\nCtrl + Alt + Space 展开/收起；Esc 收起。\n图钉开启固定置顶，切换应用仍显示；取消图钉恢复此前模式。\n设置 → 显示模式：自动、手动、固定置顶。手动收起后仅主动唤出才恢复。\n\n性能页显示 CPU/GPU 占用与温度、内存、显存和实时网速。\n性能页展开时每 1 秒更新，CPU 温度每秒读取；收起或切换到文件页时每 2 秒只检查内存，其他指标暂停。\n内存卡片可点击整理，圆环动画完成后即可再次点击；占用过高时入口变红。\n设置 → 外观：跟随系统、浅色、深色，立即生效。\n固定项及设置保存在程序旁的 Data 文件夹。"); _inDialog = false; });
         AddMenu(menu, "退出文件坞", Quit);
         ShowMenu(menu, SettingsButton);
     }
@@ -610,7 +606,7 @@ public partial class MainWindow : Window
         if (_captureHook != IntPtr.Zero) NativeMethods.UnhookWinEvent(_captureHook);
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged -= TrayPreferenceChanged;
-        if (_source != null) { _shortcuts?.Dispose(); _source.RemoveHook(WindowProc); }
+        if (_source != null) { NativeMethods.UnregisterHotKey(_source.Handle, NativeMethods.HotkeyId); _source.RemoveHook(WindowProc); }
         _tray?.Dispose(); _trayIcon?.Dispose(); _dock?.Close();
     }
 }

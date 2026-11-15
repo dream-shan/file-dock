@@ -16,10 +16,6 @@ public sealed class PinnedEntry
 
 public sealed class AppState
 {
-    public bool DockHotkeyEnabled {get;set;}=true;
-    public uint DockHotkeyModifiers {get;set;}=3;
-    public int DockHotkeyKey {get;set;}=0x20;
-    public List<ApplicationEntry> Applications {get;set;}=[];
     public bool WindowPinHotkeyEnabled {get;set;}=true;
     public uint WindowPinModifiers {get;set;}=3;
     public int WindowPinKey {get;set;}=0x54;
@@ -47,7 +43,6 @@ public sealed class AppState
     internal AppState Copy()
     {
         var copy = (AppState)MemberwiseClone();
-        copy.Applications = Applications.Select(p=>p.Copy()).ToList();
         copy.Pins = Pins.Select(p => p.Copy()).ToList();
         copy.Plans = Plans.Select(p => p.Copy()).ToList();
         copy.Countdowns = Countdowns.Select(p => p.Copy()).ToList();

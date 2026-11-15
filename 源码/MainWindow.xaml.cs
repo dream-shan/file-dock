@@ -72,6 +72,7 @@ public partial class MainWindow : Window
         _dataDirectory = dataDirectory;
         Storage = new StorageService(dataDirectory);
         State = Storage.Load();
+        ShortcutCatalog.Normalize(State);
         _saves = new StateSaveCoordinator(State, Storage.Save, ReportSave);
         PageRailWindow.MigratePosition(State);
         DesktopPresence.NormalizeMode(State);
@@ -79,6 +80,7 @@ public partial class MainWindow : Window
         State.ThemeMode = ThemePalette.Normalize(State.ThemeMode);
         ThemePalette.Apply(ThemePalette.Resolve(State.ThemeMode, ThemePalette.SystemAppsDark()));
         InitializeComponent();
+        InitializeApplications();
         Width=State.PanelWidth;Height=State.PanelHeight;
         InitializeMovement();
         InitializeDesktopPresence();
@@ -117,15 +119,12 @@ public partial class MainWindow : Window
         NativeMethods.HideFromTaskSwitcher(new WindowInteropHelper(this).Handle); ApplyNativeCorners(new WindowInteropHelper(this).Handle);
         _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         _source?.AddHook(WindowProc);
-        if (!NativeMethods.RegisterHotKey(_source!.Handle, NativeMethods.HotkeyId, 0x4003, 0x20))
-        {
-            SetStatus("快捷键已被占用，可通过贴边标签或托盘打开。", true);
-            HotkeyHint.Text = "快捷键冲突 · 请用贴边入口";
-        }
+        InitializeShortcuts();
         InitializeWindowPinning();
         _dock = new DockTabWindow(this);
         _trayIcon = CreateTrayIcon();
-        _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞 · Ctrl+Alt+Space", Visible = !App.IsSelfTest };
+        _tray = new Forms.NotifyIcon { Icon = _trayIcon, Text = "文件坞", Visible = !App.IsSelfTest };
+        UpdateShortcutHints();
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("打开文件坞", null, (_, _) => QueueTrayReveal());
         menu.Items.Add("收起到屏幕边缘", null, (_, _) => Dispatcher.Invoke(CollapsePanel));
@@ -180,8 +179,12 @@ public partial class MainWindow : Window
     {
         if (TrySuppressCaptureInput(msg, wParam, out IntPtr captureResult)) { handled = true; return captureResult; }
         if(msg==0x0232 && _loaded && !_movingPanel && !_quitting){Width=ActualWidth;Height=ActualHeight;if(State.PanelDocked==true)PositionPanel();RememberPanelSize();QueueDesktopPresence();}
-        if (msg == 0x0312 && wParam.ToInt32() == NativeMethods.HotkeyId) { RecordDiagnosticState("hotkey"); if (!UpdateCaptureVisibility()) { if (IsVisible) CollapsePanel(); else ExpandPanel(); } handled = true; }
-        if (msg == 0x0312 && wParam.ToInt32() == WindowPinHotkeyId) { if (!_exitSaving && _windowPicker == null && !_captureInteractionHeld && _windowPinning != null) NotifyWindowPin(_windowPinning.Toggle(NativeMethods.GetForegroundWindow())); handled = true; }
+        if (msg == 0x0312)
+        {
+            long chord=lParam.ToInt64();
+            if(ActiveModuleDialog is ShortcutSettingsView editor&&editor.TryCaptureHotkey((uint)(chord&0xffff),(int)((chord>>16)&0xffff)))handled=true;
+            else if(_shortcuts?.Dispatch(wParam.ToInt32())==true)handled=true;
+        }
         if (msg == 0x001A || msg == 0x031A) QueueThemeRefresh();
         if (msg == 0x031E || msg == 0x031A) Dispatcher.BeginInvoke(UpdatePageRail);
         if (msg == 0x02E0 && !_movingPanel) Dispatcher.BeginInvoke(() => PositionPanel());
@@ -421,6 +424,7 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
         menu.Items.Add(CreateAppearanceMenu());
+        AddMenu(menu, "快捷键管理…", ()=>OpenShortcutSettings());
         menu.Items.Add(CreateTransparencyMenu());
         AddMenu(menu, "恢复默认大小", ResetPanelSize);
         var display = new MenuItem { Header = "显示模式" };
@@ -588,6 +592,7 @@ public partial class MainWindow : Window
     public void DisposeResources()
     {
         DisposeWindowPinning();
+        _shortcuts?.Dispose();_applicationsView?.Dispose();
         _saves.Dispose();
         _pageRailWindow?.DisposeRail();
         _plannerModule.Dispose();
@@ -606,7 +611,7 @@ public partial class MainWindow : Window
         if (_captureHook != IntPtr.Zero) NativeMethods.UnhookWinEvent(_captureHook);
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged -= TrayPreferenceChanged;
-        if (_source != null) { NativeMethods.UnregisterHotKey(_source.Handle, NativeMethods.HotkeyId); _source.RemoveHook(WindowProc); }
+        if (_source != null) _source.RemoveHook(WindowProc);
         _tray?.Dispose(); _trayIcon?.Dispose(); _dock?.Close();
     }
 }

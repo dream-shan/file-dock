@@ -26,7 +26,8 @@ internal sealed class WindowPinningView : IModuleDialog
     public FrameworkElement View { get; }
     public bool HasChanges => false;
     internal WindowPinningView(IModuleHost host, WindowPinningModule module, Action pick,
-        bool enabled, uint mods, int key, Func<bool,uint,int,string> save, string registrationStatus)
+        bool enabled, uint mods, int key, Func<bool,uint,int,string> save, string registrationStatus,
+        Action? manageShortcut=null,Action? manageAll=null)
     {
         _host=host;_module=module;_pick=pick;_save=save;_mods=mods;_key=key;
         var root=new StackPanel(); root.SetResourceReference(Control.ForegroundProperty,"Ink");
@@ -39,11 +40,14 @@ internal sealed class WindowPinningView : IModuleDialog
         detailsButton.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");System.Windows.Automation.AutomationProperties.SetName(detailsButton,"窗口置顶详情");
         var divider=new Border{BorderThickness=new Thickness(1,0,0,0),Child=detailsButton};divider.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");Grid.SetColumn(divider,1);row.Children.Add(divider);
         var rowBorder=new Border{Child=row,CornerRadius=new CornerRadius(8),BorderThickness=new Thickness(1)};rowBorder.SetResourceReference(Border.BackgroundProperty,"PaneCard");rowBorder.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");_toolList.Children.Add(rowBorder);root.Children.Add(_toolList);
+        if(manageAll!=null){var entry=Button("快捷键管理",manageAll);entry.MinHeight=44;entry.HorizontalContentAlignment=HorizontalAlignment.Left;entry.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");_toolList.Children.Add(entry);}
         var back=Button("← 工具",()=>{_details.Visibility=Visibility.Collapsed;_toolList.Visibility=Visibility.Visible;_run.Focus();});back.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new Thickness(0,0,0,8);_details.Children.Add(back);
         _details.Children.Add(new TextBlock{Text="窗口置顶",FontSize=18,FontWeight=FontWeights.SemiBold});
         var pinContent=new StackPanel();
         _removeAll=Button("取消全部",()=>{int failures=_module.RestoreAll();_message.Text=failures==0?"已取消全部受管理的置顶。":$"仍有 {failures} 个窗口取消失败，请重试。";Render();});
         pinContent.Children.Add(_removeAll);pinContent.Children.Add(_list);_pins.Content=pinContent;_pins.IsExpanded=true;_pins.SetResourceReference(Control.ForegroundProperty,"Ink");_details.Children.Add(_pins);
+        _enabled.IsChecked=enabled;
+        if(manageShortcut==null){
         var shortcutSettings=new Expander { Header="快捷键设置", Margin=new Thickness(0,10,0,0) };shortcutSettings.SetResourceReference(Control.ForegroundProperty,"Ink");
         var settings=new StackPanel();
         _enabled.SetResourceReference(Control.ForegroundProperty,"Ink");
@@ -51,11 +55,14 @@ internal sealed class WindowPinningView : IModuleDialog
         settings.Children.Add(new TextBlock { Text="点击下框后按组合键（至少包含 Ctrl 或 Alt）", TextWrapping=TextWrapping.Wrap });
         _shortcut.Text=Format(mods,key);_shortcut.PreviewKeyDown+=Record;settings.Children.Add(_shortcut);
         settings.Children.Add(Button("应用快捷键设置",()=>{_message.Text=_save(_enabled.IsChecked==true,_mods,_key);UpdateTooltip();}));
-        _message.Text=registrationStatus;shortcutSettings.Content=settings;shortcutSettings.IsExpanded=true;_details.Children.Add(shortcutSettings);_details.Children.Add(_message);UpdateTooltip();root.Children.Add(_details);
+        shortcutSettings.Content=settings;shortcutSettings.IsExpanded=true;_details.Children.Add(shortcutSettings);
+        }else _details.Children.Add(Button("快捷键设置…",manageShortcut));
+        _message.Text=registrationStatus;_details.Children.Add(_message);UpdateTooltip();root.Children.Add(_details);
         View=new ScrollViewer{Content=root,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         Render();
     }
     private void UpdateTooltip()=>_run.ToolTip="选择窗口置顶或取消 · "+(_enabled.IsChecked==true?Format(_mods,_key):"快捷键已禁用");
+    internal void UpdateShortcut(ShortcutBinding binding,string status){_mods=binding.Modifiers;_key=binding.Key;_enabled.IsChecked=binding.Enabled;_message.Text=status;UpdateTooltip();}
     internal void ShowDetails(){_toolList.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;Render();}
     internal static string Format(uint mods,int key) => ((mods&2)!=0?"Ctrl + ":"")+((mods&1)!=0?"Alt + ":"")+((mods&4)!=0?"Shift + ":"")+((mods&8)!=0?"Win + ":"")+KeyInterop.KeyFromVirtualKey(key);
     private static Button Button(string text,Action action)

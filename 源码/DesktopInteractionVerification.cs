@@ -188,6 +188,9 @@ internal static class DesktopInteractionVerification
                 }
                 finally { SetWindowPlacement(target,ref saved); }
             }
+            await ShortcutDesktopVerification.Run(window,directory,(condition,label)=>{
+                if(!condition)throw new InvalidOperationException(label);report.Add("PASS: "+label);
+            });
         }
         finally
         {

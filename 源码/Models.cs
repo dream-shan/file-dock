@@ -16,6 +16,8 @@ public sealed class PinnedEntry
 
 public sealed class AppState
 {
+    public List<ApplicationEntry> Applications {get;set;}=[];
+    public Dictionary<string,ShortcutBinding>? Shortcuts {get;set;}
     public bool WindowPinHotkeyEnabled {get;set;}=true;
     public uint WindowPinModifiers {get;set;}=3;
     public int WindowPinKey {get;set;}=0x54;
@@ -43,6 +45,8 @@ public sealed class AppState
     internal AppState Copy()
     {
         var copy = (AppState)MemberwiseClone();
+        copy.Applications=Applications.Select(a=>a.Copy()).ToList();
+        copy.Shortcuts=Shortcuts?.ToDictionary(p=>p.Key,p=>p.Value.Copy());
         copy.Pins = Pins.Select(p => p.Copy()).ToList();
         copy.Plans = Plans.Select(p => p.Copy()).ToList();
         copy.Countdowns = Countdowns.Select(p => p.Copy()).ToList();

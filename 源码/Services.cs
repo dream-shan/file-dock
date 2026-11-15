@@ -111,6 +111,10 @@ public sealed class StorageService
         DesktopPresence.NormalizeMode(state);
         if(state.WindowPinKey<1||state.WindowPinKey>254||(state.WindowPinModifiers&3)==0||(state.WindowPinModifiers&~15u)!=0)
         {state.WindowPinKey=0x54;state.WindowPinModifiers=3;}
+        state.Applications??=[];
+        if(state.Applications.Any(a=>a==null||string.IsNullOrWhiteSpace(a.Id)||string.IsNullOrWhiteSpace(a.DisplayName)||string.IsNullOrWhiteSpace(a.Path)||a.Arguments==null||a.WorkingDirectory==null||!ApplicationEntry.Supported(a.Path))||state.Applications.Select(a=>a.Id).Distinct().Count()!=state.Applications.Count)
+            throw new InvalidDataException("应用入口配置无效。");
+        ShortcutCatalog.Normalize(state);
         state.PanelWidth=Math.Clamp(state.PanelWidth,380,4000);state.PanelHeight=Math.Clamp(state.PanelHeight,480,4000);
         state.EmptyAreaTransparency=Math.Clamp(state.EmptyAreaTransparency,0,85);
         state.Countdowns??=[];

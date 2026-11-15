@@ -31,6 +31,10 @@ internal static class DemoVerification
         Check(window.Width==380&&window.Height==500,"First launch uses compact default dimensions");
 
         Check(!window.IsFilesPage && window.State.SelectedPage == "Performance","First launch defaults to the performance page");
+        window.SelectPage("Applications",false);
+        Check(window.State.SelectedPage=="Applications","Applications has its own selectable page");
+        await ShortcutRegistryVerification.Run(Check);
+        await ApplicationsVerification.Run(window,directory,Check);
         window.SelectPage("Files",false);
         bool IsUtilityWindow(Window target)
         {

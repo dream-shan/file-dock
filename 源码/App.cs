@@ -21,7 +21,8 @@ public sealed class App : Application
         if (args.Length == 2 && args[0] == "--launch-probe") { File.WriteAllText(args[1], Environment.CurrentDirectory); return 0; }
         if (args.Length == 2 && args[0] == "--memory-trim-probe") return MemoryTools.RunProbe(args[1]);
         if (args.Length == 1 && args[0] == "--desktop-fixture") return DesktopInteractionVerification.RunFixture();
-        bool desktopTest = args.Length == 2 && args[0] == "--desktop-test";
+        bool shortcutsOnly = args.Length == 2 && args[0] == "--shortcut-test";
+        bool desktopTest = shortcutsOnly || (args.Length == 2 && args[0] == "--desktop-test");
         if (desktopTest && Directory.Exists(Path.GetFullPath(args[1]))) return 2;
         IsSelfTest = args.Length > 0 && args[0] == "--self-test";
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -79,7 +80,7 @@ public sealed class App : Application
             app.Startup += async (_, _) => {
                 window.Show();
                 if (!desktopTest) return;
-                try { await DesktopInteractionVerification.Run(window, Path.GetFullPath(args[1])); app.Shutdown(0); }
+                try { await DesktopInteractionVerification.Run(window, Path.GetFullPath(args[1]),shortcutsOnly); app.Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString()); app.Shutdown(1); }
             };
         }

@@ -41,9 +41,12 @@ internal static class DesktopInteractionVerification
     internal static int RunFixture()
     {
         var app=new Application();
-        return app.Run(new Window { Title="FileDock external desktop test fixture", Width=180,Height=140,
+        var fixture=new Window { Title="FileDock external desktop test fixture", Width=180,Height=140,
             WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,
-            WindowStartupLocation=WindowStartupLocation.Manual,Left=20,Top=20 });
+            WindowStartupLocation=WindowStartupLocation.Manual,Left=20,Top=20 };
+        fixture.SourceInitialized+=(_,_)=>NativeMethods.RegisterHotKey(new WindowInteropHelper(fixture).Handle,0x7D01,0x4007,0x7A);
+        fixture.Closed+=(_,_)=>NativeMethods.UnregisterHotKey(new WindowInteropHelper(fixture).Handle,0x7D01);
+        return app.Run(fixture);
     }
     private static void Click(IntPtr target)
     {
@@ -53,7 +56,7 @@ internal static class DesktopInteractionVerification
         var inputs=new[]{new Input { Mouse=new MouseInput {Flags=2} },new Input {Mouse=new MouseInput {Flags=4}}};
         if(SendInput(2,inputs,Marshal.SizeOf<Input>())!=2) throw new InvalidOperationException("Desktop mouse input was blocked");
     }
-    internal static async Task Run(MainWindow window,string directory)
+    internal static async Task Run(MainWindow window,string directory,bool shortcutsOnly=false)
     {
         using var cancellation=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\FileDockDemo.DesktopTest.Cancel");
         GetWindowThreadProcessId(NativeMethods.GetForegroundWindow(),out uint foregroundPid);
@@ -105,6 +108,12 @@ internal static class DesktopInteractionVerification
             },IntPtr.Zero);
             await Task.Delay(500);
             void Move(bool overlap) => SetWindowPos(other,IntPtr.Zero,overlap?bounds.L+20:Math.Max(0,bounds.L-320),bounds.T+20,180,140,0x0040);
+            if(shortcutsOnly)
+            {
+                Move(false);
+                await ShortcutDesktopVerification.Run(window,other,Wait);
+                return;
+            }
             for(int cycle=0;cycle<20;cycle++)
             {
                 Move(false);Click(other);

@@ -151,7 +151,7 @@ internal static class PagesVerification
             check(mainHandle!=railHandle && Math.Abs(mainRect.Left-bodyBounds.X)<=1 && Math.Abs(mainRect.Right-mainRect.Left-window.PanelSurface.ActualWidth*scale)<=1,"Capture HWND rectangle exactly matches main body and has a separate rail HWND");
             check(right ? Math.Abs(railRect.Left-mainRect.Right+P(2))<=1 : Math.Abs(railRect.Right-mainRect.Left-P(2))<=1,"Separate tabs attach to the main body on the correct side");
             window.SelectPage("Planner",false);window.UpdateLayout();
-            check(Math.Abs(window.PageTabsWindow!.ActualHeight-200)<1 && window.PageJoin.Margin.Top==52,"Rail height and selected seam derive from all four tabs");
+            check(Math.Abs(window.PageTabsWindow!.ActualHeight-252)<1 && window.PageJoin.Margin.Top==52,"Rail height and selected seam derive from all five tabs");
             IntPtr railRegion=CreateRectRgn(0,0,0,0);
             try{check(GetWindowRgn(railHandle,railRegion)>0 && PtInRegion(railRegion,P(16),P(126)) && !PtInRegion(railRegion,P(16),P(48)) && !PtInRegion(railRegion,P(16),P(100)),"Rail shape contains the third tab and leaves both gaps transparent");}finally{DeleteObject(railRegion);}
             window.BeginCaptureShortcut();check(window.PageTabsWindow!.IsVisible && !window.PageTabsWindow!.IsHitTestVisible,"Screenshot leaves side icons visible while blocking tab clicks");window.CancelCaptureShortcutPending();
@@ -167,7 +167,7 @@ internal static class PagesVerification
                 var rail=window.PageTabsWindow!;rail.UpdateLayout();
                 var railBitmap=new RenderTargetBitmap((int)rail.ActualWidth,(int)rail.ActualHeight,96,96,PixelFormats.Pbgra32);railBitmap.Render(rail);
                 byte RailAlpha(Point point){var data=new byte[4];railBitmap.CopyPixels(new Int32Rect((int)point.X,(int)point.Y,1,1),data,4,0);return data[3];}
-                var tabs=new[]{window.FilesPageTab,window.PlannerPageTab,window.PerformancePageTab,window.ToolsPageTab};
+                var tabs=new[]{window.FilesPageTab,window.PlannerPageTab,window.PerformancePageTab,window.ToolsPageTab,window.ApplicationsPageTab};
                 check(tabs.All(tab=>RailAlpha(tab.TranslatePoint(new Point(10,8),rail)) is >=175 and <=210) && RailAlpha(new Point(16,48))==0,
                     $"All four tab backgrounds are translucent with clear gaps on {nextSide} in {nextTheme}");
                 check(rail.Opacity==1 && tabs.All(tab=>tab.Opacity==1 && tab.Foreground is SolidColorBrush brush && brush.Color.A==255),

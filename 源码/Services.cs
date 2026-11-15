@@ -109,6 +109,11 @@ public sealed class StorageService
     private static void Validate(AppState state)
     {
         DesktopPresence.NormalizeMode(state);
+        state.Applications??=[];
+        if(state.Applications.Any(p=>p==null||string.IsNullOrWhiteSpace(p.Id)||string.IsNullOrWhiteSpace(p.Path)||p.DisplayName==null)||state.Applications.Select(p=>p.Id).Distinct().Count()!=state.Applications.Count)
+            throw new InvalidDataException("应用入口数据无效。");
+        if(state.DockHotkeyKey<1||state.DockHotkeyKey>254||(state.DockHotkeyModifiers&3)==0||(state.DockHotkeyModifiers&~15u)!=0)
+        {state.DockHotkeyKey=0x20;state.DockHotkeyModifiers=3;}
         if(state.WindowPinKey<1||state.WindowPinKey>254||(state.WindowPinModifiers&3)==0||(state.WindowPinModifiers&~15u)!=0)
         {state.WindowPinKey=0x54;state.WindowPinModifiers=3;}
         state.PanelWidth=Math.Clamp(state.PanelWidth,380,4000);state.PanelHeight=Math.Clamp(state.PanelHeight,480,4000);

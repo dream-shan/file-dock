@@ -41,6 +41,7 @@ public sealed class AppState
     public PanelDisplayMode? DisplayMode { get; set; }
     public PanelDisplayMode UnpinnedMode { get; set; } = PanelDisplayMode.Automatic;
     public string SelectedPage { get; set; } = "Performance";
+    public string? PreferredBrightnessDisplayId {get;set;}
     public string ThemeMode { get; set; } = "System";
     internal AppState Copy()
     {

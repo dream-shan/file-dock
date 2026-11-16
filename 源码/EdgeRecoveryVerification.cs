@@ -8,8 +8,11 @@ internal static class EdgeRecoveryVerification
         var dock=w.DockEntry;
         try
         {
-            w.CollapsePanel();dock.Show();var foreground=NativeMethods.GetForegroundWindow();
+            w.CollapsePanel();
+            var owner=new System.Windows.Interop.WindowInteropHelper(w).Handle;long ownerBand=NativeMethods.GetExtendedWindowStyle(owner)&8;
+            dock.Show();var foreground=NativeMethods.GetForegroundWindow();
             check(dock.NativeTopmost,"Showing the entry establishes native topmost status");
+            check((NativeMethods.GetExtendedWindowStyle(owner)&8)==ownerBand,"Raising the entry preserves the main window owner band");
             NativeMethods.SetCaptureTopmost(dock.Handle,false);
             check(!dock.NativeTopmost,"Fixture reproduces visible entry with lost native topmost flag");
             await Task.Delay(250);

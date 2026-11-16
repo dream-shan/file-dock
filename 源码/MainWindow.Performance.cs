@@ -37,6 +37,7 @@ public partial class MainWindow
     internal void EnablePerformanceForVerification() { _testPerformanceEnabled = true; UpdatePerformanceActivity(); }
     internal void UpdatePerformanceActivity()
     {
+        _controlCenter?.SetPaused(MemoryPaused||_quitting);
         if (_performanceTimer == null || _performanceDisposed) return;
         bool active = IsVisible && IsPerformancePage && !_quitting && !MemoryPaused && (!App.IsSelfTest || _testPerformanceEnabled);
         if (_performanceActive == active) { UpdateMemoryActivity(); return; }

@@ -35,6 +35,10 @@ internal static class DemoVerification
         Check(window.State.SelectedPage=="Applications","Applications has its own selectable page");
         window.SelectPage("Control",false);
         Check(window.State.SelectedPage=="Control","Control center has its own selectable page");
+        await ControlReviewRegression.Run(window,Check);
+        await BrightnessVerification.Run(window,Check);
+        await PowerVerification.Run(window,Check);
+        await DisplayPowerViewVerification.Run(window,directory,Check);
         await AudioControlVerification.Run(window,directory,Check);
         await ShortcutRegistryVerification.Run(Check);
         await ApplicationsVerification.Run(window,directory,Check);

@@ -13,6 +13,7 @@
 /TemperatureService/
 /运行时许可/microsoft.*.TXT
 /运行时许可/System.Numerics.Tensors-*.TXT
+/运行时许可/System.Management-THIRD-PARTY-NOTICES.TXT
 /publish/
 /artifacts/
 

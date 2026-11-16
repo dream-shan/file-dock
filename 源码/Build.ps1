@@ -50,5 +50,9 @@ try {
     foreach ($name in @('LICENSE','THIRD-PARTY-NOTICES')) {
         Copy-Item -LiteralPath (Join-Path $tensorsRoot "$name.TXT") -Destination (Join-Path $notices "System.Numerics.Tensors-$name.TXT")
     }
+    $management = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'System.Management/*' })
+    if ($management.Count -ne 1) { throw 'Cannot identify the restored Management package.' }
+    Copy-Item -LiteralPath (Join-Path $repo '运行时许可\System.Management-MIT.TXT') -Destination $notices
+    Copy-Item -LiteralPath (Join-Path (Join-Path $cache $management[0].ToLowerInvariant()) 'THIRD-PARTY-NOTICES.TXT') -Destination (Join-Path $notices 'System.Management-THIRD-PARTY-NOTICES.TXT')
     Write-Host "Built application and service: $output"
 } finally { Pop-Location }

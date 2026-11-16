@@ -24,4 +24,5 @@
   <ItemGroup><Compile Remove="TemperatureService\**\*.cs" /><None Remove="TemperatureService\bin\**;TemperatureService\obj\**" /></ItemGroup>
   <ItemGroup><Resource Include="Assets\*.ico;Assets\*.png" /></ItemGroup>
   <ItemGroup><PackageReference Include="NAudio.Wasapi" Version="3.3.0" /></ItemGroup>
+  <ItemGroup><PackageReference Include="System.Management" Version="10.0.2" /></ItemGroup>
 </Project>

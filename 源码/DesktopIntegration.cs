@@ -74,7 +74,7 @@ internal static partial class NativeMethods
     internal static bool SetCaptureTopmost(IntPtr window,bool topmost) =>
         SetWindowPos(window,new IntPtr(topmost ? -1 : -2),0,0,0,0,0x0013 | KeepOwnerOrder);
     internal static bool RaiseWithoutActivation(IntPtr window) =>
-        SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, 0x0013);
+        SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, 0x0013 | KeepOwnerOrder);
     internal static bool RaisePanelWithoutActivation(IntPtr window, bool topmost) =>
         SetWindowPos(window, topmost ? new IntPtr(-1) : IntPtr.Zero, 0, 0, 0, 0, 0x0013 | KeepOwnerOrder);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);

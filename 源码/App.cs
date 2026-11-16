@@ -24,7 +24,9 @@ public sealed class App : Application
         bool desktopTest = args.Length == 2 && args[0] == "--desktop-test";
         if (desktopTest && Directory.Exists(Path.GetFullPath(args[1]))) return 2;
         bool audioTest=args.Length==2&&args[0]=="--audio-test";
-        IsSelfTest = audioTest || args.Length > 0 && args[0] == "--self-test";
+        bool controlTest=args.Length==2&&args[0]=="--control-test";
+        bool displayPowerTest=args.Length==2&&args[0]=="--display-power-test";
+        IsSelfTest = audioTest || controlTest || displayPowerTest || args.Length > 0 && args[0] == "--self-test";
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) =>
         {
@@ -67,7 +69,7 @@ public sealed class App : Application
             window.Top = -10000;
             app.Startup += async (_, _) =>
             {
-                try { if(audioTest)await AudioDeviceVerification.Run(window,Path.GetFullPath(args[1]));else await DemoVerification.Run(window, Path.GetFullPath(args[1])); await window.WaitForSavesAsync(); app.Shutdown(0); }
+                try { if(displayPowerTest)await DisplayPowerDeviceVerification.Run(Path.GetFullPath(args[1]));else if(audioTest)await AudioDeviceVerification.Run(window,Path.GetFullPath(args[1]));else if(controlTest)await ControlFeatureVerification.Run(window,Path.GetFullPath(args[1]));else await DemoVerification.Run(window, Path.GetFullPath(args[1])); await window.WaitForSavesAsync(); app.Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(Path.GetFullPath(args[1]), "failure.txt"), ex.ToString()); app.Shutdown(1); }
             };
         }

@@ -26,14 +26,20 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private readonly PowerView? _power;
     private readonly BrightnessController? _brightnessController;
     private readonly PowerController? _powerController;
+    private readonly WirelessView? _wireless;
     private string? _chosenOutput,_chosenMic;
     private string _deviceSignature="";
     private bool _updating,_disposed,_paused;
-    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null)
+    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null,bool wireless=false,bool nativeWireless=true)
     {
         _audio=audio;_writeTimer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(80)};_writeTimer.Tick+=(_,_)=>Flush();
         var root=new StackPanel();var header=new DockPanel();
-        var refresh=Ui.Button("刷新",()=>{CancelPending();_audio.Refresh();_brightnessController?.Refresh();_powerController?.Refresh();});refresh.SetResourceReference(StyleProperty,"QuietButton");DockPanel.SetDock(refresh,Dock.Right);header.Children.Add(refresh);header.Children.Add(Ui.Text("控制",18));root.Children.Add(header);
+        var refresh=Ui.Button("刷新",()=>{CancelPending();_audio.Refresh();_brightnessController?.Refresh();_powerController?.Refresh();_wireless?.Refresh();});refresh.SetResourceReference(StyleProperty,"QuietButton");DockPanel.SetDock(refresh,Dock.Right);header.Children.Add(refresh);header.Children.Add(Ui.Text("控制",18));root.Children.Add(header);
+        if(wireless)
+        {
+            _wireless=new WirelessView(()=>ShowExtra(_wireless!.WifiDetails,"Wi-Fi"),()=>ShowExtra(_wireless!.BluetoothDetails,"蓝牙"),()=>ShowDetails(true),nativeWireless);
+            _home.Children.Add(_wireless.Home);
+        }
         _output=new AudioLevelRow("音量",QueueVolume,SetMute,Flush,HasPending);_microphone=new AudioLevelRow("麦克风",QueueVolume,SetMute,Flush,HasPending);
         _home.Children.Add(_output);_home.Children.Add(_microphone);
         _brightnessController=brightness;_powerController=power;
@@ -41,11 +47,16 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         if(power!=null){_power=new(power,openPowerSettings??(()=>{}));_home.Children.Add(_power.Home);_power.Details.Visibility=Visibility.Collapsed;_power.DetailsRequested+=()=>ShowExtra(_power.Details,"电源");}
         _sessionsButton=Ui.Button("应用音量  ›",()=>ShowDetails(false));_home.Children.Add(_sessionsButton);
         _home.Children.Add(Ui.Button("音频设备  ›",()=>ShowDetails(true)));root.Children.Add(_home);
-        _details.Children.Add(Ui.Button("← 控制",()=>{Flush();_details.Visibility=Visibility.Collapsed;_home.Visibility=Visibility.Visible;}));_details.Children.Add(_detailTitle);
+        _details.Children.Add(Ui.Button("← 控制",()=>{Flush();_wireless?.ShowDetails(null);_details.Visibility=Visibility.Collapsed;_home.Visibility=Visibility.Visible;ScrollTop();}));_details.Children.Add(_detailTitle);
         _devicePanel.Children.Add(Ui.Text("选择要调节的设备，不改变 Windows 默认设备。"));
         DeviceSelector(_devicePanel,"输出设备",_outputs,false);DeviceSelector(_devicePanel,"输入设备",_microphones,true);
         _details.Children.Add(_devicePanel);_details.Children.Add(_sessionPanel);_details.Visibility=Visibility.Collapsed;root.Children.Add(_details);
         if(_brightness!=null)_details.Children.Add(_brightness.Details);if(_power!=null)_details.Children.Add(_power.Details);
+        if(_wireless!=null)
+        {
+            _wireless.WifiDetails.Visibility=Visibility.Collapsed;_details.Children.Add(_wireless.WifiDetails);
+            _wireless.BluetoothDetails.Visibility=Visibility.Collapsed;_details.Children.Add(_wireless.BluetoothDetails);
+        }
         _status.FontSize=11;_status.SetResourceReference(TextBlock.ForegroundProperty,"Muted");root.Children.Add(_status);Content=Ui.Scroll(root);
         _audio.Changed+=Render;IsVisibleChanged+=(_,_)=>{
             if(!_disposed)SyncActivity();
@@ -68,11 +79,21 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private void CancelPending(){_writeTimer.Stop();_pending.Clear();_brightness?.Cancel();}
     internal void SetPaused(bool paused){if(_paused==paused||_disposed)return;_paused=paused;SyncActivity();}
     private void SyncActivity(){bool active=IsVisible&&!_paused;if(!active)CancelPending();SetActive(active);}
-    private void SetActive(bool active){_audio.SetActive(active);_brightnessController?.SetActive(active);_powerController?.SetActive(active);}
+    private void SetActive(bool active){_audio.SetActive(active);_brightnessController?.SetActive(active);_powerController?.SetActive(active);_wireless?.SetActive(active);}
+    private void ScrollTop(){if(Content is ScrollViewer scroll)scroll.ScrollToTop();}
+    internal void RefreshWireless()=>_wireless?.Refresh();
+    private void ShowWirelessPanel(FrameworkElement? panel)
+    {
+        if(_wireless==null)return;
+        _wireless.WifiDetails.Visibility=panel==_wireless.WifiDetails?Visibility.Visible:Visibility.Collapsed;
+        _wireless.BluetoothDetails.Visibility=panel==_wireless.BluetoothDetails?Visibility.Visible:Visibility.Collapsed;
+        _wireless.ShowDetails(panel);
+    }
     private void ShowExtra(FrameworkElement detail,string title)
     {
         Flush();_home.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;_devicePanel.Visibility=_sessionPanel.Visibility=Visibility.Collapsed;
         if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;detail.Visibility=Visibility.Visible;_detailTitle.Text=title;
+        ShowWirelessPanel(detail);ScrollTop();
     }
     private void ShowDetails(bool devices)
     {
@@ -80,6 +101,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;
         _devicePanel.Visibility=devices?Visibility.Visible:Visibility.Collapsed;_sessionPanel.Visibility=devices?Visibility.Collapsed:Visibility.Visible;
         _detailTitle.Text=devices?"音频设备":"应用音量";
+        ShowWirelessPanel(null);ScrollTop();
     }
     private void Render(AudioSnapshot snapshot)
     {
@@ -116,7 +138,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         var entries=new[]{new AudioDevice("",devices.Length==0?"无可用设备":"跟随系统默认",input,false)}.Concat(devices).ToArray();
         combo.ItemsSource=entries;combo.SelectedItem=entries.FirstOrDefault(d=>d.Id==selected)??entries[0];combo.IsEnabled=devices.Length>0;
     }
-    public void Dispose(){if(_disposed)return;_disposed=true;CancelPending();_audio.Changed-=Render;_audio.Dispose();_brightness?.Dispose();_power?.Dispose();}
+    public void Dispose(){if(_disposed)return;_disposed=true;CancelPending();_audio.Changed-=Render;_audio.Dispose();_brightness?.Dispose();_power?.Dispose();_wireless?.Dispose();}
 }
 
 internal sealed class AudioLevelRow : StackPanel

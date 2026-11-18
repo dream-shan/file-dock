@@ -39,6 +39,8 @@ PawnIO 是由用户从 [官方网站](https://pawnio.eu/) 单独取得并安装�
 
 ## 主程序运行时
 
+无线控制使用 Microsoft.Windows.SDK.NET.Ref 10.0.19041.57。自包含包原样包含其中的 `Microsoft.Windows.SDK.NET.dll` 与 `WinRT.Runtime.dll`，依 [Windows SDK 再分发清单](https://learn.microsoft.com/en-us/legal/windows-sdk/redist#microsoftwindowssdknetref) 随 Windows 程序分发。`运行时许可/Windows-SDK-LICENSE.TXT` 保留该 SDK 包的官方条款。WinRT 运行时源码见 [C#/WinRT](https://github.com/microsoft/CsWinRT)。
+
 亮度模块另外使用 System.Management 10.0.2（MIT），版本与内容哈希同样记录于 `源码/packages.lock.json`。完整许可及包版权声明见 `运行时许可/System.Management-MIT.TXT`；构建脚本同时复制实际还原包的 THIRD-PARTY-NOTICES，随主程序分发。该组件来自 [.NET 源码](https://github.com/dotnet/runtime/tree/v10.0.2)，未修改。
 
 自包含 Windows x64 下载包使用 .NET / Windows Desktop Runtime 10.0.14，其版本在项目文件中锁定。构建脚本从这两个**实际还原的运行时包**复制其 LICENSE，以及 .NET Runtime 随包提供的 THIRD-PARTY-NOTICES，放入下载包的 `运行时许可/`。这些声明随二进制一起分发，不能仅保留文件坞自己的许可证。

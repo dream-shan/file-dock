@@ -52,7 +52,7 @@ try {
     }
     $buildInfo = [ordered]@{
         version=$version;commit=$revision.Trim();sdk=(Get-Content -Raw (Join-Path $repo 'global.json')|ConvertFrom-Json).sdk.version
-        runtime=[string]$project.Project.PropertyGroup.RuntimeFrameworkVersion
+        runtime=[string]$project.Project.PropertyGroup.FileDockRuntimeVersion
         architecture='win-x64';files=$manifest
     }
     $utf8 = [Text.UTF8Encoding]::new($false)

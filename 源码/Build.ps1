@@ -30,7 +30,15 @@ try {
     $assets = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'obj\project.assets.json') | ConvertFrom-Json
     $cache = @($assets.packageFolders.PSObject.Properties.Name)[0]
     [xml]$project = Get-Content -LiteralPath $main
-    $runtime = [string]$project.Project.PropertyGroup.RuntimeFrameworkVersion
+    $runtime = [string]$project.Project.PropertyGroup.FileDockRuntimeVersion
+    $windowsSdk = [string]$project.Project.PropertyGroup.WindowsSdkPackageVersion
+    $downloads = @($assets.project.frameworks.PSObject.Properties.Value.downloadDependencies)
+    foreach ($dependency in @(@('Microsoft.NETCore.App.Runtime.win-x64',$runtime),@('Microsoft.WindowsDesktop.App.Runtime.win-x64',$runtime),@('Microsoft.Windows.SDK.NET.Ref',$windowsSdk))) {
+        $resolved = @($downloads | Where-Object { $_.name -eq $dependency[0] })
+        if ($resolved.Count -ne 1 -or $resolved[0].version -ne "[$($dependency[1]), $($dependency[1])]") {
+            throw "Unexpected version for $($dependency[0])."
+        }
+    }
     $notices = Join-Path $output '运行时许可'
     New-Item -ItemType Directory -Path $notices -Force | Out-Null
     foreach ($pack in @('microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesktop.app.runtime.win-x64')) {
@@ -44,6 +52,7 @@ try {
         }
     }
     Copy-Item -LiteralPath (Join-Path $repo '运行时许可\NAudio-MIT.TXT') -Destination $notices
+    Copy-Item -LiteralPath (Join-Path $repo '运行时许可\Windows-SDK-LICENSE.TXT') -Destination $notices
     $tensors = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'System.Numerics.Tensors/*' })
     if ($tensors.Count -ne 1) { throw 'Cannot identify the restored Tensors package.' }
     $tensorsRoot = Join-Path $cache $tensors[0].ToLowerInvariant()

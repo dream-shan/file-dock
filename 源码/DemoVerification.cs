@@ -35,6 +35,9 @@ internal static class DemoVerification
         Check(window.State.SelectedPage=="Applications","Applications has its own selectable page");
         window.SelectPage("Control",false);
         Check(window.State.SelectedPage=="Control","Control center has its own selectable page");
+        window.UpdateLayout();
+        Check(DisplayPowerViewVerification.Children<System.Windows.Controls.Button>(window.ControlSection).Any(button=>System.Windows.Automation.AutomationProperties.GetName(button)=="Wi-Fi 详情"),"Control center offers a separate wireless-network detail action");
+        await WirelessVerification.Run(window,directory,Check);
         await ControlReviewRegression.Run(window,Check);
         await BrightnessVerification.Run(window,Check);
         await PowerVerification.Run(window,Check);

@@ -28,13 +28,17 @@ internal static partial class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr GetModuleHandle(string? name);
     [DllImport("dwmapi.dll")] internal static extern int DwmFlush();
 
-    internal static bool IsCaptureShortcut(int key)
+    internal static bool IsCaptureShortcut(int key,out uint modifiers)
     {
         // Read only modifiers, whose earlier events have already updated the
         // asynchronous state. The current key comes from the hook payload.
+        modifiers=0;
+        if (key is not (0x2C or 0x53 or 0x70)) return false;
         bool win = GetAsyncKeyState(0x5B) < 0 || GetAsyncKeyState(0x5C) < 0;
         bool shift = GetAsyncKeyState(0x10) < 0;
         bool alt = GetAsyncKeyState(0x12) < 0;
+        bool ctrl = GetAsyncKeyState(0x11) < 0;
+        modifiers=(win?8u:0)|(shift?4u:0)|(ctrl?2u:0)|(alt?1u:0);
         return key == 0x2C || (key == 0x53 && win && shift)
             || (key == 0x70 && !win && !alt && !shift); // Snipaste F1 / Ctrl+F1.
     }
@@ -82,7 +86,11 @@ public partial class MainWindow
             {
                 int key = Marshal.ReadInt32(data);
                 if (key == 0x1B) CancelCaptureShortcutPending();
-                else if (NativeMethods.IsCaptureShortcut(key)) BeginCaptureShortcut();
+                else if (NativeMethods.IsCaptureShortcut(key,out uint modifiers) &&
+                    ActiveModuleDialog is not ShortcutSettingsView { Recording: true } &&
+                    _shortcuts?.MatchesRegistered(ShortcutCatalog.Screenshot,modifiers,key)!=true &&
+                    !(IsActive && MatchesFilePreviewShortcut(modifiers,key) && FocusedPreviewFile()!=null))
+                    BeginCaptureShortcut();
             }
             // Never consume or simulate the user's keystroke.
             return NativeMethods.CallNextHookEx(_captureKeyHook, code, message, data);
@@ -106,7 +114,7 @@ public partial class MainWindow
     }
     internal void BeginCaptureShortcut()
     {
-        if (_quitting || _dock == null || _captureActive) return;
+        if (_ownScreenshotActive || _quitting || _dock == null || _captureActive) return;
         _capturePendingUntil = Environment.TickCount64 + 1500;
         _captureActive = true;
         RecordDiagnosticState("capture-shortcut");
@@ -120,6 +128,7 @@ public partial class MainWindow
 
     internal bool UpdateCaptureVisibility()
     {
+        if (_ownScreenshotActive) return true;
         _captureSurfaces.RemoveWhere(w => !NativeMethods.IsCaptureSurface(w));
         var foreground = NativeMethods.GetForegroundWindow();
         if (NativeMethods.IsCaptureSurface(foreground)) _captureSurfaces.Add(foreground);

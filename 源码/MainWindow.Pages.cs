@@ -77,7 +77,7 @@ public partial class MainWindow
         PerformanceSection.Visibility = IsPerformancePage ? Visibility.Visible : Visibility.Collapsed;
         CopySelectionButton.Visibility=IsFilesPage && _selectedPaths.Count>0 ? Visibility.Visible : Visibility.Collapsed;
         UpdatePerformanceActivity(); UpdateFolderWatcher(); UpdatePageRail();
-        if(IsPlannerPage)InteractionHint.Text="今日清单 · 点击编辑";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else if(IsToolsPage)InteractionHint.Text="窗口置顶 · 点击选择";else if(IsApplicationsPage)InteractionHint.Text="拖动排序 · 右键管理";else if(IsControlPage)InteractionHint.Text="亮度 · 声音 · 电源";else UpdateFileSelection();
+        if(IsPlannerPage)InteractionHint.Text="今日清单 · 点击编辑";else if(IsPerformancePage)InteractionHint.Text="电脑状态 · 点击内存整理";else if(IsToolsPage)InteractionHint.Text="点击工具执行 · 右侧查看选项";else if(IsApplicationsPage)InteractionHint.Text="拖动排序 · 右键管理";else if(IsControlPage)InteractionHint.Text="亮度 · 声音 · 电源";else UpdateFileSelection();
     }
     internal void UpdatePageRail()
     {

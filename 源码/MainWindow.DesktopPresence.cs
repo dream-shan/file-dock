@@ -40,7 +40,7 @@ public partial class MainWindow
         // produce a foreground change, so observe button-down only (no input log).
         _outsideClickCallback = (code, message, data) =>
         {
-            if (IsVisible && !IsPinned && !_captureActive && code >= 0 && message.ToInt32() is 0x0201 or 0x0204 or 0x0207 or 0x020B)
+            if (IsVisible && !IsPinned && !_ownScreenshotActive && !_captureActive && code >= 0 && message.ToInt32() is 0x0201 or 0x0204 or 0x0207 or 0x020B)
             {
                 var point = Marshal.PtrToStructure<NativeMethods.PointerPoint>(data);
                 IntPtr target = NativeMethods.TopLevelWindowAtPoint(point);

@@ -19,6 +19,7 @@ public sealed class AppState
     public List<ApplicationEntry> Applications {get;set;}=[];
     public Dictionary<string,ShortcutBinding>? Shortcuts {get;set;}
     public bool WindowPinHotkeyEnabled {get;set;}=true;
+    public bool IncludeDockInScreenshot {get;set;}
     public uint WindowPinModifiers {get;set;}=3;
     public int WindowPinKey {get;set;}=0x54;
     public List<CountdownItem> Countdowns {get;set;}=[];

@@ -15,7 +15,7 @@ public partial class MainWindow
         _windowPinning=new WindowPinningModule(new PinNative(),!App.IsSelfTest);
         _toolsView=new WindowPinningView(this,_windowPinning,PickPinWindow,State.WindowPinHotkeyEnabled,
             State.WindowPinModifiers,State.WindowPinKey,(_,_,_)=>"请在统一快捷键管理中修改。",_pinRegistrationStatus,
-            ()=>OpenShortcutSettings(ShortcutCatalog.Pin),()=>OpenShortcutSettings());
+            ()=>OpenShortcutSettings(ShortcutCatalog.Pin),()=>OpenShortcutSettings(), RunScreenshot, BuildScreenshotOptions);
         ToolsSection.Content=_toolsView.View;
         ToolsSection.IsVisibleChanged+=(_,_)=>{if(ToolsSection.IsVisible)_toolsView?.OnShown();else _toolsView?.OnHidden();};
         if(ToolsSection.IsVisible)_toolsView.OnShown();

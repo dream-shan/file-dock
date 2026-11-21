@@ -44,6 +44,9 @@ internal static class DemoVerification
         await DisplayPowerViewVerification.Run(window,directory,Check);
         await AudioControlVerification.Run(window,directory,Check);
         await ShortcutRegistryVerification.Run(Check);
+        ScreenshotVerification.Run(Check);
+        await FilePreviewVerification.Run(window,directory,Check);
+        await FilePreviewVerification.VerifyFocus(window,directory,Check);
         await ApplicationsVerification.Run(window,directory,Check);
         window.SelectPage("Files",false);
         bool IsUtilityWindow(Window target)

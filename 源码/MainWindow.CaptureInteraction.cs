@@ -62,6 +62,7 @@ public partial class MainWindow
     internal bool TrySuppressCaptureInput(int message, IntPtr wParam, out IntPtr result)
     {
         result = IntPtr.Zero;
+        if (_ownScreenshotActive && message == 0x0312) return true;
         if (!_captureInteractionHeld) return false;
         // Leave hit testing, accessibility and geometry queries intact so screenshot
         // tools can discover the same HWND and its bounds. Do not use HTTRANSPARENT.

@@ -348,6 +348,7 @@ public partial class MainWindow : Window
         if (entry.Kind == "图片" && _selectedPaths.Count == 1) AddMenu(menu, "复制图片", () => _ = CopySelectedFilesAsync(true));
         menu.Items.Add(new Separator());
         AddMenu(menu, entry.Kind == "文件夹" ? "在文件坞中浏览" : "打开", () => OpenEntry(entry));
+        if (entry.Kind != "文件夹") AddMenu(menu, "预览", () => PreviewFile(entry));
         if (entry.Kind == "文件夹") AddMenu(menu, "在文件管理器中打开", () => { try { FileService.Open(entry.Path); } catch (Exception ex) { SetStatus(ex.Message, true); } });
         AddMenu(menu, "打开所在位置", () => { try { FileService.Reveal(entry.Path); } catch (Exception ex) { SetStatus(ex.Message, true); } });
         AddMenu(menu, "复制路径", () => { try { Clipboard.SetText(entry.Path); SetStatus("已复制路径"); } catch (Exception ex) { SetStatus(ex.Message, true); } });
@@ -574,6 +575,7 @@ public partial class MainWindow : Window
     {
         if (_captureInteractionHeld) { e.Handled = true; return; }
         if(ActiveModuleDialog!=null){ActiveModuleDialog.HandleWindowKey(e);return;}
+        if (HandleFilePreviewKey(e)) return;
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { SelectPage("Files"); SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
         if (Planner.IsKeyboardFocusWithin && e.Key != Key.Escape) return;
         if (HandleMemoryActionKey(e) || IsFilesPage && (HandleTransferKey(e) || HandleBrowserKey(e))) return;
@@ -592,6 +594,7 @@ public partial class MainWindow : Window
     public async void Quit() => await QuitAsync();
     public void DisposeResources()
     {
+        _filePreview?.Close();
         DisposeWindowPinning();
         _controlCenter?.Dispose();
         _shortcuts?.Dispose();_applicationsView?.Dispose();

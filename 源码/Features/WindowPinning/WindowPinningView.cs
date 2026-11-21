@@ -23,23 +23,38 @@ internal sealed class WindowPinningView : IModuleDialog
     private readonly StackPanel _toolList = new();
     private readonly StackPanel _details = new() { Visibility=Visibility.Collapsed };
     private readonly Button _run;
+    private readonly StackPanel? _screenshotOptions;
     public FrameworkElement View { get; }
     public bool HasChanges => false;
     internal WindowPinningView(IModuleHost host, WindowPinningModule module, Action pick,
         bool enabled, uint mods, int key, Func<bool,uint,int,string> save, string registrationStatus,
-        Action? manageShortcut=null,Action? manageAll=null)
+        Action? manageShortcut=null,Action? manageAll=null, Action? screenshot=null, Action<Panel>? screenshotOptions=null)
     {
         _host=host;_module=module;_pick=pick;_save=save;_mods=mods;_key=key;
         var root=new StackPanel(); root.SetResourceReference(Control.ForegroundProperty,"Ink");
         _toolList.Children.Add(new TextBlock { Text="工具", FontSize=18, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,12) });
-        var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(44)});
-        _run=Button("窗口置顶",()=>_pick());_run.MinHeight=44;_run.Margin=new Thickness(0);_run.HorizontalContentAlignment=HorizontalAlignment.Left;_run.Padding=new Thickness(12,0,8,0);
-        _run.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");_run.SetResourceReference(Control.ForegroundProperty,"Ink");
-        System.Windows.Automation.AutomationProperties.SetName(_run,"窗口置顶：选择窗口");row.Children.Add(_run);
-        var detailsButton=Button("›",ShowDetails);detailsButton.MinHeight=44;detailsButton.Margin=new Thickness(0);detailsButton.FontSize=20;detailsButton.ToolTip="已置顶窗口与快捷键设置";
-        detailsButton.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");System.Windows.Automation.AutomationProperties.SetName(detailsButton,"窗口置顶详情");
-        var divider=new Border{BorderThickness=new Thickness(1,0,0,0),Child=detailsButton};divider.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");Grid.SetColumn(divider,1);row.Children.Add(divider);
-        var rowBorder=new Border{Child=row,CornerRadius=new CornerRadius(8),BorderThickness=new Thickness(1)};rowBorder.SetResourceReference(Border.BackgroundProperty,"PaneCard");rowBorder.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");_toolList.Children.Add(rowBorder);root.Children.Add(_toolList);
+        _run=Button("窗口置顶",_pick);
+        _toolList.Children.Add(ToolRow(_run,"窗口置顶：选择窗口","窗口置顶详情","已置顶窗口与快捷键设置",ShowDetails));
+        root.Children.Add(_toolList);
+        if (screenshot != null && screenshotOptions != null)
+        {
+            var options = new StackPanel { Visibility = Visibility.Collapsed };
+            var runScreenshot = Button("截图", screenshot);
+            var backToTools = Button("← 工具", () => {
+                options.Visibility = Visibility.Collapsed;
+                _toolList.Visibility = Visibility.Visible;
+                runScreenshot.Focus();
+            });
+            options.Children.Add(backToTools);
+            screenshotOptions(options);
+            root.Children.Add(options);
+            _toolList.Children.Add(ToolRow(runScreenshot,"截图：选择区域","截图选项","包含文件坞与快捷键设置",() => {
+                _details.Visibility = _toolList.Visibility = Visibility.Collapsed;
+                options.Visibility = Visibility.Visible;
+                backToTools.Focus();
+            }));
+            _screenshotOptions = options;
+        }
         if(manageAll!=null){var entry=Button("快捷键管理",manageAll);entry.MinHeight=44;entry.HorizontalContentAlignment=HorizontalAlignment.Left;entry.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");_toolList.Children.Add(entry);}
         var back=Button("← 工具",()=>{_details.Visibility=Visibility.Collapsed;_toolList.Visibility=Visibility.Visible;_run.Focus();});back.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new Thickness(0,0,0,8);_details.Children.Add(back);
         _details.Children.Add(new TextBlock{Text="窗口置顶",FontSize=18,FontWeight=FontWeights.SemiBold});
@@ -63,7 +78,37 @@ internal sealed class WindowPinningView : IModuleDialog
     }
     private void UpdateTooltip()=>_run.ToolTip="选择窗口置顶或取消 · "+(_enabled.IsChecked==true?Format(_mods,_key):"快捷键已禁用");
     internal void UpdateShortcut(ShortcutBinding binding,string status){_mods=binding.Modifiers;_key=binding.Key;_enabled.IsChecked=binding.Enabled;_message.Text=status;UpdateTooltip();}
-    internal void ShowDetails(){_toolList.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;Render();}
+    private static Border ToolRow(Button run, string actionName, string detailsName, string hint, Action showDetails)
+    {
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
+        run.MinHeight = 44;
+        run.Margin = new Thickness(0);
+        run.Padding = new Thickness(12,0,8,0);
+        run.HorizontalContentAlignment = HorizontalAlignment.Left;
+        run.SetResourceReference(FrameworkElement.StyleProperty, "QuietButton");
+        System.Windows.Automation.AutomationProperties.SetName(run, actionName);
+        row.Children.Add(run);
+
+        var details = Button("›", showDetails);
+        details.MinHeight = 44;
+        details.Margin = new Thickness(0);
+        details.FontSize = 20;
+        details.ToolTip = hint;
+        details.SetResourceReference(FrameworkElement.StyleProperty, "QuietButton");
+        System.Windows.Automation.AutomationProperties.SetName(details, detailsName);
+        var divider = new Border { BorderThickness = new Thickness(1,0,0,0), Child = details };
+        divider.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
+        Grid.SetColumn(divider,1);
+        row.Children.Add(divider);
+
+        var border = new Border { Child = row, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Margin = new Thickness(0,0,0,4) };
+        border.SetResourceReference(Border.BackgroundProperty,"PaneCard");
+        border.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
+        return border;
+    }
+    internal void ShowDetails(){if(_screenshotOptions!=null)_screenshotOptions.Visibility=Visibility.Collapsed;_toolList.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;Render();}
     internal static string Format(uint mods,int key) => ((mods&2)!=0?"Ctrl + ":"")+((mods&1)!=0?"Alt + ":"")+((mods&4)!=0?"Shift + ":"")+((mods&8)!=0?"Win + ":"")+KeyInterop.KeyFromVirtualKey(key);
     private static Button Button(string text,Action action)
     {

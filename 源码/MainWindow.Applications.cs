@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using Microsoft.Win32;
 
 namespace FileDockDemo;
@@ -79,8 +80,18 @@ public partial class MainWindow
         _shortcuts.Add(ShortcutCatalog.Pin,"窗口置顶",()=>{
             if(!_exitSaving&&_windowPicker==null&&!_captureInteractionHeld&&_windowPinning!=null)NotifyWindowPin(_windowPinning.Toggle(NativeMethods.GetForegroundWindow()));
         },State.Shortcuts[ShortcutCatalog.Pin]);
+        _shortcuts.Add(ShortcutCatalog.Screenshot,"截图",RunScreenshot,State.Shortcuts[ShortcutCatalog.Screenshot]);
+        _shortcuts.Add(ShortcutCatalog.Preview,"文件预览",null,State.Shortcuts[ShortcutCatalog.Preview]);
         RefreshApplicationActions();UpdateShortcutHints();
     }
+    private bool MatchesFilePreviewShortcut(KeyEventArgs e)
+    {
+        var key=e.Key==Key.System?e.SystemKey:e.Key;
+        return MatchesFilePreviewShortcut((uint)Keyboard.Modifiers,KeyInterop.VirtualKeyFromKey(key));
+    }
+    private bool MatchesFilePreviewShortcut(uint modifiers,int key) =>
+        IsFilesPage && !_quitting && !_exitSaving && !_inDialog && ActiveModuleDialog==null && !_captureInteractionHeld &&
+        State.Shortcuts!.TryGetValue(ShortcutCatalog.Preview,out var binding) && binding.Matches(modifiers,key);
     private void RefreshApplicationActions()
     {
         if(_shortcuts==null)return;

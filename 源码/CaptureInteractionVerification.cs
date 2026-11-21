@@ -56,5 +56,29 @@ internal static class CaptureInteractionVerification
         NativeMethods.SetCaptureTopmost(handle,oldTopmost);
         window.BeginCaptureShortcut();await Task.Delay(1650);window.UpdateCaptureVisibility();
         check(!window.CaptureInteractionHeld && NativeMethods.IsWindowEnabled(handle),"Unused expanded screenshot shortcut expires and restores input");
+
+        bool held = false, hidden = false, nested = false;
+        window.RunScreenshot((owner, prepare, restore) => {
+            prepare();
+            try {
+                hidden = !window.IsVisible && !window.DockEntry.IsVisible;
+                held = window.UpdateCaptureVisibility() && window.TrySuppressCaptureInput(0x0312, IntPtr.Zero, out _);
+                window.RunScreenshot((_,_,_) => { nested = true; return ""; });
+            } finally { restore(); }
+            return "已取消截图";
+        });
+        check(hidden && held && !nested && window.IsVisible && !window.UpdateCaptureVisibility(),
+            "Built-in capture hides both dock surfaces, blocks reentry and restores the expanded panel");
+        window.State.IncludeDockInScreenshot = true;
+        bool included = false;
+        try {
+            window.RunScreenshot((_,prepare,restore) => {
+                prepare();
+                try { included = window.IsVisible; throw new InvalidOperationException("test capture error"); }
+                finally { restore(); }
+            });
+            check(included && window.IsVisible && !window.UpdateCaptureVisibility(),
+                "Include-dock capture preserves the visible panel and releases the guard on failure");
+        } finally { window.State.IncludeDockInScreenshot = false; }
     }
 }

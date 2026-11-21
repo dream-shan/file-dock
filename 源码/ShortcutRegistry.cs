@@ -12,13 +12,27 @@ public sealed class ShortcutBinding
     public uint Modifiers {get;set;}
     public int Key {get;set;}
     internal ShortcutBinding Copy()=>(ShortcutBinding)MemberwiseClone();
+    internal bool Matches(uint modifiers,int key) => Enabled && Modifiers==modifiers && Key==key;
     internal string Label=>Key==0?"未设置":Features.WindowPinning.WindowPinningView.Format(Modifiers,Key);
-    internal bool Valid=>Key==0?!Enabled:Key>=8&&Key<=254&&(Modifiers&3)!=0&&(Modifiers&~15u)==0&&Key is not (0x10 or 0x11 or 0x12 or 0x5B or 0x5C or 0xA0 or 0xA1 or 0xA2 or 0xA3 or 0xA4 or 0xA5);
+    internal bool IsValidFor(string action)
+    {
+        if (Key == 0) return !Enabled;
+        if (action == ShortcutCatalog.Preview)
+        {
+            if (Key == 0x20 && Modifiers == 0) return true;
+            // Enter, Escape and F5 are handled regardless of modifiers in the file page.
+            if (Key is 0x09 or 0x0D or 0x1B or 0x74 ||
+                (Modifiers, Key) is (2, 0x43 or 0x46) or (1, 0x25 or 0x26 or 0x73)) return false;
+        }
+        return Key is >= 8 and <= 254 && (Modifiers & 3) != 0 && (Modifiers & ~15u) == 0 &&
+            Key is not (0x10 or 0x11 or 0x12 or 0x5B or 0x5C or 0xA0 or 0xA1 or 0xA2 or 0xA3 or 0xA4 or 0xA5);
+    }
 }
 
 internal static class ShortcutCatalog
 {
     internal const string Wake="dock.toggle",Pin="window.pin";
+    internal const string Screenshot="screen.capture", Preview="file.preview";
     internal static string Application(string id)=>"app:"+id;
     internal static ShortcutBinding Default(string action)=>action switch {
         Wake=>new(){Enabled=true,Modifiers=3,Key=32},
@@ -26,8 +40,8 @@ internal static class ShortcutCatalog
     internal static void Normalize(AppState state)
     {
         if(state.Shortcuts==null)state.Shortcuts=new(){[Wake]=Default(Wake),[Pin]=new(){Enabled=state.WindowPinHotkeyEnabled,Modifiers=state.WindowPinModifiers,Key=state.WindowPinKey}};
-        foreach(var action in new[]{Wake,Pin})if(!state.Shortcuts.ContainsKey(action))state.Shortcuts[action]=Default(action);
-        if(state.Shortcuts.Any(pair=>string.IsNullOrWhiteSpace(pair.Key)||pair.Value==null||!pair.Value.Valid))throw new System.IO.InvalidDataException("快捷键配置无效。");
+        foreach(var action in new[]{Wake,Pin,Screenshot,Preview})if(!state.Shortcuts.ContainsKey(action))state.Shortcuts[action]=Default(action);
+        if(state.Shortcuts.Any(pair=>string.IsNullOrWhiteSpace(pair.Key)||pair.Value==null||!pair.Value.IsValidFor(pair.Key)))throw new System.IO.InvalidDataException("快捷键配置无效。");
     }
 }
 
@@ -43,11 +57,12 @@ internal sealed class NativeShortcutBackend(IntPtr window,bool enabled=true) : I
     public void Unregister(int id){if(enabled)NativeMethods.UnregisterHotKey(window,id);}
 }
 
-internal sealed class ShortcutAction(string key,string name,Action run,ShortcutBinding binding)
+internal sealed class ShortcutAction(string key,string name,Action? run,ShortcutBinding binding)
 {
     internal string Key {get;}=key;
     internal string Name {get;set;}=name;
-    internal Action Run {get;}=run;
+    internal Action? Run {get;}=run;
+    internal string Scope => Key == ShortcutCatalog.Preview ? "文件坞文件列表" : "全局";
     internal ShortcutBinding Binding {get;set;}=binding.Copy();
     internal int NativeId {get;set;}
     internal string Status {get;set;}="未设置";
@@ -63,29 +78,35 @@ internal sealed class ShortcutRegistry(IShortcutBackend backend) : IDisposable
     private int _next=0x5100;
     private bool _disposed;
     internal IReadOnlyList<ShortcutAction> Items=>_actions.Values.ToArray();
+    internal bool MatchesRegistered(string action,uint modifiers,int key) =>
+        _actions.TryGetValue(action,out var item) && item.NativeId!=0 && item.Binding.Matches(modifiers,key);
     private int Allocate()=>_free.Count>0?_free.Pop():_next<0xBFFF?_next++:throw new InvalidOperationException("快捷键数量超出限制。");
     // UnregisterHotKey does not discard queued WM_HOTKEY messages. Never reuse a
     // successfully registered ID within this session, even for a different chord.
     private void Release(int id){if(id==0)return;backend.Unregister(id);}
-    internal void Add(string key,string name,Action action,ShortcutBinding binding)
+    internal void Add(string key,string name,Action? action,ShortcutBinding binding)
     {
         if(_disposed)throw new ObjectDisposedException(nameof(ShortcutRegistry));
         if(_actions.TryGetValue(key,out var existing)){existing.Name=name;return;}
         var item=new ShortcutAction(key,name,action,binding);_actions.Add(key,item);
-        if(binding.Enabled&&binding.Valid)
+        if(binding.Enabled&&binding.IsValidFor(key))
         {
+            if (key == ShortcutCatalog.Preview) { item.Status = "已生效"; return; }
             int id=Allocate();if(backend.Register(id,binding)){item.NativeId=id;item.Status="已生效";}else{_free.Push(id);item.Status="注册失败，可能被占用";}
         }
         else item.Status=binding.Key==0?"未设置":"已禁用";
     }
     internal bool Dispatch(int id)
     {
-        var item=_actions.Values.FirstOrDefault(a=>a.NativeId==id&&id!=0);if(item==null)return false;
-        item.Run();return true;
+        var item=_actions.Values.FirstOrDefault(a=>a.NativeId==id&&id!=0);if(item?.Run is not {} run)return false;
+        run();return true;
     }
     internal async Task<ShortcutResult> ChangeAsync(string key,ShortcutBinding proposed,Func<Task<bool>> persist)
     {
-        var binding=proposed.Copy();if(!binding.Valid)return new(false,"请选择包含 Ctrl 或 Alt 的有效组合键。");
+        var binding=proposed.Copy();
+        if (!binding.IsValidFor(key)) return new(false, key == ShortcutCatalog.Preview
+            ? "请使用空格或含 Ctrl / Alt 的组合，避开文件列表已有操作。"
+            : "请选择包含 Ctrl 或 Alt 的有效组合键。");
         await _changes.WaitAsync();int reserved=0;
         try
         {
@@ -93,7 +114,7 @@ internal sealed class ShortcutRegistry(IShortcutBackend backend) : IDisposable
             var conflict=_actions.Values.FirstOrDefault(a=>a.Key!=key&&a.Binding.Enabled&&binding.Enabled&&a.Binding.Modifiers==binding.Modifiers&&a.Binding.Key==binding.Key);
             if(conflict!=null)return new(false,"与“"+conflict.Name+"”冲突，请选择其他组合键。");
             bool reuse=binding.Enabled&&item.NativeId!=0&&binding.Modifiers==item.Binding.Modifiers&&binding.Key==item.Binding.Key;
-            if(binding.Enabled&&!reuse)
+            if(binding.Enabled&&!reuse&&key!=ShortcutCatalog.Preview)
             {
                 reserved=Allocate();if(!backend.Register(reserved,binding)){_free.Push(reserved);reserved=0;return new(false,"注册失败，可能被其他程序占用或受系统限制；原快捷键保留。");}
             }

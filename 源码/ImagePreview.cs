@@ -20,7 +20,8 @@ internal static class ImageLoader
     internal static void InvalidateThumbnails() { lock (Cache) { Cache.Clear(); ++_cacheGeneration; } }
     internal static int CacheCount { get { lock (Cache) return Cache.Count; } }
 
-    internal static async Task<BitmapSource?> LoadAsync(string path, bool preview, CancellationToken token)
+    internal static async Task<BitmapSource?> LoadAsync(string path, bool preview, CancellationToken token,
+        int previewWidth = 720, int previewHeight = 560)
     {
         int generation; lock (Cache) generation = _cacheGeneration;
         await Workers.WaitAsync(token);
@@ -49,7 +50,7 @@ internal static class ImageLoader
                         if ((long)width * height > 200_000_000) return null;
                         token.ThrowIfCancellationRequested();
                         stream.Position = 0;
-                        int maxWidth = preview ? 720 : 96, maxHeight = preview ? 560 : 96;
+                        int maxWidth = preview ? previewWidth : 96, maxHeight = preview ? previewHeight : 96;
                         var image = new BitmapImage();
                         image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = stream;
                         if (width / (double)maxWidth >= height / (double)maxHeight) image.DecodePixelWidth = Math.Min(width, maxWidth);

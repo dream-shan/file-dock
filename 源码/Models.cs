@@ -18,6 +18,7 @@ public sealed class AppState
 {
     public List<ApplicationEntry> Applications {get;set;}=[];
     public Dictionary<string,ShortcutBinding>? Shortcuts {get;set;}
+    public List<AppShortcutGroup> AppShortcutGroups { get; set; } = [];
     public bool WindowPinHotkeyEnabled {get;set;}=true;
     public bool IncludeDockInScreenshot {get;set;}
     public uint WindowPinModifiers {get;set;}=3;
@@ -49,6 +50,7 @@ public sealed class AppState
         var copy = (AppState)MemberwiseClone();
         copy.Applications=Applications.Select(a=>a.Copy()).ToList();
         copy.Shortcuts=Shortcuts?.ToDictionary(p=>p.Key,p=>p.Value.Copy());
+        copy.AppShortcutGroups = AppShortcutGroups.Select(group => group.Copy()).ToList();
         copy.Pins = Pins.Select(p => p.Copy()).ToList();
         copy.Plans = Plans.Select(p => p.Copy()).ToList();
         copy.Countdowns = Countdowns.Select(p => p.Copy()).ToList();

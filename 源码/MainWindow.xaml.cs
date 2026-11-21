@@ -162,12 +162,12 @@ public partial class MainWindow : Window
 
     internal void QueueDockRaise()
     {
-        if (_quitting || !_isCollapsed || _foregroundUpdateQueued) return;
+        if (_quitting || SelectingAppShortcutTarget || !_isCollapsed || _foregroundUpdateQueued) return;
         _foregroundUpdateQueued = true;
         Dispatcher.BeginInvoke(() =>
         {
             _foregroundUpdateQueued = false;
-            if (_quitting || !_isCollapsed || _dock == null) return;
+            if (_quitting || SelectingAppShortcutTarget || !_isCollapsed || _dock == null) return;
             if (UpdateCaptureVisibility()) return;
             if (!_dock.IsVisible) _dock.Show();
             // Reorder events also occur while unrelated windows change. Avoid
@@ -497,7 +497,7 @@ public partial class MainWindow : Window
 
     internal void ShowPanel(bool activate, bool reposition = true)
     {
-        if (_quitting || UpdateCaptureVisibility()) return;
+        if (_quitting || SelectingAppShortcutTarget || UpdateCaptureVisibility()) return;
         _desktopPresence.Reveal();
         _passiveRevealForeground = activate ? IntPtr.Zero : NativeMethods.GetForegroundWindow();
         RememberMemoryForeground();

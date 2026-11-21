@@ -66,7 +66,7 @@ public partial class MainWindow
     },false);
     internal void LaunchApplication(string id)
     {
-        if(_exitSaving||_quitting)return;
+        if(_exitSaving||_quitting||_windowPicker!=null)return;
         var app=State.Applications.FirstOrDefault(a=>a.Id==id);if(app==null)return;
         try{app.Launch();SetStatus("已请求打开："+app.DisplayName);if(IsVisible)CollapsePanel();}
         catch(Exception error){SetStatus("启动失败："+error.Message,true);if(!IsVisible&&!App.IsSelfTest&&_tray!=null){_tray.BalloonTipTitle="应用启动失败";_tray.BalloonTipText=error.Message;_tray.ShowBalloonTip(2500);}}
@@ -124,6 +124,29 @@ public partial class MainWindow
     internal void OpenShortcutSettings(string? action=null)
     {
         if(_shortcuts==null||_exitSaving)return;if(!IsVisible)ExpandPanel();
-        OpenModuleDialog(new ShortcutSettingsView(this,_shortcuts,ChangeShortcutAsync,action));
+        OpenModuleDialog(new ShortcutSettingsView(this,_shortcuts,ChangeShortcutAsync,action,OpenAppShortcutCatalog));
+    }
+
+    private void OpenAppShortcutCatalog()
+    {
+        if (_exitSaving || _quitting) return;
+        OpenModuleDialog(new AppShortcutCatalogDialog(this, () => State.AppShortcutGroups, () => State.Applications,
+            SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings()));
+    }
+
+    internal Task<bool> SaveAppShortcutGroupAsync(AppShortcutGroup group)
+    {
+        if (!group.Valid()) return Task.FromResult(false);
+        var draft = group.Copy();
+        string key = FileService.NormalizeKey(draft.Path);
+        return CatalogOperation(() => _saves.CommitAsync(state => {
+            int index = state.AppShortcutGroups.FindIndex(item => FileService.NormalizeKey(item.Path) == key);
+            if (draft.Manual.Count == 0 && draft.Sources.Count == 0)
+            {
+                if (index >= 0) state.AppShortcutGroups.RemoveAt(index);
+            }
+            else if (index >= 0) state.AppShortcutGroups[index] = draft;
+            else state.AppShortcutGroups.Add(draft);
+        }, state => State.AppShortcutGroups = state.AppShortcutGroups), false);
     }
 }

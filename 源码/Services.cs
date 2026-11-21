@@ -115,6 +115,7 @@ public sealed class StorageService
         if(state.Applications.Any(a=>a==null||string.IsNullOrWhiteSpace(a.Id)||string.IsNullOrWhiteSpace(a.DisplayName)||string.IsNullOrWhiteSpace(a.Path)||a.Arguments==null||a.WorkingDirectory==null||!ApplicationEntry.Supported(a.Path))||state.Applications.Select(a=>a.Id).Distinct().Count()!=state.Applications.Count)
             throw new InvalidDataException("应用入口配置无效。");
         ShortcutCatalog.Normalize(state);
+        AppShortcutGroup.Validate(state);
         state.PanelWidth=Math.Clamp(state.PanelWidth,380,4000);state.PanelHeight=Math.Clamp(state.PanelHeight,480,4000);
         state.EmptyAreaTransparency=Math.Clamp(state.EmptyAreaTransparency,0,85);
         state.Countdowns??=[];

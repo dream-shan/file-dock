@@ -13,6 +13,7 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     private readonly IModuleHost _host;
     private readonly ShortcutRegistry _registry;
     private readonly Func<string,ShortcutBinding,Task<ShortcutResult>> _save;
+    private readonly Action? _openAppShortcuts;
     private readonly StackPanel _body=new();
     private readonly TextBlock _message=Ui.Text("");
     private ShortcutAction? _editing;
@@ -23,9 +24,9 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     public FrameworkElement View {get;}
     public bool HasChanges=>_dirty||_busy;
     internal bool Recording => !_busy && _input?.IsKeyboardFocusWithin==true;
-    internal ShortcutSettingsView(IModuleHost host,ShortcutRegistry registry,Func<string,ShortcutBinding,Task<ShortcutResult>> save,string? action=null)
+    internal ShortcutSettingsView(IModuleHost host,ShortcutRegistry registry,Func<string,ShortcutBinding,Task<ShortcutResult>> save,string? action=null,Action? openAppShortcuts=null)
     {
-        _host=host;_registry=registry;_save=save;
+        _host=host;_registry=registry;_save=save;_openAppShortcuts=openAppShortcuts;
         var root=new StackPanel();root.Children.Add(Ui.Text("快捷键管理",18));root.Children.Add(_body);root.Children.Add(_message);root.Children.Add(Ui.Button("关闭",RequestClose));
         View=Ui.Scroll(root);ShowList();
         if(action!=null&&registry.Items.FirstOrDefault(a=>a.Key==action) is {} item)Edit(item);
@@ -33,6 +34,8 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     private void ShowList()
     {
         _body.Children.Clear();_editing=null;_dirty=false;_input=null;_enabled=null;
+        if (_openAppShortcuts != null)
+            _body.Children.Add(Ui.Button("软件内部快捷键  ›",_openAppShortcuts));
         foreach(var item in _registry.Items)
         {
             string label=item.Name+"\n"+item.Scope+" · "+(item.Binding.Key==0?"未设置":item.Binding.Label+" · "+item.Status);

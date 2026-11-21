@@ -71,7 +71,13 @@ public sealed class ManualAppShortcut
     public string Keys { get; set; } = "";
     public string Note { get; set; } = "";
     public ManualShortcutScope Scope { get; set; }
-    internal ManualAppShortcut Copy() => (ManualAppShortcut)MemberwiseClone();
+    public ShortcutBinding? Mapping { get; set; }
+    internal ManualAppShortcut Copy()
+    {
+        var copy = (ManualAppShortcut)MemberwiseClone();
+        copy.Mapping = Mapping?.Copy();
+        return copy;
+    }
 }
 
 public enum ManualShortcutScope { Unknown, Application, Global }
@@ -93,5 +99,11 @@ public sealed class ImportedAppShortcut
     public string Condition { get; set; } = "";
     public bool HasArguments { get; set; }
     public bool SystemWide { get; set; }
-    internal ImportedAppShortcut Copy() => (ImportedAppShortcut)MemberwiseClone();
+    public ShortcutBinding? Mapping { get; set; }
+    internal ImportedAppShortcut Copy()
+    {
+        var copy = (ImportedAppShortcut)MemberwiseClone();
+        copy.Mapping = Mapping?.Copy();
+        return copy;
+    }
 }

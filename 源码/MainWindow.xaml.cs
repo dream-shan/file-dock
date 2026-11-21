@@ -597,6 +597,7 @@ public partial class MainWindow : Window
         _filePreview?.Close();
         DisposeWindowPinning();
         _controlCenter?.Dispose();
+        _appMappings.Dispose();
         _shortcuts?.Dispose();_applicationsView?.Dispose();
         _saves.Dispose();
         _pageRailWindow?.DisposeRail();

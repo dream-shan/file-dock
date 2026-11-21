@@ -13,6 +13,7 @@ public partial class MainWindow
 {
     private ApplicationsView? _applicationsView;
     private ShortcutRegistry? _shortcuts;
+    private readonly AppMappingRuntime _appMappings = new();
     private readonly SemaphoreSlim _catalogGate=new(1);
     private Task _catalogOperations=Task.CompletedTask;
 
@@ -62,7 +63,13 @@ public partial class MainWindow
     },false);
     internal Task RemoveApplicationAsync(string id)=>CatalogOperation(async()=>{
         bool saved=await _saves.CommitAsync(s=>{s.Applications.RemoveAll(a=>a.Id==id);s.Shortcuts!.Remove(ShortcutCatalog.Application(id));},s=>{State.Applications=s.Applications;State.Shortcuts=s.Shortcuts;});
-        if(saved){_shortcuts?.Remove(ShortcutCatalog.Application(id));_applicationsView?.Render();}return saved;
+        if (saved)
+        {
+            _shortcuts?.Remove(ShortcutCatalog.Application(id));
+            _appMappings.Update(State.AppShortcutGroups, State.Shortcuts);
+            _applicationsView?.Render();
+        }
+        return saved;
     },false);
     internal void LaunchApplication(string id)
     {
@@ -83,6 +90,7 @@ public partial class MainWindow
         _shortcuts.Add(ShortcutCatalog.Screenshot,"截图",RunScreenshot,State.Shortcuts[ShortcutCatalog.Screenshot]);
         _shortcuts.Add(ShortcutCatalog.Preview,"文件预览",null,State.Shortcuts[ShortcutCatalog.Preview]);
         RefreshApplicationActions();UpdateShortcutHints();
+        _appMappings.Update(State.AppShortcutGroups, State.Shortcuts);
     }
     private bool MatchesFilePreviewShortcut(KeyEventArgs e)
     {
@@ -104,10 +112,18 @@ public partial class MainWindow
     internal Task<ShortcutResult> ChangeShortcutAsync(string action,ShortcutBinding binding)=>CatalogOperation(async()=>{
         if(_shortcuts==null)return new ShortcutResult(false,"快捷键管理尚未就绪。");
         var draft=binding.Copy();
+        if (action != ShortcutCatalog.Preview && draft.Enabled)
+        {
+            var chord = new AppChord(draft.Modifiers, draft.Key);
+            foreach (var group in State.AppShortcutGroups)
+                if (AppMappingRules.Active(group).Any(rule => rule.Alias == chord || rule.Original == chord))
+                    return new ShortcutResult(false, $"与「{group.Name}」的应用内映射冲突。请先暂停或更改该映射。");
+        }
         var result=await _shortcuts.ChangeAsync(action,draft,()=>_saves.CommitAsync(s=>{
             s.Shortcuts![action]=draft.Copy();
             if(action==ShortcutCatalog.Pin){s.WindowPinHotkeyEnabled=draft.Enabled;s.WindowPinModifiers=draft.Modifiers;s.WindowPinKey=draft.Key;}
         },s=>{State.Shortcuts=s.Shortcuts;State.WindowPinHotkeyEnabled=s.WindowPinHotkeyEnabled;State.WindowPinModifiers=s.WindowPinModifiers;State.WindowPinKey=s.WindowPinKey;}));
+        if (result.Success) _appMappings.Update(State.AppShortcutGroups, State.Shortcuts);
         UpdateShortcutHints();return result;
     },new ShortcutResult(false,"程序正在退出。"));
     private void UpdateShortcutHints()
@@ -131,7 +147,7 @@ public partial class MainWindow
     {
         if (_exitSaving || _quitting) return;
         OpenModuleDialog(new AppShortcutCatalogDialog(this, () => State.AppShortcutGroups, () => State.Applications,
-            SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings()));
+            SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings(), () => State.Shortcuts!));
     }
 
     internal Task<bool> SaveAppShortcutGroupAsync(AppShortcutGroup group)
@@ -139,14 +155,20 @@ public partial class MainWindow
         if (!group.Valid()) return Task.FromResult(false);
         var draft = group.Copy();
         string key = FileService.NormalizeKey(draft.Path);
-        return CatalogOperation(() => _saves.CommitAsync(state => {
-            int index = state.AppShortcutGroups.FindIndex(item => FileService.NormalizeKey(item.Path) == key);
-            if (draft.Manual.Count == 0 && draft.Sources.Count == 0)
-            {
-                if (index >= 0) state.AppShortcutGroups.RemoveAt(index);
-            }
-            else if (index >= 0) state.AppShortcutGroups[index] = draft;
-            else state.AppShortcutGroups.Add(draft);
-        }, state => State.AppShortcutGroups = state.AppShortcutGroups), false);
+        return CatalogOperation(async () => {
+            if (AppMappingRules.Conflict(draft, State.Shortcuts!) != null) return false;
+            return await _saves.CommitAsync(state => {
+                int index = state.AppShortcutGroups.FindIndex(item => FileService.NormalizeKey(item.Path) == key);
+                if (draft.Manual.Count == 0 && draft.Sources.Count == 0)
+                {
+                    if (index >= 0) state.AppShortcutGroups.RemoveAt(index);
+                }
+                else if (index >= 0) state.AppShortcutGroups[index] = draft;
+                else state.AppShortcutGroups.Add(draft);
+            }, state => {
+                State.AppShortcutGroups = state.AppShortcutGroups;
+                _appMappings.Update(State.AppShortcutGroups, State.Shortcuts);
+            });
+        }, false);
     }
 }

@@ -13,7 +13,7 @@ using Microsoft.Win32;
 
 namespace FileDockDemo;
 
-internal sealed class AppShortcutCatalogDialog : IModuleDialog
+internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 {
     private const int PageSize = 40;
     private readonly IModuleHost _host;
@@ -22,6 +22,7 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
     private readonly Func<AppShortcutGroup,Task<bool>> _save;
     private readonly Action<Action<string,string>,Action> _pickWindow;
     private readonly Action _back;
+    private readonly Func<IReadOnlyDictionary<string,ShortcutBinding>> _getGlobals;
     private readonly StackPanel _body = new();
     private readonly StackPanel _results = new();
     private readonly TextBlock _status = Ui.Text("");
@@ -43,7 +44,8 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
 
     internal AppShortcutCatalogDialog(IModuleHost host, Func<IReadOnlyList<AppShortcutGroup>> getGroups,
         Func<IReadOnlyList<ApplicationEntry>> getFixed, Func<AppShortcutGroup,Task<bool>> save,
-        Action<Action<string,string>,Action> pickWindow, Action back)
+        Action<Action<string,string>,Action> pickWindow, Action back,
+        Func<IReadOnlyDictionary<string,ShortcutBinding>>? getGlobals = null)
     {
         _host = host;
         _getGroups = getGroups;
@@ -51,6 +53,7 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         _save = save;
         _pickWindow = pickWindow;
         _back = back;
+        _getGlobals = getGlobals ?? (() => new Dictionary<string,ShortcutBinding>());
 
         AutomationProperties.SetName(_software, "软件");
         _software.SelectionChanged += (_,_) => {
@@ -224,12 +227,12 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         foreach (var row in rows.Skip(_page * PageSize).Take(PageSize))
         {
             if (row.Manual is { } manual)
-                AddResult(manual.Action, manual.Keys, $"手动登记 · {ScopeLabel(manual.Scope)}", manual.Note,
+                AddResult(manual.Action, manual.Keys, $"手动登记 · {ScopeLabel(manual.Scope)}" + MappingSuffix(manual.Mapping), manual.Note,
                     "编辑登记", () => EditManual(manual));
             else if (row.Source is { } source && row.Rule is { } rule)
             {
                 string scope = rule.SystemWide ? "声明全局" : "应用内规则";
-                AddResult(RuleLabel(rule), rule.Key, $"{SourceName(source)} · {scope}", rule.Condition,
+                AddResult(RuleLabel(rule), rule.Key, $"{SourceName(source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
                     "查看规则", () => ShowImportedRule(source, rule));
             }
         }
@@ -273,12 +276,7 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         note.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         ManualShortcutScope SelectedScope() => (scope.SelectedItem as ComboBoxItem)?.Tag is ManualShortcutScope value
             ? value : ManualShortcutScope.Unknown;
-        _hasDraft = () => action.Text != (current?.Action ?? "") || keys.Text != (current?.Keys ?? "") ||
-            note.Text != (current?.Note ?? "") || SelectedScope() != (current?.Scope ?? ManualShortcutScope.Unknown);
-        ShowDetail(current == null ? "添加手动登记" : "编辑手动登记", () => {
-            if (_hasDraft?.Invoke() != true || _host.ConfirmDiscardChanges())
-                ShowCatalogAndFocus();
-        });
+        ShowDetail(current == null ? "添加手动登记" : "编辑手动登记", ReturnFromDetail);
         _body.Children.Add(Ui.Text("动作名称"));
         _body.Children.Add(action);
         _body.Children.Add(Ui.Text("原快捷键，可按文字填写连按键位"));
@@ -287,23 +285,42 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         _body.Children.Add(scope);
         _body.Children.Add(Ui.Text("备注，可填写在哪个页面或工具中生效"));
         _body.Children.Add(note);
+        var entry = current?.Copy() ?? new ManualAppShortcut();
+        var mapping = new MappingEditor(current?.Mapping);
+        void UpdateEntry()
+        {
+            entry.Action = action.Text.Trim();
+            entry.Keys = keys.Text.Trim();
+            entry.Note = note.Text.Trim();
+            entry.Scope = SelectedScope();
+            bool changedOriginal = current?.Mapping != null && current.Keys != entry.Keys;
+            mapping.SetAvailability(changedOriginal ? "原快捷键已更改。" :
+                AppMappingRules.Eligibility(group, entry, null),
+                changedOriginal || (current?.Mapping != null && current.Scope != entry.Scope));
+        }
+        UpdateEntry();
+        keys.TextChanged += (_,_) => UpdateEntry();
+        scope.SelectionChanged += (_,_) => UpdateEntry();
+        _body.Children.Add(mapping.View);
+        _hasDraft = () => mapping.HasChanges || action.Text != (current?.Action ?? "") || keys.Text != (current?.Keys ?? "") ||
+            note.Text != (current?.Note ?? "") || SelectedScope() != (current?.Scope ?? ManualShortcutScope.Unknown);
         _body.Children.Add(Ui.Button("保存登记", async () => {
             if (string.IsNullOrWhiteSpace(action.Text) || string.IsNullOrWhiteSpace(keys.Text))
             {
                 SetStatus("请填写动作名称和原快捷键。");
                 return;
             }
+            UpdateEntry();
+            if (!mapping.TryRead(out var binding, out var invalid)) { ShowValidation(invalid); return; }
+            entry.Mapping = binding;
             var candidate = group.Copy();
-            var entry = new ManualAppShortcut {
-                Action = action.Text.Trim(), Keys = keys.Text.Trim(), Note = note.Text.Trim(), Scope = SelectedScope()
-            };
             if (current == null) candidate.Manual.Add(entry);
             else
             {
                 entry.Id = current.Id;
                 candidate.Manual[candidate.Manual.FindIndex(item => item.Id == current.Id)] = entry;
             }
-            await SaveGroup(candidate, "登记已保存。", ShowCatalogAndFocus);
+            await SaveGroup(candidate, current?.Mapping != null && binding == null ? "登记已保存，映射已清除。" : "登记已保存。", ShowCatalogAndFocus);
         }));
         if (current != null)
         {
@@ -377,6 +394,7 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         if (group == null || _closed || _busy) return;
         bool saved = false;
         int rulesCount = 0;
+        int lostMappings = 0, pausedMappings = 0;
         BeginWork("正在读取快捷键…");
         using var cancellation = new CancellationTokenSource();
         _importCancellation = cancellation;
@@ -396,7 +414,15 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
             };
             int existing = candidate.Sources.FindIndex(item => item.IsDefault == isDefault && SamePath(item.Path, path));
             if (existing < 0) candidate.Sources.Add(replacement);
-            else candidate.Sources[existing] = replacement;
+            else
+            {
+                var previous = candidate.Sources[existing];
+                AppMappingRules.RestoreMappings(previous, replacement);
+                lostMappings = previous.Rules.Count(rule => rule.Mapping != null) -
+                    replacement.Rules.Count(rule => rule.Mapping != null);
+                candidate.Sources[existing] = replacement;
+            }
+            pausedMappings = AppMappingRules.PauseConflicts(candidate, _getGlobals());
             saved = await _save(candidate);
             if (_closed) return;
             if (saved) SetSavedGroup(candidate);
@@ -412,13 +438,17 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         if (saved && !_closed)
         {
             ShowSources();
-            SetStatus($"已导入 {rulesCount} 条规则。");
+            SetStatus($"已导入 {rulesCount} 条规则。" +
+                (pausedMappings == 0 ? "" : $"因键位冲突，已暂停 {pausedMappings} 个映射。") +
+                (lostMappings == 0 ? "" : $"因来源规则变更，{lostMappings} 个原映射无法继承。"));
         }
     }
 
     private void ShowImportedRule(AppShortcutSource source, ImportedAppShortcut rule)
     {
-        ShowDetail(RuleLabel(rule), ShowCatalogAndFocus);
+        var group = _group;
+        if (group == null) return;
+        ShowDetail(RuleLabel(rule), ReturnFromDetail);
         _body.Children.Add(Ui.Text("键位"));
         _body.Children.Add(Ui.Text(rule.Key, 14));
         _body.Children.Add(Ui.Text("来源与范围"));
@@ -430,14 +460,30 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         {
             _body.Children.Add(Ui.Text("生效条件"));
             _body.Children.Add(Ui.Text(rule.Condition, 13));
+            _body.Children.Add(Ui.Text("映射只发送原键，具体动作由 VS Code 按当前条件决定。", 12));
         }
         if (rule.HasArguments)
             _body.Children.Add(Ui.Text("该规则声明了命令参数。", 12));
+        var mapping = new MappingEditor(rule.Mapping);
+        string? unavailable = AppMappingRules.Eligibility(group, null, rule);
+        mapping.SetAvailability(unavailable);
+        _body.Children.Add(mapping.View);
+        _hasDraft = () => mapping.HasChanges;
+        if (unavailable == null || rule.Mapping != null)
+        {
+            _body.Children.Add(Ui.Button("保存映射", async () => {
+                if (!mapping.TryRead(out var binding, out var invalid)) { ShowValidation(invalid); return; }
+                var candidate = group.Copy();
+                candidate.Sources[group.Sources.IndexOf(source)].Rules[source.Rules.IndexOf(rule)].Mapping = binding;
+                await SaveGroup(candidate, "映射已保存。", ShowCatalogAndFocus);
+            }));
+        }
         FocusInitial();
     }
 
     private void ShowDetail(string heading, Action returnToCatalog)
     {
+        _hasDraft = null;
         _body.Children.Clear();
         SetStatus("");
         var back = Ui.Button("返回软件快捷键", returnToCatalog);
@@ -445,6 +491,11 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
         _body.Children.Add(Ui.Text(heading, 16));
         _initialFocus = back;
         _scroll.ScrollToTop();
+    }
+
+    private void ReturnFromDetail()
+    {
+        if (_hasDraft?.Invoke() != true || _host.ConfirmDiscardChanges()) ShowCatalogAndFocus();
     }
 
     private void ShowCatalogAndFocus()
@@ -456,6 +507,11 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
     private async Task SaveGroup(AppShortcutGroup candidate, string success, Action done)
     {
         if (_busy || _closed) return;
+        if (AppMappingRules.Conflict(candidate, _getGlobals()) is { } conflict)
+        {
+            ShowValidation(conflict);
+            return;
+        }
         bool saved = false;
         BeginWork("正在保存…");
         try
@@ -496,6 +552,12 @@ internal sealed class AppShortcutCatalogDialog : IModuleDialog
     {
         _status.Text = status;
         _status.Visibility = status.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void ShowValidation(string message)
+    {
+        SetStatus(message);
+        _scroll.ScrollToTop();
     }
 
     private bool ConfirmRemove(string message)

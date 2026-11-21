@@ -82,7 +82,9 @@ public partial class MainWindow
         _captureRecovery.Tick += (_, _) => UpdateCaptureVisibility();
         _captureKeyCallback = (code, message, data) =>
         {
-            if (code >= 0 && (message == (IntPtr)0x100 || message == (IntPtr)0x104) && !_quitting)
+            if (!_quitting && !_exitSaving && _appMappings.Handle(code, message, data)) return (IntPtr)1;
+            if (code >= 0 && (message == (IntPtr)0x100 || message == (IntPtr)0x104) && !_quitting &&
+                !AppMappingRuntime.IsMappingInput(data))
             {
                 int key = Marshal.ReadInt32(data);
                 if (key == 0x1B) CancelCaptureShortcutPending();
@@ -92,11 +94,10 @@ public partial class MainWindow
                     !(IsActive && MatchesFilePreviewShortcut(modifiers,key) && FocusedPreviewFile()!=null))
                     BeginCaptureShortcut();
             }
-            // Never consume or simulate the user's keystroke.
             return NativeMethods.CallNextHookEx(_captureKeyHook, code, message, data);
         };
         _captureKeyHook = NativeMethods.SetWindowsHookEx(13, _captureKeyCallback, NativeMethods.GetModuleHandle(null), 0);
-        if (_captureKeyHook == IntPtr.Zero) SetStatus("截图快捷键监听不可用，截图前请暂时收起或退出文件坞。", true);
+        if (_captureKeyHook == IntPtr.Zero) SetStatus("键盘监听未启动，本次运行的前台映射不可用。使用外部截图工具前请先收起文件坞。", true);
         _captureCallback = (_, eventType, window, objectId, childId, _, _) =>
         {
             if (objectId != 0 || childId != 0 || window == IntPtr.Zero) return;

@@ -52,6 +52,7 @@ try {
         }
     }
     Copy-Item -LiteralPath (Join-Path $repo '运行时许可\NAudio-MIT.TXT') -Destination $notices
+    Copy-Item -LiteralPath (Join-Path $repo '运行时许可\Markdig-BSD-2-Clause.TXT') -Destination $notices
     Copy-Item -LiteralPath (Join-Path $repo '运行时许可\Windows-SDK-LICENSE.TXT') -Destination $notices
     $tensors = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'System.Numerics.Tensors/*' })
     if ($tensors.Count -ne 1) { throw 'Cannot identify the restored Tensors package.' }

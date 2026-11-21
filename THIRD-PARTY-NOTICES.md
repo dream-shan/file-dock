@@ -43,6 +43,8 @@ PawnIO 是由用户从 [官方网站](https://pawnio.eu/) 单独取得并安装�
 
 亮度模块另外使用 System.Management 10.0.2（MIT），版本与内容哈希同样记录于 `源码/packages.lock.json`。完整许可及包版权声明见 `运行时许可/System.Management-MIT.TXT`；构建脚本同时复制实际还原包的 THIRD-PARTY-NOTICES，随主程序分发。该组件来自 [.NET 源码](https://github.com/dotnet/runtime/tree/v10.0.2)，未修改。
 
+Markdown 预览使用 Markdig 1.6.0（BSD-2-Clause）。版本和内容哈希记录在 `源码/packages.lock.json`，完整许可随分发包放在 `运行时许可/Markdig-BSD-2-Clause.TXT`。 [Markdig 源码](https://github.com/xoofx/markdig/tree/1.6.0)
+
 自包含 Windows x64 下载包使用 .NET / Windows Desktop Runtime 10.0.14，其版本在项目文件中锁定。构建脚本从这两个**实际还原的运行时包**复制其 LICENSE，以及 .NET Runtime 随包提供的 THIRD-PARTY-NOTICES，放入下载包的 `运行时许可/`。这些声明随二进制一起分发，不能仅保留文件坞自己的许可证。
 
 构建使用 `global.json` 指定的 .NET SDK；SDK 本身不随文件坞分发。仓库中历史的 `运行时许可/` 文本予以保留，新包使用实际构建依赖带来的声明。

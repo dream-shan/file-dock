@@ -10,7 +10,7 @@ using System.Windows.Media.Imaging;
 
 namespace FileDockDemo;
 
-internal sealed class FilePreviewWindow : Window
+internal sealed partial class FilePreviewWindow : Window
 {
     private readonly ContentControl _content = new()
     {
@@ -18,7 +18,8 @@ internal sealed class FilePreviewWindow : Window
         VerticalContentAlignment = VerticalAlignment.Stretch
     };
     private readonly TextBlock _status = Ui.Text("");
-    private readonly StackPanel _controls = new() { Orientation = Orientation.Horizontal };
+    private readonly WrapPanel _controls = new();
+    private readonly DockPanel _fileNavigation = new() { Visibility = Visibility.Collapsed };
     private readonly ScrollViewer _scroller = new()
     {
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -31,6 +32,7 @@ internal sealed class FilePreviewWindow : Window
     private string _path = "";
     private uint _page, _pages;
     private double _zoom = 1;
+    private bool _actualPixels;
     private bool _closed;
 
     internal FilePreviewWindow(ResourceDictionary theme)
@@ -44,6 +46,9 @@ internal sealed class FilePreviewWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         SetResourceReference(BackgroundProperty, "Surface");
         var layout = new DockPanel { Margin = new Thickness(14) };
+        InitializeFileNavigation();
+        DockPanel.SetDock(_fileNavigation, Dock.Top);
+        layout.Children.Add(_fileNavigation);
         var footer = new DockPanel { LastChildFill = false };
         var open = Ui.Button("打开文件", () =>
         {
@@ -61,6 +66,7 @@ internal sealed class FilePreviewWindow : Window
         Content = layout;
         _scroller.Content = _image;
         _scroller.SizeChanged += (_, _) => FitImage();
+        DpiChanged += (_, args) => FitImage(args.NewDpi);
         Closed += (_, _) =>
         {
             _closed = true;
@@ -72,6 +78,9 @@ internal sealed class FilePreviewWindow : Window
             }
             _image.Source = null;
             _content.Content = null;
+            _controls.Children.Clear();
+            _fileNavigation.Children.Clear();
+            _moveFile = null;
         };
     }
 
@@ -81,6 +90,7 @@ internal sealed class FilePreviewWindow : Window
         _path = path;
         _page = _pages = 0;
         _zoom = 1;
+        _actualPixels = false;
         Title = Path.GetFileName(path) + " · 文件预览";
         return LoadAsync(openFile: true);
     }
@@ -119,24 +129,29 @@ internal sealed class FilePreviewWindow : Window
                 case PreviewKind.Text:
                     var text = await FilePreviewReader.ReadTextAsync(path, token);
                     token.ThrowIfCancellationRequested();
-                    bool prose = Path.GetExtension(path).ToLowerInvariant() is ".txt" or ".md" or ".markdown";
-                    var box = new TextBox
+                    string extension = Path.GetExtension(path).ToLowerInvariant();
+                    if (extension is ".md" or ".markdown")
                     {
-                        Text = text.Text, IsReadOnly = true, IsUndoEnabled = false, BorderThickness = new Thickness(0),
-                        Padding = new Thickness(8), FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
-                        TextWrapping = prose ? TextWrapping.Wrap : TextWrapping.NoWrap,
-                        HorizontalScrollBarVisibility = prose ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto,
-                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-                    };
-                    box.SetResourceReference(Control.BackgroundProperty, "ContentSurface");
-                    box.SetResourceReference(Control.ForegroundProperty, "Ink");
-                    _content.Content = box;
+                        var markdown = await Task.Run(() => MarkdownPreview.Parse(text.Text), token);
+                        token.ThrowIfCancellationRequested();
+                        ShowMarkdown(text.Text, markdown);
+                    }
+                    else ShowText(text.Text, extension == ".txt");
                     if (text.Truncated) _status.Text = metadata + " · 已显示开头 64 K 字符";
                     break;
                 case PreviewKind.Image:
-                    var bitmap = await ImageLoader.LoadAsync(path, true, token, 2560, 2560);
+                    var bitmap = await ImageLoader.LoadAsync(path, true, token, 2560, 2560, originalPixels: _actualPixels);
                     token.ThrowIfCancellationRequested();
-                    ShowBitmap(bitmap ?? throw new InvalidDataException("图片无法解码或超过预览大小限制。"));
+                    bool originalUnavailable = _actualPixels && bitmap == null;
+                    if (originalUnavailable)
+                    {
+                        bitmap = await ImageLoader.LoadAsync(path, true, token, 2560, 2560);
+                        token.ThrowIfCancellationRequested();
+                        _actualPixels = false;
+                        _status.Text = metadata + " · 无法载入原始像素，已适应窗口";
+                    }
+                    token.ThrowIfCancellationRequested();
+                    ShowBitmap(bitmap ?? throw new InvalidDataException("图片无法解码或超过预览大小限制。"), imageFile: true);
                     break;
                 case PreviewKind.Pdf:
                     _pdf ??= await Task.Run(() => PreviewPdfDocument.OpenAsync(path, token), token);
@@ -145,8 +160,7 @@ internal sealed class FilePreviewWindow : Window
                     var pageImage = await Task.Run(() => FilePreviewReader.RenderPageAsync(document, page, token), token);
                     token.ThrowIfCancellationRequested();
                     _pages = document.PageCount;
-                    AddControl("上一页", () => ChangePage(-1), page > 0);
-                    AddControl("下一页", () => ChangePage(1), page + 1 < _pages);
+                    AddPageControls(page);
                     ShowBitmap(pageImage);
                     _status.Text = $"{metadata} · 第 {page + 1} / {_pages} 页";
                     break;
@@ -175,28 +189,33 @@ internal sealed class FilePreviewWindow : Window
         }
     }
 
-    private void ChangePage(int delta)
+    private void ChangePage(uint page)
     {
-        long next = (long)_page + delta;
-        if (_closed || next < 0 || next >= _pages) return;
-        _page = (uint)next;
+        if (_closed || page == _page || page >= _pages) return;
+        _page = page;
         _ = LoadAsync(openFile: false);
     }
 
-    private void AddControl(string name, Action action, bool enabled = true)
+    private Button AddControl(string name, Action action, bool enabled = true)
     {
         var button = Ui.Button(name, action);
         button.IsEnabled = enabled;
         button.Margin = new Thickness(0, 4, 4, 0);
         _controls.Children.Add(button);
+        return button;
     }
 
-    private void ShowBitmap(BitmapSource bitmap)
+    private void ShowBitmap(BitmapSource bitmap, bool imageFile = false)
     {
         _image.Source = bitmap;
         _content.Content = _scroller;
         AddControl("缩小", () => Zoom(0.8));
         AddControl("放大", () => Zoom(1.25));
+        if (imageFile)
+        {
+            AddControl("适应窗口", () => SetImageSize(false));
+            AddControl("实际大小", () => SetImageSize(true));
+        }
         _scroller.ScrollToTop();
         _scroller.ScrollToLeftEnd();
         FitImage();
@@ -208,11 +227,24 @@ internal sealed class FilePreviewWindow : Window
         FitImage();
     }
 
-    private void FitImage()
+    private void SetImageSize(bool actualPixels)
+    {
+        _zoom = 1;
+        if (_actualPixels == actualPixels)
+        {
+            FitImage();
+            return;
+        }
+        _actualPixels = actualPixels;
+        _ = LoadAsync(openFile: true);
+    }
+
+    private void FitImage(DpiScale? newDpi = null)
     {
         if (_image.Source is not BitmapSource bitmap || _scroller.ActualWidth < 2 || _scroller.ActualHeight < 2) return;
         double fit = Math.Min((_scroller.ActualWidth - 1) / bitmap.PixelWidth, (_scroller.ActualHeight - 1) / bitmap.PixelHeight);
-        _image.Width = bitmap.PixelWidth * fit * _zoom;
-        _image.Height = bitmap.PixelHeight * fit * _zoom;
+        var dpi = newDpi ?? VisualTreeHelper.GetDpi(_image);
+        _image.Width = bitmap.PixelWidth * (_actualPixels ? 1 / dpi.DpiScaleX : fit) * _zoom;
+        _image.Height = bitmap.PixelHeight * (_actualPixels ? 1 / dpi.DpiScaleY : fit) * _zoom;
     }
 }

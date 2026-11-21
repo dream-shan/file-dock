@@ -47,6 +47,8 @@ internal static class DemoVerification
         ScreenshotVerification.Run(Check);
         await FilePreviewVerification.Run(window,directory,Check);
         await FilePreviewVerification.VerifyFocus(window,directory,Check);
+        await FilePreviewNavigationVerification.Run(window,directory,Check);
+        MarkdownPreviewVerification.Run(Check);
         await ApplicationsVerification.Run(window,directory,Check);
         window.SelectPage("Files",false);
         bool IsUtilityWindow(Window target)

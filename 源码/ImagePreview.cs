@@ -21,7 +21,7 @@ internal static class ImageLoader
     internal static int CacheCount { get { lock (Cache) return Cache.Count; } }
 
     internal static async Task<BitmapSource?> LoadAsync(string path, bool preview, CancellationToken token,
-        int previewWidth = 720, int previewHeight = 560)
+        int previewWidth = 720, int previewHeight = 560, bool originalPixels = false)
     {
         int generation; lock (Cache) generation = _cacheGeneration;
         await Workers.WaitAsync(token);
@@ -48,13 +48,17 @@ internal static class ImageLoader
                         var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
                         int width = decoder.Frames[0].PixelWidth, height = decoder.Frames[0].PixelHeight;
                         if ((long)width * height > 200_000_000) return null;
+                        if (originalPixels && (long)width * height > 32_000_000) return null;
                         token.ThrowIfCancellationRequested();
                         stream.Position = 0;
                         int maxWidth = preview ? previewWidth : 96, maxHeight = preview ? previewHeight : 96;
                         var image = new BitmapImage();
                         image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = stream;
-                        if (width / (double)maxWidth >= height / (double)maxHeight) image.DecodePixelWidth = Math.Min(width, maxWidth);
-                        else image.DecodePixelHeight = Math.Min(height, maxHeight);
+                        if (!originalPixels)
+                        {
+                            if (width / (double)maxWidth >= height / (double)maxHeight) image.DecodePixelWidth = Math.Min(width, maxWidth);
+                            else image.DecodePixelHeight = Math.Min(height, maxHeight);
+                        }
                         image.EndInit(); image.Freeze(); result = image;
                     }
                     catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or System.Runtime.InteropServices.COMException or InvalidOperationException) { }

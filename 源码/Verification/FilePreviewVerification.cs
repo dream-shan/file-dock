@@ -18,11 +18,11 @@ internal static class FilePreviewVerification
 {
     internal static async Task Run(MainWindow window, string directory, Action<bool, string> check)
     {
-        string sample = Path.Combine(directory, "preview-sample.md");
-        await File.WriteAllTextAsync(sample, "# 中文教程\n" + new string('x', FilePreviewReader.TextLimit));
+        string sample = Path.Combine(directory, "preview-sample.txt");
+        await File.WriteAllTextAsync(sample, "# 中文教程\n第二处中文教程\n" + new string('x', FilePreviewReader.TextLimit));
         var preview = await FilePreviewReader.ReadTextAsync(sample, CancellationToken.None);
         check(preview.Text.StartsWith("# 中文教程") && preview.Truncated && preview.Text.Length == FilePreviewReader.TextLimit,
-            "Markdown preview preserves Unicode and bounds the displayed text");
+            "Text preview preserves Unicode and bounds the displayed text");
         check(FilePreviewReader.Kind("SAMPLE.PDF") == PreviewKind.Pdf && FilePreviewReader.Kind("run.exe") == PreviewKind.Unsupported,
             "Preview routes PDF and unsupported file types without launching them");
         using var cancelled = new CancellationTokenSource();
@@ -54,6 +54,17 @@ internal static class FilePreviewVerification
             DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "放大"))
                 .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(picture.Width > oldWidth, "The preview opens and zooms a read-only PNG");
+            var originalSize = DisplayPowerViewVerification.Children<Button>(viewer)
+                .SingleOrDefault(item => Equals(item.Content, "实际大小"));
+            check(originalSize != null, "Image preview exposes an actual-size control");
+            originalSize!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Until(() => Math.Abs(picture.Width * VisualTreeHelper.GetDpi(picture).DpiScaleX - 2) < 0.01);
+            check(Math.Abs(picture.Width * VisualTreeHelper.GetDpi(picture).DpiScaleX - 2) < 0.01,
+                "Image actual size maps source pixels to screen pixels");
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "适应窗口"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Until(() => picture.Width > 2);
+            check(picture.Width > 2, "Image fit mode restores window-sized display");
 
             await viewer.ShowFileAsync(pdfPath);
             viewer.UpdateLayout();
@@ -68,12 +79,68 @@ internal static class FilePreviewVerification
             var timer = Stopwatch.StartNew();
             while (!HasPage(2) && timer.ElapsedMilliseconds < 8000) { await Task.Delay(25); viewer.UpdateLayout(); }
             check(HasPage(2), "PDF navigation reuses the open document and renders page two after the file is renamed");
+            var pageNumber = DisplayPowerViewVerification.Children<TextBox>(viewer).Single();
+            pageNumber.Text = "100";
+            var jump = DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "跳转"));
+            jump.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check(HasPage(2), "Out-of-range PDF page numbers keep the current page");
+            pageNumber.Text = "1";
+            jump.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Until(() => HasPage(1));
+            check(HasPage(1), "PDF can jump directly to an entered page on the same open document");
             File.Move(renamed, pdfPath);
             Task pending = viewer.ShowFileAsync(pdfPath);
             await Task.WhenAll(pending, viewer.ShowFileAsync(sample));
             viewer.UpdateLayout();
             check(DisplayPowerViewVerification.Children<TextBox>(viewer).Any(box => box.Text.StartsWith("# 中文教程")),
                 "Switching preview drops an older PDF completion");
+            var textPreview = DisplayPowerViewVerification.Children<TextBox>(viewer).Single(box => box.IsReadOnly);
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "查找"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var query = DisplayPowerViewVerification.Children<TextBox>(viewer).Single(box => !box.IsReadOnly);
+            query.Text = "中文教程";
+            check(textPreview.SelectedText == "中文教程", "Preview search highlights the matching text in the read-only document");
+            int firstMatch = textPreview.SelectionStart;
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "下一处"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check(textPreview.SelectedText == "中文教程" && textPreview.SelectionStart > firstMatch,
+                "Preview search navigates to the next matching occurrence");
+            query.Text = "不存在";
+            check(textPreview.SelectionLength == 0, "Searching for missing text clears the previous highlight");
+            string log = Path.Combine(directory, "preview-long-line.log");
+            await File.WriteAllTextAsync(log, new string('x', 2500) + "TARGET     TARGET");
+            await viewer.ShowFileAsync(log);
+            viewer.UpdateLayout();
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "查找"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            viewer.UpdateLayout();
+            textPreview = DisplayPowerViewVerification.Children<TextBox>(viewer).Single(box => box.IsReadOnly);
+            query = DisplayPowerViewVerification.Children<TextBox>(viewer).Single(box => !box.IsReadOnly);
+            query.Text = "TARGET";
+            viewer.UpdateLayout();
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "下一处"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            viewer.UpdateLayout();
+            var matchRect = textPreview.GetRectFromCharacterIndex(textPreview.SelectionStart);
+            check(textPreview.SelectedText == "TARGET" && !matchRect.IsEmpty &&
+                matchRect.Left >= 0 && matchRect.Left < textPreview.ViewportWidth,
+                "Repeated search keeps the current match visible horizontally on a long line");
+            string markdown = Path.Combine(directory, "preview-reading.md");
+            await File.WriteAllTextAsync(markdown, "# 阅读教程\n\n- 第一步\n");
+            await viewer.ShowFileAsync(markdown);
+            viewer.UpdateLayout();
+            check(DisplayPowerViewVerification.Children<FlowDocumentScrollViewer>(viewer).Any(),
+                "Opening Markdown shows the reading view");
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "查看原文"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            viewer.UpdateLayout();
+            check(DisplayPowerViewVerification.Children<TextBox>(viewer).Any(item => item.Text.StartsWith("# 阅读教程")),
+                "Markdown can switch to its original text");
+            DisplayPowerViewVerification.Children<Button>(viewer).Single(item => Equals(item.Content, "阅读视图"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            viewer.UpdateLayout();
+            check(DisplayPowerViewVerification.Children<FlowDocumentScrollViewer>(viewer).Any(),
+                "Markdown can return to its reading view");
             using (var exclusive = new FileStream(pdfPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 check(exclusive.Length > 0, "Leaving the PDF releases its file handle");
             string unknown = Path.ChangeExtension(sample, ".unknown");
@@ -94,6 +161,12 @@ internal static class FilePreviewVerification
             await viewer.ShowFileAsync(pdfPath);
         }
         finally { viewer.Close(); }
+
+        async Task Until(Func<bool> done)
+        {
+            var wait = Stopwatch.StartNew();
+            while (!done() && wait.ElapsedMilliseconds < 8000) { await Task.Delay(20); viewer.UpdateLayout(); }
+        }
         using (var exclusive = new FileStream(pdfPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             check(exclusive.Length > 0, "Closing the PDF window releases its cached document stream");
     }

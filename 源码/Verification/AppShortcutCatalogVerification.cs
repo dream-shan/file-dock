@@ -95,7 +95,7 @@ internal static class AppShortcutCatalogVerification
             window.UpdateLayout();
             var software = DisplayPowerViewVerification.Children<ComboBox>(dialog.View)
                 .Single(item => AutomationProperties.GetName(item) == "软件");
-            if (software.SelectedIndex < 0) software.SelectedIndex = 0;
+            software.SelectedItem = software.Items.Cast<ComboBoxItem>().Single(item => Equals(item.ToolTip, appPath));
             window.UpdateLayout();
 
             Click("添加手动登记");

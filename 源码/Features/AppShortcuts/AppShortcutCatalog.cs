@@ -13,11 +13,17 @@ public sealed class AppShortcutGroup
     public string Name { get; set; } = "";
     public List<ManualAppShortcut> Manual { get; set; } = [];
     public List<AppShortcutSource> Sources { get; set; } = [];
+    public AppShortcutSource? MenuSource { get; set; }
+    public DateTimeOffset? LastMenuRead { get; set; }
+
+    internal IEnumerable<AppShortcutSource> AllSources() =>
+        MenuSource == null ? Sources : Sources.Append(MenuSource);
 
     internal AppShortcutGroup Copy() => new() {
         Path = Path, Name = Name,
         Manual = Manual.Select(item => item.Copy()).ToList(),
-        Sources = Sources.Select(item => item.Copy()).ToList()
+        Sources = Sources.Select(item => item.Copy()).ToList(),
+        MenuSource = MenuSource?.Copy(), LastMenuRead = LastMenuRead
     };
 
     internal bool Valid()
@@ -41,7 +47,10 @@ public sealed class AppShortcutGroup
                     string.IsNullOrWhiteSpace(rule.Key) || rule.Command == null || rule.Condition == null))
                 return false;
         }
-        return true;
+        return MenuSource == null || (LastMenuRead != null && !MenuSource.IsDefault &&
+            string.Equals(Path, MenuSource.Path, StringComparison.OrdinalIgnoreCase) &&
+            MenuSource.Rules != null && MenuSource.Rules.All(rule => rule != null &&
+                HasText(rule.Key, 256) && !string.IsNullOrWhiteSpace(rule.Command) && rule.Condition != null));
     }
 
     private static bool HasText(string? value, int maxLength) =>

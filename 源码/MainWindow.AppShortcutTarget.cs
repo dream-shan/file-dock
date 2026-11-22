@@ -15,7 +15,13 @@ public partial class MainWindow
 {
     private bool SelectingAppShortcutTarget => _windowPicker != null && ActiveModuleDialog is AppShortcutCatalogDialog;
 
-    private void PickAppShortcutTarget(Action<string, string> selected, Action cancelled)
+    private void PickAppShortcutTarget(Action<string, string> selected, Action cancelled) =>
+        PickShortcutWindow((name,path,_) => selected(name,path), cancelled, "点击要登记的软件窗口 · Esc 取消");
+
+    private void PickMenuWindow(Action<string,string,IntPtr> selected, Action cancelled) =>
+        PickShortcutWindow(selected, cancelled, "点击要读取菜单的软件窗口 · Esc 取消");
+
+    private void PickShortcutWindow(Action<string,string,IntPtr> selected, Action cancelled, string prompt)
     {
         var dialog = ActiveModuleDialog;
         if (dialog == null || !IsVisible || _windowPicker != null || _exitSaving || _quitting ||
@@ -46,16 +52,16 @@ public partial class MainWindow
             }
             else QueueDockRaise();
 
-            if (identity is { } app) selected(app.Name, app.Path);
-            else
+            if (identity is { } app) selected(app.Name, app.Path, window);
+            else if (window != IntPtr.Zero && dialog is AppShortcutCatalogDialog catalog)
             {
-                if (window != IntPtr.Zero) SetStatus("无法识别该窗口的软件路径，请从已固定应用选择。", true);
-                cancelled();
+                catalog.ReportUnreadableWindow();
             }
+            else cancelled();
         }
 
         picker = new WindowPicker(Complete);
-        if (picker.Content is TextBlock hint) hint.Text = "点击要登记的软件窗口 · Esc 取消";
+        if (picker.Content is TextBlock hint) hint.Text = prompt;
         _windowPicker = picker;
         picker.Closed += (_, _) =>
         {

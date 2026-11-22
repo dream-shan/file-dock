@@ -50,6 +50,10 @@ internal static class DemoVerification
         AppMappingRuntimeVerification.Run(Check);
         await AppMappingIntegrationVerification.Run(window,directory,Check);
         await AppMappingUiVerification.Run(window,directory,Check);
+        AppMenuCatalogVerification.Run(Check);
+        await MenuShortcutVerification.Run(directory,Check);
+        await AppReadUiVerification.Run(window,directory,Check);
+        VerifyVsCodeProfiles(directory,Check);
         ScreenshotVerification.Run(Check);
         await FilePreviewVerification.Run(window,directory,Check);
         await FilePreviewVerification.VerifyFocus(window,directory,Check);
@@ -555,6 +559,27 @@ internal static class DemoVerification
         void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string path, uint reserved);
         void Resolve(IntPtr window, uint flags);
         void SetPath([MarshalAs(UnmanagedType.LPWStr)] string path);
+    }
+
+    private static void VerifyVsCodeProfiles(string directory, Action<bool,string> check)
+    {
+        string appData = Path.Combine(directory, "profile-fixture");
+        string stable = Path.Combine(appData, "Code", "User", "keybindings.json");
+        string custom = Path.Combine(appData, "Code", "User", "profiles", "alpha", "keybindings.json");
+        string insiders = Path.Combine(appData, "Code - Insiders", "User", "keybindings.json");
+        foreach (var path in new[] { stable, custom, insiders })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "[]");
+        }
+        var installation = Path.Combine(appData,"insiders-test-install");
+        var found = VsCodeProfiles.Find(Path.Combine(installation,"Code.exe"), appData);
+        check(found.SequenceEqual(new[] { stable, custom }), "Detect default and custom VS Code keymaps without mixing editions");
+        check(VsCodeProfiles.Find(Path.Combine(installation,"Code - Insiders.exe"),appData).SequenceEqual(new[] {insiders}),
+            "VS Code Insiders uses its own profile root");
+        Directory.CreateDirectory(Path.Combine(installation,"data"));
+        check(VsCodeProfiles.Find(Path.Combine(installation,"Code.exe"),appData).Count == 0,
+            "An empty portable VS Code installation keeps its own profile scope");
     }
 
     internal static void SaveRender(Window window, string path)

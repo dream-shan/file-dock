@@ -21,6 +21,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private readonly Func<IReadOnlyList<ApplicationEntry>> _getFixed;
     private readonly Func<AppShortcutGroup,Task<bool>> _save;
     private readonly Action<Action<string,string>,Action> _pickWindow;
+    private readonly Action<Action<string,string,IntPtr>,Action>? _pickMenuWindow;
     private readonly Action _back;
     private readonly Func<IReadOnlyDictionary<string,ShortcutBinding>> _getGlobals;
     private readonly StackPanel _body = new();
@@ -34,10 +35,11 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private Control? _initialFocus;
     private CancellationTokenSource? _importCancellation;
     private int _page;
-    private bool _changingSoftware, _busy, _closed;
+    private bool _changingSoftware, _busy, _closed, _allSoftware = true;
 
     private sealed record SoftwareChoice(string Name, string Path);
-    private readonly record struct CatalogRow(ManualAppShortcut? Manual, AppShortcutSource? Source, ImportedAppShortcut? Rule);
+    private readonly record struct CatalogRow(AppShortcutGroup Group, ManualAppShortcut? Manual, AppShortcutSource? Source,
+        ImportedAppShortcut? Rule, OfficialShortcutReference? Reference);
 
     public FrameworkElement View => _scroll;
     public bool HasChanges => _busy || _hasDraft?.Invoke() == true;
@@ -45,20 +47,31 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     internal AppShortcutCatalogDialog(IModuleHost host, Func<IReadOnlyList<AppShortcutGroup>> getGroups,
         Func<IReadOnlyList<ApplicationEntry>> getFixed, Func<AppShortcutGroup,Task<bool>> save,
         Action<Action<string,string>,Action> pickWindow, Action back,
-        Func<IReadOnlyDictionary<string,ShortcutBinding>>? getGlobals = null)
+        Func<IReadOnlyDictionary<string,ShortcutBinding>>? getGlobals = null,
+        Action<Action<string,string,IntPtr>,Action>? pickMenuWindow = null)
     {
         _host = host;
         _getGroups = getGroups;
         _getFixed = getFixed;
         _save = save;
         _pickWindow = pickWindow;
+        _pickMenuWindow = pickMenuWindow;
         _back = back;
         _getGlobals = getGlobals ?? (() => new Dictionary<string,ShortcutBinding>());
 
         AutomationProperties.SetName(_software, "软件");
         _software.SelectionChanged += (_,_) => {
             if (!_changingSoftware && _software.SelectedItem is ComboBoxItem { Tag: SoftwareChoice choice })
-                SelectSoftware(choice.Name, choice.Path);
+            {
+                if (choice.Path.Length > 0) SelectSoftware(choice.Name, choice.Path);
+                else
+                {
+                    _allSoftware = true;
+                    _page = 0;
+                    SetStatus("");
+                    ShowCatalogAndFocus();
+                }
+            }
         };
         _search.TextChanged += (_,_) => {
             _page = 0;
@@ -79,6 +92,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 
     private void ShowCatalog()
     {
+        if (_allSoftware) _group = null;
         _hasDraft = null;
         _body.Children.Clear();
         _body.Children.Add(Ui.Button("返回快捷键管理", () => { if (!_busy) _back(); }));
@@ -91,20 +105,24 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _initialFocus ??= browse;
         softwareActions.Children.Add(browse);
         softwareActions.Children.Add(CompactButton("从窗口选择", BeginWindowPick));
+        if (_pickMenuWindow != null)
+            softwareActions.Children.Add(CompactButton("读取窗口菜单", BeginMenuPick));
         _body.Children.Add(softwareActions);
-        if (_group == null)
+        if (_group != null)
         {
-            _body.Children.Add(Ui.Text("选择一个软件，查看或登记它的原快捷键。"));
-            _scroll.ScrollToTop();
-            return;
+            var actions = new WrapPanel();
+            actions.Children.Add(CompactButton("添加手动登记", () => EditManual(null)));
+            if (IsVsCode(_group))
+                actions.Children.Add(CompactButton("VS Code 导入来源", ShowSources));
+            _body.Children.Add(actions);
+            if (_group.LastMenuRead is { } read)
+            {
+                int count = _group.MenuSource?.Rules.Count ?? 0;
+                string coverage = count > 0 ? $"读到菜单公开的 {count} 条键位" : "所选窗口未公开可读的菜单键位";
+                _body.Children.Add(Ui.Text($"{read.ToLocalTime():yyyy-MM-dd HH:mm} · {coverage}。", 12));
+            }
         }
-
-        var actions = new WrapPanel();
-        actions.Children.Add(CompactButton("添加手动登记", () => EditManual(null)));
-        if (IsVsCode(_group))
-            actions.Children.Add(CompactButton("VS Code 导入来源", ShowSources));
-        _body.Children.Add(actions);
-        _body.Children.Add(Ui.Text("按动作、键位或备注查找", 12));
+        _body.Children.Add(Ui.Text("按软件、动作、原键位或映射键位查找", 12));
         _body.Children.Add(_search);
         _body.Children.Add(_results);
         RenderResults();
@@ -125,6 +143,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         try
         {
             _software.Items.Clear();
+            var all = new ComboBoxItem { Content = "所有软件", Tag = new SoftwareChoice("所有软件", "") };
+            _software.Items.Add(all);
+            if (_allSoftware) _software.SelectedItem = all;
             foreach (var choice in choices.Values.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase))
             {
                 var item = new ComboBoxItem {
@@ -144,6 +165,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private void SelectSoftware(string name, string path)
     {
         if (_closed) return;
+        _allSoftware = false;
         _group = _getGroups().FirstOrDefault(group => SamePath(group.Path, path))?.Copy() ??
             new AppShortcutGroup { Name = name, Path = path };
         SetStatus("");
@@ -183,35 +205,27 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private void RenderResults()
     {
         _results.Children.Clear();
-        if (_group == null) return;
-        var group = _group;
         var query = _search.Text.Trim();
-        bool Matches(string value) => query.Length == 0 || value.Contains(query, StringComparison.OrdinalIgnoreCase);
-        var rows = new List<CatalogRow>();
-        foreach (var entry in group.Manual)
+        int total = 0;
+        var rows = new List<CatalogRow>(PageSize);
+        foreach (var row in CatalogRows(query))
         {
-            if (!Matches(entry.Action) && !Matches(entry.Keys) && !Matches(entry.Note) &&
-                !Matches("手动登记") && !Matches(ScopeLabel(entry.Scope))) continue;
-            rows.Add(new(entry, null, null));
+            if (total / PageSize == _page) rows.Add(row);
+            total++;
         }
-        foreach (var source in group.Sources)
-        {
-            string sourceName = SourceName(source);
-            foreach (var rule in source.Rules)
-            {
-                if (!Matches(rule.Command) && !Matches(rule.Key) && !Matches(rule.Condition) &&
-                    !Matches(sourceName) && !Matches(source.Path)) continue;
-                rows.Add(new(null, source, rule));
-            }
-        }
-        if (rows.Count == 0)
+        if (total == 0)
         {
             _results.Children.Add(Ui.Text(query.Length == 0 ? "暂无快捷键记录。" : "没有匹配的记录。"));
             return;
         }
 
-        int pages = (rows.Count + PageSize - 1) / PageSize;
-        _page = Math.Clamp(_page, 0, pages - 1);
+        int pages = (total + PageSize - 1) / PageSize;
+        if (_page >= pages)
+        {
+            _page = pages - 1;
+            RenderResults();
+            return;
+        }
         if (pages > 1)
         {
             var paging = new WrapPanel();
@@ -221,19 +235,23 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
             next.IsEnabled = _page + 1 < pages;
             paging.Children.Add(previous);
             paging.Children.Add(next);
-            paging.Children.Add(Ui.Text($"第 {_page + 1} / {pages} 页 · {rows.Count} 条", 12));
+            paging.Children.Add(Ui.Text($"第 {_page + 1} / {pages} 页 · {total} 条", 12));
             _results.Children.Add(paging);
         }
-        foreach (var row in rows.Skip(_page * PageSize).Take(PageSize))
+        foreach (var row in rows)
         {
+            string app = _allSoftware ? row.Group.Name + " · " : "";
             if (row.Manual is { } manual)
-                AddResult(manual.Action, manual.Keys, $"手动登记 · {ScopeLabel(manual.Scope)}" + MappingSuffix(manual.Mapping), manual.Note,
-                    "编辑登记", () => EditManual(manual));
+                AddResult(manual.Action, manual.Keys, app + $"手动登记 · {ScopeLabel(manual.Scope)}" + MappingSuffix(manual.Mapping), manual.Note,
+                    "编辑登记", () => { _group = row.Group; EditManual(manual); });
+            else if (row.Reference is { } reference && row.Rule is { } example)
+                AddResult(example.Command, example.Key, app + "官方默认参考", reference.Scope,
+                    "查看参考", () => ShowReference(row.Group, reference, example));
             else if (row.Source is { } source && row.Rule is { } rule)
             {
                 string scope = rule.SystemWide ? "声明全局" : "应用内规则";
-                AddResult(RuleLabel(rule), rule.Key, $"{SourceName(source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
-                    "查看规则", () => ShowImportedRule(source, rule));
+                AddResult(RuleLabel(rule), rule.Key, app + $"{SourceLabel(row.Group, source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
+                    "查看规则", () => { _group = row.Group; ShowImportedRule(source, rule); });
             }
         }
     }
@@ -277,6 +295,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         ManualShortcutScope SelectedScope() => (scope.SelectedItem as ComboBoxItem)?.Tag is ManualShortcutScope value
             ? value : ManualShortcutScope.Unknown;
         ShowDetail(current == null ? "添加手动登记" : "编辑手动登记", ReturnFromDetail);
+        _body.Children.Add(Ui.Text(group.Name + " · 手动登记", 12));
         _body.Children.Add(Ui.Text("动作名称"));
         _body.Children.Add(action);
         _body.Children.Add(Ui.Text("原快捷键，可按文字填写连按键位"));
@@ -340,6 +359,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         var group = _group;
         if (group == null) return;
         ShowDetail("VS Code 导入来源", ShowCatalogAndFocus);
+        AddDetectedProfiles(group);
         _body.Children.Add(Ui.Text("手动选择配置文件，导入这份文件中声明的键位。实际触发仍取决于 VS Code 的活动配置、扩展和当前编辑位置。"));
         _body.Children.Add(Ui.Button("导入 VS Code 用户配置", async () => await PickSource(false)));
         _body.Children.Add(Ui.Text("从 VS Code 命令面板打开默认快捷键 JSON，复制内容到本地 JSON 文件后导入。", 12));
@@ -452,9 +472,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _body.Children.Add(Ui.Text("键位"));
         _body.Children.Add(Ui.Text(rule.Key, 14));
         _body.Children.Add(Ui.Text("来源与范围"));
-        _body.Children.Add(Ui.Text(SourceName(source) + (rule.SystemWide ? " · 声明全局" : " · 应用内规则")));
+        _body.Children.Add(Ui.Text(group.Name + " · " + SourceLabel(group, source) + (rule.SystemWide ? " · 声明全局" : " · 应用内规则")));
         _body.Children.Add(Ui.Text(source.Path, 12));
-        _body.Children.Add(Ui.Text("命令"));
+        _body.Children.Add(Ui.Text(source == group.MenuSource ? "菜单项" : "命令"));
         _body.Children.Add(Ui.Text(rule.Command.Length == 0 ? "空命令" : rule.Command, 13));
         if (!string.IsNullOrEmpty(rule.Condition))
         {
@@ -474,7 +494,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
             _body.Children.Add(Ui.Button("保存映射", async () => {
                 if (!mapping.TryRead(out var binding, out var invalid)) { ShowValidation(invalid); return; }
                 var candidate = group.Copy();
-                candidate.Sources[group.Sources.IndexOf(source)].Rules[source.Rules.IndexOf(rule)].Mapping = binding;
+                var target = source == group.MenuSource ? candidate.MenuSource! : candidate.Sources[group.Sources.IndexOf(source)];
+                target.Rules[source.Rules.IndexOf(rule)].Mapping = binding;
                 await SaveGroup(candidate, "映射已保存。", ShowCatalogAndFocus);
             }));
         }

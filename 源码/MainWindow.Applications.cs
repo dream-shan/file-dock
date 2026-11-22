@@ -147,7 +147,7 @@ public partial class MainWindow
     {
         if (_exitSaving || _quitting) return;
         OpenModuleDialog(new AppShortcutCatalogDialog(this, () => State.AppShortcutGroups, () => State.Applications,
-            SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings(), () => State.Shortcuts!));
+            SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings(), () => State.Shortcuts!, PickMenuWindow));
     }
 
     internal Task<bool> SaveAppShortcutGroupAsync(AppShortcutGroup group)
@@ -159,7 +159,7 @@ public partial class MainWindow
             if (AppMappingRules.Conflict(draft, State.Shortcuts!) != null) return false;
             return await _saves.CommitAsync(state => {
                 int index = state.AppShortcutGroups.FindIndex(item => FileService.NormalizeKey(item.Path) == key);
-                if (draft.Manual.Count == 0 && draft.Sources.Count == 0)
+                if (draft.Manual.Count == 0 && draft.Sources.Count == 0 && draft.MenuSource == null && draft.LastMenuRead == null)
                 {
                     if (index >= 0) state.AppShortcutGroups.RemoveAt(index);
                 }

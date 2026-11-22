@@ -74,7 +74,7 @@ internal static class AppMappingRules
         return !((mod & 3) == 3 && key == 46);
     }
 
-    private sealed record Entry(string Keys, ManualAppShortcut? Manual, ImportedAppShortcut? Rule)
+    private sealed record Entry(string Keys, ManualAppShortcut? Manual, ImportedAppShortcut? Rule, bool ObservedInConfig = false)
     {
         internal ShortcutBinding? Binding => Manual?.Mapping ?? Rule?.Mapping;
     }
@@ -82,8 +82,22 @@ internal static class AppMappingRules
     private static IEnumerable<Entry> Entries(AppShortcutGroup group)
     {
         foreach (var item in group.Manual) yield return new(item.Keys,item,null);
+        var known = new HashSet<(AppChord,string,string)>();
         foreach (var source in group.Sources)
-            foreach (var rule in source.Rules) yield return new(rule.Key,null,rule);
+            foreach (var rule in source.Rules)
+            {
+                if (group.MenuSource != null && !rule.HasArguments && !rule.SystemWide && TryParse(rule.Key,out var chord))
+                    known.Add((chord,rule.Command,rule.Condition));
+                yield return new(rule.Key,null,rule);
+            }
+        if (group.MenuSource == null) yield break;
+        foreach (var rule in group.MenuSource.Rules)
+        {
+            // Count one exact observation once. Other menu rows for this key remain ambiguous.
+            bool repeated = !rule.HasArguments && !rule.SystemWide && TryParse(rule.Key,out var chord) &&
+                known.Remove((chord,rule.Command,rule.Condition));
+            yield return new(rule.Key,null,rule,repeated);
+        }
     }
 
     // A known chord prefix is occupied even if the entire sequence cannot be replayed.
@@ -92,7 +106,7 @@ internal static class AppMappingRules
         var counts = new Dictionary<AppChord,int>();
         foreach (var entry in entries)
         {
-            if (string.IsNullOrWhiteSpace(entry.Keys) || entry.Keys.Length > 256) continue;
+            if (entry.ObservedInConfig || string.IsNullOrWhiteSpace(entry.Keys) || entry.Keys.Length > 256) continue;
             string text = PlusSpacing.Replace(entry.Keys.Trim(),"+");
             int end = text.IndexOfAny(StrokeSeparators);
             string stroke = end < 0 ? text : text[..end];

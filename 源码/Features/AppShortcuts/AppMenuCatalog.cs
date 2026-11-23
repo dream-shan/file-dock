@@ -28,12 +28,21 @@ internal static class AppMenuCatalog
         return status;
     }
 
-    internal static OfficialShortcutReference? OfficialReference(string applicationPath)
+    internal static OfficialShortcutReference? OfficialReference(string? applicationPath, string? appId = null)
     {
         // Reference-only excerpts. They are never inserted into a user's observed configuration.
         const string scope = "适用于 Windows 桌面版。以下为官方文档列举的部分默认键位；已安装版本、扩展及个人设置可能有所不同。";
         static ImportedAppShortcut Row(string key, string action) => new() { Key=key, Command=action };
-        return Path.GetFileName(applicationPath).ToLowerInvariant() switch {
+        // Packaged applications can have no executable path. Match the whole registered
+        // identity so another entry point or a similarly named store app stays distinct.
+        string? product = appId?.ToLowerInvariant() switch {
+            "microsoft.windowscalculator_8wekyb3d8bbwe!app" => "windows-calculator",
+            "microsoft.windowsterminal_8wekyb3d8bbwe!app" => "windowsterminal.exe",
+            "msedge" => "msedge.exe",
+            _ when appId?.Contains('!') == true => null,
+            _ => Path.GetFileName(applicationPath)?.ToLowerInvariant()
+        };
+        return product switch {
             "code.exe" => new("Visual Studio Code · 微软官方快捷键表",
                 "https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf", scope,
                 [Row("Ctrl+Shift+P","显示命令面板"), Row("Ctrl+P","按名称打开文件"), Row("Ctrl+K Ctrl+S","打开键盘快捷方式")]),
@@ -43,6 +52,20 @@ internal static class AppMenuCatalog
             "firefox.exe" => new("Firefox · Mozilla 官方帮助",
                 "https://support.mozilla.org/en-US/kb/keyboard-shortcuts-perform-firefox-tasks-quickly", scope,
                 [Row("Ctrl+T","打开新标签页"), Row("Ctrl+N","打开新窗口"), Row("Ctrl+Shift+P","打开隐私窗口")]),
+            "msedge.exe" => new("Microsoft Edge · 微软官方帮助",
+                "https://support.microsoft.com/zh-cn/edge/keyboard-shortcuts-in-microsoft-edge", scope,
+                [Row("Ctrl+Shift+T", "恢复上次关闭的标签页"), Row("Ctrl+Shift+N", "打开 InPrivate 窗口"),
+                 Row("Ctrl+L", "选中地址栏网址"), Row("Ctrl+M", "切换标签页静音"),
+                 Row("Ctrl+J", "查看下载记录"), Row("Ctrl+Shift+O", "查看收藏夹")]),
+            "windowsterminal.exe" => new("Windows 终端 · 微软官方操作文档",
+                "https://learn.microsoft.com/zh-cn/windows/terminal/customize-settings/actions", scope,
+                [Row("Ctrl+Shift+T", "使用默认配置新建标签页"), Row("Ctrl+Shift+D", "复制当前标签页"),
+                 Row("Ctrl+Shift+F", "在终端中查找文本"), Row("Ctrl+,", "打开终端设置"),
+                 Row("Alt+Enter", "切换全屏显示"), Row("Ctrl+Shift+Space", "展开新建标签页菜单")]),
+            "windows-calculator" => new("Windows 计算器 · 微软官方帮助",
+                "https://support.microsoft.com/zh-cn/windows/apps/use-the-calculator-in-windows",
+                "适用于 Windows 计算器标准模式。以下为微软公布的窗口置顶默认键位。",
+                [Row("Alt+Up", "在标准模式下置顶计算器窗口"), Row("Alt+Down", "退出计算器置顶视图")]),
             _ => null
         };
     }

@@ -53,6 +53,11 @@ internal static class DemoVerification
         AppMenuCatalogVerification.Run(Check);
         await MenuShortcutVerification.Run(directory,Check);
         await AppReadUiVerification.Run(window,directory,Check);
+        InstalledAppDiscoveryVerification.Run(Check);
+        InstalledSourcesVerification.Run(Check);
+        await InstalledAppUiVerification.Run(window,directory,Check);
+        Check(AppShortcutTarget.PackageWindowId(new WindowInteropHelper(window).Handle) == null,
+            "FileDock's unpackaged desktop window has no package identity");
         VerifyVsCodeProfiles(directory,Check);
         ScreenshotVerification.Run(Check);
         await FilePreviewVerification.Run(window,directory,Check);

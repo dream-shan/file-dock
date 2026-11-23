@@ -22,6 +22,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private readonly Func<AppShortcutGroup,Task<bool>> _save;
     private readonly Action<Action<string,string>,Action> _pickWindow;
     private readonly Action<Action<string,string,IntPtr>,Action>? _pickMenuWindow;
+    private readonly Func<IntPtr,string?> _getWindowPackageId;
+    private readonly Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>> _readMenu;
     private readonly Action _back;
     private readonly Func<IReadOnlyDictionary<string,ShortcutBinding>> _getGlobals;
     private readonly StackPanel _body = new();
@@ -37,8 +39,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private int _page;
     private bool _changingSoftware, _busy, _closed, _allSoftware = true;
 
-    private sealed record SoftwareChoice(string Name, string Path);
-    private readonly record struct CatalogRow(AppShortcutGroup Group, ManualAppShortcut? Manual, AppShortcutSource? Source,
+    private readonly record struct CatalogRow(SoftwareChoice Software, ManualAppShortcut? Manual, AppShortcutSource? Source,
         ImportedAppShortcut? Rule, OfficialShortcutReference? Reference);
 
     public FrameworkElement View => _scroll;
@@ -48,7 +49,10 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         Func<IReadOnlyList<ApplicationEntry>> getFixed, Func<AppShortcutGroup,Task<bool>> save,
         Action<Action<string,string>,Action> pickWindow, Action back,
         Func<IReadOnlyDictionary<string,ShortcutBinding>>? getGlobals = null,
-        Action<Action<string,string,IntPtr>,Action>? pickMenuWindow = null)
+        Action<Action<string,string,IntPtr>,Action>? pickMenuWindow = null,
+        Func<CancellationToken,Task<IReadOnlyList<DiscoveredApp>>>? discover = null,
+        Func<IntPtr,string?>? getWindowPackageId = null,
+        Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>>? readMenu = null)
     {
         _host = host;
         _getGroups = getGroups;
@@ -56,17 +60,20 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _save = save;
         _pickWindow = pickWindow;
         _pickMenuWindow = pickMenuWindow;
+        _getWindowPackageId = getWindowPackageId ?? AppShortcutTarget.PackageWindowId;
+        _readMenu = readMenu ?? MenuShortcutReader.ReadAsync;
         _back = back;
         _getGlobals = getGlobals ?? (() => new Dictionary<string,ShortcutBinding>());
 
         AutomationProperties.SetName(_software, "软件");
         _software.SelectionChanged += (_,_) => {
-            if (!_changingSoftware && _software.SelectedItem is ComboBoxItem { Tag: SoftwareChoice choice })
+            if (!_changingSoftware && _software.SelectedItem is ComboBoxItem item)
             {
-                if (choice.Path.Length > 0) SelectSoftware(choice.Name, choice.Path);
+                if (item.Tag is SoftwareChoice choice) SelectChoice(choice);
                 else
                 {
                     _allSoftware = true;
+                    _selectedSoftware = null;
                     _page = 0;
                     SetStatus("");
                     ShowCatalogAndFocus();
@@ -87,17 +94,21 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         root.Children.Add(_body);
         root.Children.Add(Ui.Button("关闭", RequestClose));
         _scroll = Ui.Scroll(root);
+        SetDiscoveryHint(discover != null ? "正在读取本机软件列表…" : "");
         ShowCatalog();
+        if (discover != null) _ = LoadInstalledAsync(discover);
     }
 
     private void ShowCatalog()
     {
         if (_allSoftware) _group = null;
+        _catalogVisible = true;
         _hasDraft = null;
         _body.Children.Clear();
         _body.Children.Add(Ui.Button("返回快捷键管理", () => { if (!_busy) _back(); }));
         RefreshSoftwareChoices();
         _body.Children.Add(_software);
+        _body.Children.Add(_discoveryHint);
         _initialFocus = _software.Items.Count > 0 ? _software : null;
 
         var softwareActions = new WrapPanel();
@@ -105,7 +116,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _initialFocus ??= browse;
         softwareActions.Children.Add(browse);
         softwareActions.Children.Add(CompactButton("从窗口选择", BeginWindowPick));
-        if (_pickMenuWindow != null)
+        bool packageMenu = _selectedSoftware?.PackageOnly == true;
+        if (_pickMenuWindow != null && (_allSoftware || SelectedExecutable || packageMenu))
             softwareActions.Children.Add(CompactButton("读取窗口菜单", BeginMenuPick));
         _body.Children.Add(softwareActions);
         if (_group != null)
@@ -115,6 +127,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
             if (IsVsCode(_group))
                 actions.Children.Add(CompactButton("VS Code 导入来源", ShowSources));
             _body.Children.Add(actions);
+            if (!IsVsCode(_group) && AppMenuCatalog.OfficialReference(_group.Path, _selectedSoftware?.Id) == null &&
+                _group.LastMenuRead == null && _group.Manual.Count == 0 && SelectedExecutable)
+                _body.Children.Add(Ui.Text("暂无可导入的配置或官方默认参考。打开软件后可读取窗口菜单，也可手动登记。", 12));
             if (_group.LastMenuRead is { } read)
             {
                 int count = _group.MenuSource?.Rules.Count ?? 0;
@@ -122,6 +137,12 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
                 _body.Children.Add(Ui.Text($"{read.ToLocalTime():yyyy-MM-dd HH:mm} · {coverage}。", 12));
             }
         }
+        if (!_allSoftware && !SelectedExecutable)
+            _body.Children.Add(Ui.Text(packageMenu
+                ? "打开此应用后可读取窗口菜单，结果保留到关闭本页。若要手动登记，可从窗口选择实际程序。"
+                : _group == null
+                ? "Windows 仅提供此应用的入口。要登记本机键位或读取菜单，可打开软件后点「从窗口选择」识别实际程序。"
+                : "要读取窗口菜单，可打开此快捷方式后点「从窗口选择」识别实际程序。", 12));
         _body.Children.Add(Ui.Text("按软件、动作、原键位或映射键位查找", 12));
         _body.Children.Add(_search);
         _body.Children.Add(_results);
@@ -129,45 +150,19 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _scroll.ScrollToTop();
     }
 
-    private void RefreshSoftwareChoices()
+    private void SelectSoftware(string name, string path)
     {
-        var choices = new Dictionary<string,SoftwareChoice>(StringComparer.OrdinalIgnoreCase);
-        foreach (var group in _getGroups())
-            choices[group.Path] = new SoftwareChoice(group.Name, group.Path);
-        foreach (var entry in _getFixed())
-            choices.TryAdd(entry.Path, new SoftwareChoice(entry.DisplayName, entry.Path));
-        if (_group != null)
-            choices[_group.Path] = new SoftwareChoice(_group.Name, _group.Path);
-
-        _changingSoftware = true;
-        try
-        {
-            _software.Items.Clear();
-            var all = new ComboBoxItem { Content = "所有软件", Tag = new SoftwareChoice("所有软件", "") };
-            _software.Items.Add(all);
-            if (_allSoftware) _software.SelectedItem = all;
-            foreach (var choice in choices.Values.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase))
-            {
-                var item = new ComboBoxItem {
-                    Content = choice.Name + (Path.GetExtension(choice.Path).Equals(".lnk", StringComparison.OrdinalIgnoreCase)
-                        ? " · 快捷方式" : " · 程序"),
-                    Tag = choice,
-                    ToolTip = choice.Path
-                };
-                _software.Items.Add(item);
-                if (_group != null && SamePath(_group.Path, choice.Path))
-                    _software.SelectedItem = item;
-            }
-        }
-        finally { _changingSoftware = false; }
+        SelectChoice(_choices.FirstOrDefault(item => item.Path != null && SamePath(item.Path, path))
+            ?? new SoftwareChoice(name, path));
     }
 
-    private void SelectSoftware(string name, string path)
+    private void SelectChoice(SoftwareChoice choice)
     {
         if (_closed) return;
         _allSoftware = false;
-        _group = _getGroups().FirstOrDefault(group => SamePath(group.Path, path))?.Copy() ??
-            new AppShortcutGroup { Name = name, Path = path };
+        _selectedSoftware = choice;
+        _group = choice.Path is { } path ? _getGroups().FirstOrDefault(group => SamePath(group.Path, path))?.Copy() ??
+            new AppShortcutGroup { Name = choice.Name, Path = path } : null;
         SetStatus("");
         _search.Clear();
         _page = 0;
@@ -215,7 +210,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         }
         if (total == 0)
         {
-            _results.Children.Add(Ui.Text(query.Length == 0 ? "暂无快捷键记录。" : "没有匹配的记录。"));
+            _results.Children.Add(Ui.Text(query.Length != 0 ? "没有匹配的记录。" :
+                _allSoftware ? "暂无快捷键记录。可搜索软件名称查看可用来源。" :
+                "暂无快捷键记录。", 12));
             return;
         }
 
@@ -240,19 +237,26 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         }
         foreach (var row in rows)
         {
-            string app = _allSoftware ? row.Group.Name + " · " : "";
-            if (row.Manual is { } manual)
+            var choice = row.Software;
+            string app = _allSoftware ? choice.Name + " · " : "";
+            if (choice.Group is { } group && row.Manual is { } manual)
                 AddResult(manual.Action, manual.Keys, app + $"手动登记 · {ScopeLabel(manual.Scope)}" + MappingSuffix(manual.Mapping), manual.Note,
-                    "编辑登记", () => { _group = row.Group; EditManual(manual); });
+                    "编辑登记", () => { _group = group; EditManual(manual); });
             else if (row.Reference is { } reference && row.Rule is { } example)
                 AddResult(example.Command, example.Key, app + "官方默认参考", reference.Scope,
-                    "查看参考", () => ShowReference(row.Group, reference, example));
-            else if (row.Source is { } source && row.Rule is { } rule)
+                    "查看参考", () => ShowReference(choice, reference, example));
+            else if (choice.Group is { } owner && row.Source is { } source && row.Rule is { } rule)
             {
                 string scope = rule.SystemWide ? "声明全局" : "应用内规则";
-                AddResult(RuleLabel(rule), rule.Key, app + $"{SourceLabel(row.Group, source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
-                    "查看规则", () => { _group = row.Group; ShowImportedRule(source, rule); });
+                AddResult(RuleLabel(rule), rule.Key, app + $"{SourceLabel(owner, source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
+                    "查看规则", () => { _group = owner; ShowImportedRule(source, rule); });
             }
+            else if (row.Rule is { } observed)
+                AddResult(observed.Command, observed.Key, app + "本次窗口实读", observed.Condition,
+                    "查看菜单", () => ShowPackageMenuRule(choice, observed));
+            else
+                AddResult(choice.Name, choice.Id != null ? "本机应用" : "软件", "查看快捷键来源",
+                    choice.Path ?? choice.Id ?? "", "查看软件", () => SelectChoice(choice));
         }
     }
 
@@ -504,6 +508,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 
     private void ShowDetail(string heading, Action returnToCatalog)
     {
+        _catalogVisible = false;
         _hasDraft = null;
         _body.Children.Clear();
         SetStatus("");
@@ -553,8 +558,12 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         }
     }
 
-    private void SetSavedGroup(AppShortcutGroup candidate) =>
+    private void SetSavedGroup(AppShortcutGroup candidate)
+    {
         _group = _getGroups().FirstOrDefault(group => SamePath(group.Path, candidate.Path))?.Copy() ?? candidate.Copy();
+        if (!_allSoftware)
+            _selectedSoftware = new SoftwareChoice(_group.Name, _group.Path, Group: _group);
+    }
 
     private void BeginWork(string status)
     {
@@ -603,7 +612,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
             label.Equals("VS Code", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool SamePath(string left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+    private static bool SamePath(string left, string right) => FileService.NormalizeKey(left) == FileService.NormalizeKey(right);
     private static string ScopeLabel(ManualShortcutScope scope) => scope switch {
         ManualShortcutScope.Application => "应用内",
         ManualShortcutScope.Global => "全局",
@@ -654,6 +663,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     {
         _closed = true;
         _importCancellation?.Cancel();
+        _discoveryCancellation?.Cancel();
     }
 
     public void FocusInitial() => _initialFocus?.Focus();

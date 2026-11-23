@@ -86,6 +86,28 @@ public partial class MainWindow
 
 internal static class AppShortcutTarget
 {
+    internal static string? PackageWindowId(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return null;
+        uint thread = PinNative.GetWindowThreadProcessId(window, out uint pid);
+        if (thread == 0 || pid == 0) return null;
+        using var process = OpenProcess(0x1000, false, pid);
+        if (process.IsInvalid) return null;
+
+        uint length = 0;
+        const int insufficientBuffer = 122;
+        if (GetApplicationUserModelId(process, ref length, null) != insufficientBuffer || length is 0 or > 1024)
+            return null;
+        var id = new StringBuilder((int)length);
+        if (GetApplicationUserModelId(process, ref length, id) != 0 ||
+            PinNative.GetWindowThreadProcessId(window, out uint current) != thread || current != pid) return null;
+        string value = id.ToString();
+        return value.Contains('!') ? value : null;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int GetApplicationUserModelId(SafeProcessHandle process, ref uint length, StringBuilder? id);
+
     internal static (string Name, string Path)? Read(IntPtr window)
     {
         if (window == IntPtr.Zero || !PinNative.IsWindowVisible(window) ||

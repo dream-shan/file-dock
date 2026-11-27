@@ -123,6 +123,7 @@ internal static class TemperatureRecoveryVerification
             File.WriteAllText(blocked, "fixture");
             new TemperatureDiagnosticLog(blocked).Write("close", error);
             Check(File.ReadAllText(blocked) == "fixture", "Unwritable diagnostics do not throw or overwrite existing files");
+            HardwareControlEngineVerification.Run(Check);
             Console.WriteLine("Temperature recovery self-test: " + checks + " checks passed.");
             return 0;
         }

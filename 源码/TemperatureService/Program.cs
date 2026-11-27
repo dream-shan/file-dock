@@ -16,8 +16,10 @@ internal sealed class TemperatureService : ServiceBase
 {
     private readonly CancellationTokenSource _stop = new();
     private Task? _worker;
+    private Task? _hardwareWorker;
     private readonly CpuTemperatureSampler _sampler = new(
         () => new ComputerTemperatureHardware(), new TemperatureDiagnosticLog().Write);
+    private readonly HardwareControlEngine _hardware = new(new WindowsLenovoWmiTransport());
 
     public TemperatureService()
     {
@@ -31,14 +33,19 @@ internal sealed class TemperatureService : ServiceBase
         Run(new TemperatureService());
         return 0;
     }
-    protected override void OnStart(string[] args) => _worker = Task.Run(Serve);
+    protected override void OnStart(string[] args)
+    {
+        _worker = Task.Run(Serve);
+        _hardwareWorker = Task.Run(ServeHardwareControl);
+    }
     protected override void OnShutdown() => OnStop();
     protected override void OnStop()
     {
         _stop.Cancel();
-        try { _worker?.Wait(5000); } catch (AggregateException) { }
+        try { Task.WaitAll(new[] { _worker ?? Task.CompletedTask, _hardwareWorker ?? Task.CompletedTask }, 5000); }
+        catch (AggregateException) { }
     }
-    private async Task Serve()
+    private static PipeSecurity CreateLocalPipeSecurity()
     {
         var security = new PipeSecurity();
         security.SetAccessRuleProtection(true, false);
@@ -46,6 +53,11 @@ internal sealed class TemperatureService : ServiceBase
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), PipeAccessRights.FullControl, AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), PipeAccessRights.ReadWrite, AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null), PipeAccessRights.ReadWrite, AccessControlType.Allow));
+        return security;
+    }
+    private async Task Serve()
+    {
+        var security = CreateLocalPipeSecurity();
         try
         {
             while (!_stop.IsCancellationRequested)
@@ -78,5 +90,40 @@ internal sealed class TemperatureService : ServiceBase
         }
         catch (OperationCanceledException) { }
         finally { _sampler.Dispose(); }
+    }
+    private async Task ServeHardwareControl()
+    {
+        var security = CreateLocalPipeSecurity();
+        var utf8 = new System.Text.UTF8Encoding(false);
+        try
+        {
+            while (!_stop.IsCancellationRequested)
+            {
+                try
+                {
+                    using var pipe = new NamedPipeServerStream("FileDock.HardwareControl.v1", PipeDirection.InOut, 1,
+                        PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 4096, 4096, security);
+                    using var stopRegistration = _stop.Token.Register(() => pipe.Dispose());
+                    await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+                    using var timeoutRegistration = deadline.Token.Register(() => pipe.Dispose());
+                    deadline.CancelAfter(4000);
+                    var buffer = new byte[1024];
+                    int read = await pipe.ReadAsync(buffer, 0, buffer.Length, deadline.Token).ConfigureAwait(false);
+                    if (read <= 0) continue;
+                    string command = utf8.GetString(buffer, 0, read).Trim();
+                    deadline.CancelAfter(8000);
+                    string reply = _hardware.HandleCommand(command) + "\n";
+                    byte[] payload = utf8.GetBytes(reply);
+                    await pipe.WriteAsync(payload, 0, payload.Length, deadline.Token).ConfigureAwait(false);
+                    await pipe.FlushAsync(deadline.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+                catch (ObjectDisposedException) { }
+                catch (IOException) { if (!_stop.IsCancellationRequested) await Task.Delay(100, _stop.Token).ConfigureAwait(false); }
+                catch (UnauthorizedAccessException) { await Task.Delay(1000, _stop.Token).ConfigureAwait(false); }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 }

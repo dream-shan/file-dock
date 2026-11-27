@@ -10,6 +10,7 @@ internal enum HardwareFormFactor { Unknown, Desktop, Laptop }
 
 internal enum HardwareCapabilityState
 {
+    AvailableControllable,
     AvailableReadOnly,
     RequiresElevatedService,
     Unsupported,
@@ -107,7 +108,8 @@ internal sealed record HardwareSnapshot(
     IReadOnlyList<HardwareCapabilityItem> Capabilities,
     DateTimeOffset? UpdatedAt = null,
     string? Error = null,
-    bool Loading = false)
+    bool Loading = false,
+    HardwareControlSnapshot? Control = null)
 {
     internal static HardwareSnapshot Empty(string? status = null) => new(
         HardwareIdentity.Unknown(),
@@ -116,10 +118,17 @@ internal sealed record HardwareSnapshot(
         [],
         null,
         status == "正在读取…" ? null : status,
-        Loading: status == "正在读取…");
+        Loading: status == "正在读取…",
+        Control: null);
 }
 
-internal interface IHardwareBackend : IControlBackend<HardwareSnapshot> { }
+internal interface IHardwareBackend : IControlBackend<HardwareSnapshot>
+{
+    void SetThermalMode(int mode);
+    void SetFeature(uint featureId, int value);
+    void ApplyFeatureValues(IReadOnlyDictionary<uint, int> featureValues, int targetMode, bool? fanFullSpeed);
+    void ResetDefaults();
+}
 
 internal sealed class HardwareController : IDisposable
 {
@@ -134,6 +143,11 @@ internal sealed class HardwareController : IDisposable
 
     internal void SetActive(bool active) => _channel.SetActive(active);
     internal void Refresh() => _channel.Refresh();
+    internal void SetThermalMode(int mode) => _channel.Command(backend => backend.SetThermalMode(mode));
+    internal void SetFeature(uint featureId, int value) => _channel.Command(backend => backend.SetFeature(featureId, value));
+    internal void ApplyFeatureValues(IReadOnlyDictionary<uint, int> featureValues, int targetMode, bool? fanFullSpeed) =>
+        _channel.Command(backend => backend.ApplyFeatureValues(featureValues, targetMode, fanFullSpeed));
+    internal void ResetDefaults() => _channel.Command(backend => backend.ResetDefaults());
     internal Task DrainAsync() => _channel.DrainAsync();
     public void Dispose() => _channel.Dispose();
 }

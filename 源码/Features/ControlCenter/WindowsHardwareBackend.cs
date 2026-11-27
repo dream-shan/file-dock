@@ -22,12 +22,17 @@ internal sealed class WindowsHardwareBackend : IHardwareBackend
     ];
 
     private readonly bool _native;
+    private readonly IHardwareServiceClient _service;
     private readonly NvmlPowerProbe _nvml = new();
     private HardwareIdentity? _cachedIdentity;
     private VendorInterfaceProbe? _cachedVendor;
     private bool _disposed;
 
-    internal WindowsHardwareBackend(bool native = true) => _native = native;
+    internal WindowsHardwareBackend(bool native = true, IHardwareServiceClient? service = null)
+    {
+        _native = native;
+        _service = service ?? new NamedPipeHardwareServiceClient();
+    }
 
     public void Start(Action changed) { }
     public void Stop() { }
@@ -46,8 +51,47 @@ internal sealed class WindowsHardwareBackend : IHardwareBackend
         _cachedIdentity ??= ReadIdentity();
         _cachedVendor ??= ProbeVendorInterfaces();
         var telemetry = _nvml.Read();
-        var capabilities = HardwareCapabilityEvaluator.Evaluate(_cachedIdentity, telemetry, _cachedVendor);
-        return new HardwareSnapshot(_cachedIdentity, telemetry, _cachedVendor, capabilities, DateTimeOffset.UtcNow);
+        HardwareControlSnapshot control = _cachedVendor.HasAnyVendorInterface
+            ? _service.Read()
+            : HardwareControlSnapshot.NotApplicable();
+        var capabilities = HardwareCapabilityEvaluator.Evaluate(_cachedIdentity, telemetry, _cachedVendor, control);
+        return new HardwareSnapshot(_cachedIdentity, telemetry, _cachedVendor, capabilities, DateTimeOffset.UtcNow, Control: control);
+    }
+
+    public void SetThermalMode(int mode) => _service.SetMode(mode);
+    public void SetFeature(uint featureId, int value) => _service.SetFeature(featureId, value);
+    public void ResetDefaults() => _service.ResetDefaults();
+
+    public void ApplyFeatureValues(IReadOnlyDictionary<uint, int> featureValues, int targetMode, bool? fanFullSpeed)
+    {
+        var current = _service.Read();
+        if (!current.Ready)
+            throw new InvalidOperationException(current.Message ?? "本机提权服务未就绪。");
+
+        // Validate every target value against live BIOS limits before writing anything.
+        if (targetMode == HardwareFeatureCatalog.ModeCustom && featureValues.Count > 0)
+        {
+            var byId = current.Features.ToDictionary(f => f.Id, f => f);
+            foreach (var pair in featureValues)
+            {
+                if (!byId.TryGetValue(pair.Key, out var limit))
+                    throw new InvalidOperationException($"当前机型 BIOS 不支持特征 0x{pair.Key:X8}，已取消应用。");
+                if (pair.Value < limit.Min || pair.Value > limit.Max || (pair.Value - limit.Min) % limit.Step != 0)
+                    throw new InvalidOperationException($"「{limit.Name}」目标值 {pair.Value} 超出当前 BIOS 安全范围 [{limit.Min}, {limit.Max}]（步长 {limit.Step}），已取消应用。");
+            }
+        }
+
+        if (current.ThermalMode != targetMode)
+            _service.SetMode(targetMode);
+
+        if (targetMode == HardwareFeatureCatalog.ModeCustom)
+        {
+            foreach (var pair in featureValues)
+                _service.SetFeature(pair.Key, pair.Value);
+        }
+
+        if (fanFullSpeed.HasValue && current.SupportsFanFullSpeed)
+            _service.SetFeature(HardwareFeatureCatalog.FeatureFanFullSpeed, fanFullSpeed.Value ? 1 : 0);
     }
 
     private static HardwareIdentity ReadIdentity()

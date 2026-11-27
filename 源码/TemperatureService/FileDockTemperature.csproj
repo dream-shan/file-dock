@@ -13,6 +13,7 @@
     <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System.Management" />
     <Reference Include="System.ServiceProcess" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

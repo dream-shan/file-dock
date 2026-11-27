@@ -32,7 +32,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private string? _chosenOutput,_chosenMic;
     private string _deviceSignature="";
     private bool _updating,_disposed,_paused;
-    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null,bool wireless=false,bool nativeWireless=true,HardwareController? hardware=null)
+    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null,bool wireless=false,bool nativeWireless=true,HardwareController? hardware=null,Func<IReadOnlyList<HardwarePerformancePreset>>? getHardwarePresets=null,Func<IReadOnlyList<HardwarePerformancePreset>,Task<bool>>? saveHardwarePresets=null)
     {
         _audio=audio;_writeTimer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(80)};_writeTimer.Tick+=(_,_)=>Flush();
         var root=new StackPanel();var header=new DockPanel{Margin=new Thickness(0,0,0,8)};
@@ -47,7 +47,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         _brightnessController=brightness;_powerController=power;_hardwareController=hardware;
         if(brightness!=null){_brightness=new(brightness,preferredScreen,saveScreen??(_=>Task.FromResult(false)));_home.Children.Add(_brightness.Home);_brightness.Details.Visibility=Visibility.Collapsed;_brightness.DetailsRequested+=()=>ShowExtra(_brightness.Details,"显示器");}
         if(power!=null){_power=new(power,openPowerSettings??(()=>{}));_home.Children.Add(_power.Home);_power.Details.Visibility=Visibility.Collapsed;_power.DetailsRequested+=()=>ShowExtra(_power.Details,"电源");}
-        if(hardware!=null){_hardware=new(hardware);_home.Children.Add(_hardware.Home);_hardware.Details.Visibility=Visibility.Collapsed;_hardware.DetailsRequested+=()=>ShowExtra(_hardware.Details,"硬件与性能");}
+        if(hardware!=null){_hardware=new(hardware,getHardwarePresets,saveHardwarePresets);_home.Children.Add(_hardware.Home);_hardware.Details.Visibility=Visibility.Collapsed;_hardware.DetailsRequested+=()=>ShowExtra(_hardware.Details,"硬件与性能");}
         var audioLinks=new StackPanel();
         _sessionsButton=Ui.Button("应用音量  ›",()=>ShowDetails(false));
         _sessionsButton.SetResourceReference(StyleProperty,"QuietButton");_sessionsButton.SetResourceReference(ForegroundProperty,"Ink");_sessionsButton.HorizontalContentAlignment=HorizontalAlignment.Left;_sessionsButton.Margin=new Thickness(0);_sessionsButton.Padding=new Thickness(12,9,12,9);_sessionsButton.MinHeight=38;

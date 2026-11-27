@@ -30,6 +30,7 @@ internal static class HardwareCapabilityEvaluator
 
     internal static string StateLabel(HardwareCapabilityState state) => state switch
     {
+        HardwareCapabilityState.AvailableControllable => "可调节",
         HardwareCapabilityState.AvailableReadOnly => "只读可用",
         HardwareCapabilityState.RequiresElevatedService => "需提权服务",
         HardwareCapabilityState.Unsupported => "本机不支持",
@@ -103,21 +104,32 @@ internal static class HardwareCapabilityEvaluator
     internal static IReadOnlyList<HardwareCapabilityItem> Evaluate(
         HardwareIdentity identity,
         GpuPowerTelemetry? gpu,
-        VendorInterfaceProbe vendor)
+        VendorInterfaceProbe vendor,
+        HardwareControlSnapshot? control = null)
     {
         var items = new List<HardwareCapabilityItem>(4);
+        bool serviceReady = control?.Ready == true;
         bool desktopNvmlPower = identity.FormFactor != HardwareFormFactor.Laptop &&
             gpu is { ManagementLimitWatts: not null, MinLimitWatts: not null, MaxLimitWatts: not null };
 
         // 1. Vendor performance mode
-        if (vendor.SupportsPerformanceMode)
+        if (serviceReady && control!.ThermalMode != null)
+        {
+            items.Add(new HardwareCapabilityItem(
+                "performance-mode",
+                "厂商性能模式",
+                HardwareCapabilityState.AvailableControllable,
+                $"{control.VendorFamily} · 当前 {HardwareFeatureCatalog.ModeLabel(control.ThermalMode)}模式",
+                "已连接本机提权服务，可直接切换安静 / 均衡 / 野兽 / 自定义模式（电池供电时自动阻止野兽与自定义模式）。"));
+        }
+        else if (vendor.SupportsPerformanceMode)
         {
             items.Add(new HardwareCapabilityItem(
                 "performance-mode",
                 "厂商性能模式",
                 HardwareCapabilityState.RequiresElevatedService,
                 $"检测到 {vendor.VendorFamily}",
-                $"本机已检测到 {vendor.VendorFamily} 性能模式接口（如安静 / 均衡 / 野兽 / 自定义）；当前保持普通权限只读，6.2 通过本机提权服务开放切换。"));
+                $"本机已检测到 {vendor.VendorFamily} 性能模式接口（如安静 / 均衡 / 野兽 / 自定义）；安装或更新本机提权服务后即可直接切换。"));
         }
         else if (!string.IsNullOrWhiteSpace(vendor.ProbeError))
         {
@@ -139,7 +151,18 @@ internal static class HardwareCapabilityEvaluator
         }
 
         // 2. Power limit / telemetry
-        if (vendor.SupportsPowerControl)
+        if (serviceReady && control!.Features.Count > 0)
+        {
+            string rangeNote = FormatGpuPowerNote(gpu);
+            items.Add(new HardwareCapabilityItem(
+                "power-limit",
+                "功耗与温控上限（CPU / GPU）",
+                HardwareCapabilityState.AvailableControllable,
+                $"已开放 {control.Features.Count} 项 BIOS 安全范围参数",
+                $"所有写入均按本机 BIOS 安全上下限与步长二次校验，可在自定义模式下调节并保存为方案。" +
+                (rangeNote.Length > 0 ? $"当前 GPU：{rangeNote}。" : "")));
+        }
+        else if (vendor.SupportsPowerControl)
         {
             string rangeNote = FormatGpuPowerNote(gpu);
             items.Add(new HardwareCapabilityItem(
@@ -149,7 +172,7 @@ internal static class HardwareCapabilityEvaluator
                 $"检测到 {vendor.VendorFamily} 功耗接口",
                 $"已检测到厂商自定义功耗与安全上下限接口（{string.Join(" / ", vendor.DetectedClasses.Take(3))}）。" +
                 (rangeNote.Length > 0 ? $"当前 {rangeNote}。" : "") +
-                "为防止越界写入，将由 6.2 本机提权服务按 BIOS 上下限受控调节。"));
+                "安装或更新本机提权服务后，将按 BIOS 安全上下限受控调节。"));
         }
         else if (desktopNvmlPower)
         {
@@ -181,7 +204,19 @@ internal static class HardwareCapabilityEvaluator
         }
 
         // 3. Fan control
-        if (vendor.SupportsFanCurve)
+        if (serviceReady && (control!.SupportsFanFullSpeed || control.Fan1Rpm != null || control.Fan2Rpm != null))
+        {
+            string rpmText = FormatFanRpm(control);
+            items.Add(new HardwareCapabilityItem(
+                "fan-control",
+                "风扇转速与散热控制",
+                control.SupportsFanFullSpeed ? HardwareCapabilityState.AvailableControllable : HardwareCapabilityState.AvailableReadOnly,
+                rpmText.Length > 0 ? rpmText : "支持全速散热切换",
+                control.SupportsFanFullSpeed
+                    ? "已实时读取 EC 风扇转速并支持切换全速散热开关。"
+                    : "已通过本机提权服务实时读取 EC 风扇转速。"));
+        }
+        else if (vendor.SupportsFanCurve)
         {
             items.Add(new HardwareCapabilityItem(
                 "fan-control",
@@ -189,7 +224,7 @@ internal static class HardwareCapabilityEvaluator
                 HardwareCapabilityState.RequiresElevatedService,
                 $"检测到 {vendor.VendorFamily} 风扇接口",
                 identity.FormFactor == HardwareFormFactor.Laptop
-                    ? "笔记本风扇由 EC/BIOS 托管，已检测到厂商风扇与曲线接口，需由 6.2 本机提权服务读取转速并按安全温度表调节。"
+                    ? "笔记本风扇由 EC/BIOS 托管，已检测到厂商风扇接口，安装或更新本机提权服务后可读取实时转速并控制散热。"
                     : "已检测到厂商风扇接口，需通过本机提权服务进行受控读写。"));
         }
         else if (gpu?.FanPercent != null)
@@ -223,9 +258,9 @@ internal static class HardwareCapabilityEvaluator
                 "overclock",
                 $"频率与超频（{scope}）",
                 HardwareCapabilityState.RequiresElevatedService,
-                $"检测到 {vendor.VendorFamily} 超频接口",
+                $"检测到 {vendor.VendorFamily} 超频接口（当前未开放写入）",
                 (clockNote.Length > 0 ? $"当前 {clockNote}。" : "") +
-                "已检测到厂商超频能力接口，需由 6.2 本机提权服务读取安全偏移上限并校验供电后才允许调整。"));
+                "6.2 优先开放安全的模式、功耗与散热控制；高风险超频偏移暂不写入。"));
         }
         else if (gpu?.GraphicsClockMhz != null)
         {
@@ -247,6 +282,15 @@ internal static class HardwareCapabilityEvaluator
         }
 
         return items;
+    }
+
+    internal static string FormatFanRpm(HardwareControlSnapshot? control)
+    {
+        if (control == null) return "";
+        var parts = new List<string>(2);
+        if (control.Fan1Rpm is { } f1) parts.Add($"风扇1 {f1} RPM");
+        if (control.Fan2Rpm is { } f2) parts.Add($"风扇2 {f2} RPM");
+        return string.Join(" · ", parts);
     }
 
     internal static string FormatGpuPowerNote(GpuPowerTelemetry? gpu)

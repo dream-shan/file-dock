@@ -14,6 +14,9 @@
 - **厂商 WMI 接口识别**：在 `root\wmi` 按白名单只读检测常见品牌硬件控制类定义（Lenovo Legion WMI、ASUS ATK WMI、HP OMEN WMI、Dell/Alienware WMI、MSI ACPI WMI），不扫描无关类、不调用写入方法。
 - **四项能力状态**：对「厂商性能模式」「功耗控制」「风扇转速与曲线」「频率与超频」分别输出 `只读可用`、`需提权服务`、`本机不支持` 或 `暂不可读` 及具体依据。
 
-## 下一阶段（6.2 规划）
+## 6.2 受控调节与本机提权服务实现
 
-6.2 沿用「主程序普通权限 + 本地提权服务」边界：由独立服务在读取厂商 BIOS 安全上下限（如 `LENOVO_CAPABILITY_DATA_00/01`、`LENOVO_FAN_TABLE_DATA`）后校验并应用性能模式、功耗墙、自定义风扇曲线或超频偏移，同时支持用户方案保存与一键恢复默认。
+- **本地提权服务扩展**（`FileDockTemperature`）：保持原有只读温度管道 `FileDock.Temperature.v1` 不变，新增按需响应的命名管道 `FileDock.HardwareControl.v1`（仅允许本机 LocalSystem、Administrators 与 Interactive 用户，拒绝网络访问，无后台轮询）。
+- **白名单与 BIOS 安全上下限二次校验**：服务端只接受固定白名单命令（`PING`、`READ`、`SET_MODE`、`SET_FEATURE`、`RESET_DEFAULTS`）与白名单 Lenovo Legion 特征 ID（CPU PL1/PL2/fPPT/交叉负载/温控、GPU cTGP/动态加速/温控及全速散热开关）。每次写入前强制核对本机 BIOS `LENOVO_CAPABILITY_DATA_01` 的 `[MinValue, MaxValue]`、步长对齐与交流供电状态（电池供电拒绝野兽/自定义模式与自定义功耗写入）。
+- **控制中心调节与方案保存**：主程序保持普通权限，连接 `FileDock.HardwareControl.v1` 后在控制主页与「硬件与性能」详情页开放性能模式切换（安静 / 均衡 / 野兽 / 自定义）、实时风扇 RPM 与全速散热开关、按本机 BIOS 实际返回生成的自定义功耗/温控滑块、性能方案预设保存/应用/删除（保存至 `Data\state.json`，启动时不自动重放）及一键「恢复 BIOS 默认」。服务尚未更新时优雅降级为 6.1 只读模式并给出管理员安装命令。
+

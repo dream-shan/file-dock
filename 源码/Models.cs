@@ -44,6 +44,7 @@ public sealed class AppState
     public PanelDisplayMode UnpinnedMode { get; set; } = PanelDisplayMode.Automatic;
     public string SelectedPage { get; set; } = "Performance";
     public string? PreferredBrightnessDisplayId {get;set;}
+    public List<Features.ControlCenter.HardwarePerformancePreset> HardwarePresets { get; set; } = [];
     public string ThemeMode { get; set; } = "System";
     internal AppState Copy()
     {
@@ -54,6 +55,7 @@ public sealed class AppState
         copy.Pins = Pins.Select(p => p.Copy()).ToList();
         copy.Plans = Plans.Select(p => p.Copy()).ToList();
         copy.Countdowns = Countdowns.Select(p => p.Copy()).ToList();
+        copy.HardwarePresets = HardwarePresets.Select(p => p.Copy()).ToList();
         return copy;
     }
 }

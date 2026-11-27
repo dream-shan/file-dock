@@ -155,11 +155,12 @@ public partial class MainWindow
     {
         if (!group.Valid()) return Task.FromResult(false);
         var draft = group.Copy();
-        string key = FileService.NormalizeKey(draft.Path);
+        string key = draft.IdentityKey;
         return CatalogOperation(async () => {
             if (AppMappingRules.Conflict(draft, State.Shortcuts!) != null) return false;
             return await _saves.CommitAsync(state => {
-                int index = state.AppShortcutGroups.FindIndex(item => FileService.NormalizeKey(item.Path) == key);
+                int index = state.AppShortcutGroups.FindIndex(item =>
+                    string.Equals(item.IdentityKey, key, StringComparison.OrdinalIgnoreCase));
                 if (draft.Manual.Count == 0 && draft.Sources.Count == 0 && draft.MenuSource == null && draft.LastMenuRead == null)
                 {
                     if (index >= 0) state.AppShortcutGroups.RemoveAt(index);

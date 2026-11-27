@@ -24,6 +24,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private readonly Action<Action<string,string,IntPtr>,Action>? _pickMenuWindow;
     private readonly Func<IntPtr,string?> _getWindowPackageId;
     private readonly Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>> _readMenu;
+    private readonly Func<OpenFileDialog,string?>? _chooseFile;
     private readonly Action _back;
     private readonly Func<IReadOnlyDictionary<string,ShortcutBinding>> _getGlobals;
     private readonly StackPanel _body = new();
@@ -52,7 +53,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         Action<Action<string,string,IntPtr>,Action>? pickMenuWindow = null,
         Func<CancellationToken,Task<IReadOnlyList<DiscoveredApp>>>? discover = null,
         Func<IntPtr,string?>? getWindowPackageId = null,
-        Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>>? readMenu = null)
+        Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>>? readMenu = null,
+        Func<string>? getLocalAppData = null,
+        Func<OpenFileDialog,string?>? chooseFile = null)
     {
         _host = host;
         _getGroups = getGroups;
@@ -62,6 +65,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _pickMenuWindow = pickMenuWindow;
         _getWindowPackageId = getWindowPackageId ?? AppShortcutTarget.PackageWindowId;
         _readMenu = readMenu ?? MenuShortcutReader.ReadAsync;
+        _getLocalAppData = getLocalAppData ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        _chooseFile = chooseFile;
         _back = back;
         _getGlobals = getGlobals ?? (() => new Dictionary<string,ShortcutBinding>());
 
@@ -120,16 +125,26 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         if (_pickMenuWindow != null && (_allSoftware || SelectedExecutable || packageMenu))
             softwareActions.Children.Add(CompactButton("读取窗口菜单", BeginMenuPick));
         _body.Children.Add(softwareActions);
-        if (_group != null)
+        var terminalIdentity = _allSoftware ? default : SelectedTerminalIdentity();
+        bool isTerminal = !_allSoftware && terminalIdentity is { IsWindowsTerminal: true };
+        bool canManual = _group != null && !_group.HasPackageIdentity;
+        if (canManual || isTerminal || (_group != null && IsVsCode(_group)))
         {
             var actions = new WrapPanel();
-            actions.Children.Add(CompactButton("添加手动登记", () => EditManual(null)));
-            if (IsVsCode(_group))
+            if (canManual)
+                actions.Children.Add(CompactButton("添加手动登记", () => EditManual(null)));
+            if (_group != null && IsVsCode(_group))
                 actions.Children.Add(CompactButton("VS Code 导入来源", ShowSources));
-            _body.Children.Add(actions);
-            if (!IsVsCode(_group) && AppMenuCatalog.OfficialReference(_group.Path, _selectedSoftware?.Id) == null &&
+            if (isTerminal)
+                AddWindowsTerminalCatalogActions(actions, terminalIdentity!);
+            if (actions.Children.Count > 0) _body.Children.Add(actions);
+        }
+        if (_group != null)
+        {
+            if (!IsVsCode(_group) && !isTerminal && AppMenuCatalog.OfficialReference(_group.Path, _selectedSoftware?.Id) == null &&
                 _group.LastMenuRead == null && _group.Manual.Count == 0 && SelectedExecutable)
                 _body.Children.Add(Ui.Text("暂无可导入的配置或官方默认参考。打开软件后可读取窗口菜单，也可手动登记。", 12));
+            if (isTerminal) AddWindowsTerminalCatalogSummary();
             if (_group.LastMenuRead is { } read)
             {
                 int count = _group.MenuSource?.Rules.Count ?? 0;
@@ -139,7 +154,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         }
         if (!_allSoftware && !SelectedExecutable)
             _body.Children.Add(Ui.Text(packageMenu
-                ? "打开此应用后可读取窗口菜单，结果保留到关闭本页。若要手动登记，可从窗口选择实际程序。"
+                ? (isTerminal
+                    ? "可读取此实例的个人 settings.json 快捷键配置；也可打开应用后读取窗口菜单（关闭本页后清除）。"
+                    : "打开此应用后可读取窗口菜单，结果保留到关闭本页。若要手动登记，可从窗口选择实际程序。")
                 : _group == null
                 ? "Windows 仅提供此应用的入口。要登记本机键位或读取菜单，可打开软件后点「从窗口选择」识别实际程序。"
                 : "要读取窗口菜单，可打开此快捷方式后点「从窗口选择」识别实际程序。", 12));
@@ -161,8 +178,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         if (_closed) return;
         _allSoftware = false;
         _selectedSoftware = choice;
-        _group = choice.Path is { } path ? _getGroups().FirstOrDefault(group => SamePath(group.Path, path))?.Copy() ??
-            new AppShortcutGroup { Name = choice.Name, Path = path } : null;
+        _group = _getGroups().FirstOrDefault(group =>
+            string.Equals(group.IdentityKey, choice.Identity, StringComparison.OrdinalIgnoreCase))?.Copy() ??
+            (choice.Path is { } path ? new AppShortcutGroup { Name = choice.Name, Path = path } : null);
         SetStatus("");
         _search.Clear();
         _page = 0;
@@ -193,6 +211,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 
     private string? ChooseFile(OpenFileDialog dialog)
     {
+        if (_chooseFile != null) return _chooseFile(dialog);
         var owner = Window.GetWindow(View);
         return (owner == null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) == true ? dialog.FileName : null;
     }
@@ -247,8 +266,12 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
                     "查看参考", () => ShowReference(choice, reference, example));
             else if (choice.Group is { } owner && row.Source is { } source && row.Rule is { } rule)
             {
-                string scope = rule.SystemWide ? "声明全局" : "应用内规则";
-                AddResult(RuleLabel(rule), rule.Key, app + $"{SourceLabel(owner, source)} · {scope}" + MappingSuffix(rule.Mapping), rule.Condition,
+                string statusText = ShortcutRuleStatuses.Label(rule.Status);
+                string scope = rule.Status == ShortcutRuleStatuses.Disabled ? "" :
+                    (rule.SystemWide ? "声明全局" : "应用内规则");
+                string summary = string.Join(" · ", new[] { SourceLabel(owner, source), statusText, scope }
+                    .Where(part => part.Length > 0));
+                AddResult(RuleLabel(rule), rule.Key, app + summary + MappingSuffix(rule.Mapping), rule.Condition,
                     "查看规则", () => { _group = owner; ShowImportedRule(source, rule); });
             }
             else if (row.Rule is { } observed)
@@ -368,7 +391,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _body.Children.Add(Ui.Button("导入 VS Code 用户配置", async () => await PickSource(false)));
         _body.Children.Add(Ui.Text("从 VS Code 命令面板打开默认快捷键 JSON，复制内容到本地 JSON 文件后导入。", 12));
         _body.Children.Add(Ui.Button("导入 VS Code 默认快捷键", async () => await PickSource(true)));
-        foreach (var source in group.Sources)
+        foreach (var source in group.Sources.Where(item => item.Kind == AppShortcutSourceKinds.VsCode))
         {
             _body.Children.Add(Ui.Text($"{SourceName(source)} · {source.Rules.Count} 条", 14));
             var path = Ui.Text(source.Path, 12);
@@ -382,7 +405,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
             var remove = CompactButton("移除来源", async () => {
                 if (!ConfirmRemove("移除该来源在文件坞里的导入记录？")) return;
                 var candidate = group.Copy();
-                candidate.Sources.RemoveAll(item => item.IsDefault == source.IsDefault && SamePath(item.Path, source.Path));
+                candidate.Sources.RemoveAll(item => item.Kind == AppShortcutSourceKinds.VsCode &&
+                    item.IsDefault == source.IsDefault && SamePath(item.Path, source.Path));
                 await SaveGroup(candidate, "导入来源已移除。", ShowSources);
             });
             AutomationProperties.SetName(remove, $"移除{SourceName(source)} {source.Path}");
@@ -436,7 +460,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
                     HasArguments = rule.HasArguments, SystemWide = rule.SystemWide
                 }).ToList()
             };
-            int existing = candidate.Sources.FindIndex(item => item.IsDefault == isDefault && SamePath(item.Path, path));
+            int existing = candidate.Sources.FindIndex(item => item.Kind == AppShortcutSourceKinds.VsCode &&
+                item.IsDefault == isDefault && SamePath(item.Path, path));
             if (existing < 0) candidate.Sources.Add(replacement);
             else
             {
@@ -472,22 +497,30 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     {
         var group = _group;
         if (group == null) return;
+        bool isTerminalSource = source.Kind == AppShortcutSourceKinds.WindowsTerminal;
         ShowDetail(RuleLabel(rule), ReturnFromDetail);
         _body.Children.Add(Ui.Text("键位"));
         _body.Children.Add(Ui.Text(rule.Key, 14));
         _body.Children.Add(Ui.Text("来源与范围"));
-        _body.Children.Add(Ui.Text(group.Name + " · " + SourceLabel(group, source) + (rule.SystemWide ? " · 声明全局" : " · 应用内规则")));
+        string statusText = ShortcutRuleStatuses.Label(rule.Status);
+        string scopeText = rule.Status == ShortcutRuleStatuses.Disabled ? "" :
+            (rule.SystemWide ? "声明全局" : "应用内规则");
+        _body.Children.Add(Ui.Text(string.Join(" · ", new[] { group.Name, SourceLabel(group, source), statusText, scopeText }
+            .Where(part => part.Length > 0))));
         _body.Children.Add(Ui.Text(source.Path, 12));
-        _body.Children.Add(Ui.Text(source == group.MenuSource ? "菜单项" : "命令"));
+        _body.Children.Add(Ui.Text(source == group.MenuSource ? "菜单项" : isTerminalSource ? "动作" : "命令"));
         _body.Children.Add(Ui.Text(rule.Command.Length == 0 ? "空命令" : rule.Command, 13));
         if (!string.IsNullOrEmpty(rule.Condition))
         {
-            _body.Children.Add(Ui.Text("生效条件"));
+            _body.Children.Add(Ui.Text(isTerminalSource ? "状态与来源说明" : "生效条件"));
             _body.Children.Add(Ui.Text(rule.Condition, 13));
-            _body.Children.Add(Ui.Text("映射只发送原键，具体动作由 VS Code 按当前条件决定。", 12));
+            if (!isTerminalSource)
+                _body.Children.Add(Ui.Text("映射只发送原键，具体动作由 VS Code 按当前条件决定。", 12));
         }
         if (rule.HasArguments)
-            _body.Children.Add(Ui.Text("该规则声明了命令参数。", 12));
+            _body.Children.Add(Ui.Text(isTerminalSource
+                ? "该规则声明了额外命令参数；具体命令与路径仅保留在原 settings.json 中。"
+                : "该规则声明了命令参数。", 12));
         var mapping = new MappingEditor(rule.Mapping);
         string? unavailable = AppMappingRules.Eligibility(group, null, rule);
         mapping.SetAvailability(unavailable);
@@ -560,9 +593,18 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 
     private void SetSavedGroup(AppShortcutGroup candidate)
     {
-        _group = _getGroups().FirstOrDefault(group => SamePath(group.Path, candidate.Path))?.Copy() ?? candidate.Copy();
+        bool empty = candidate.Manual.Count == 0 && candidate.Sources.Count == 0 &&
+            candidate.MenuSource == null && candidate.LastMenuRead == null;
+        var persisted = _getGroups().FirstOrDefault(group =>
+            string.Equals(group.IdentityKey, candidate.IdentityKey, StringComparison.OrdinalIgnoreCase))?.Copy();
+        _group = persisted ?? (candidate.HasPackageIdentity && empty ? null : candidate.Copy());
         if (!_allSoftware)
-            _selectedSoftware = new SoftwareChoice(_group.Name, _group.Path, Group: _group);
+        {
+            string? path = candidate.HasPackageIdentity ? null : candidate.Path;
+            string? id = candidate.HasPackageIdentity ? candidate.AppId : _selectedSoftware?.Id;
+            _selectedSoftware = new SoftwareChoice(candidate.Name, path, id,
+                InstalledName: _selectedSoftware?.InstalledName, Group: _group, PinnedName: _selectedSoftware?.PinnedName);
+        }
     }
 
     private void BeginWork(string status)
@@ -603,9 +645,11 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
 
     private static bool IsVsCode(AppShortcutGroup group)
     {
+        if (group.HasPackageIdentity) return false;
         string label = group.Name;
         string fileName = Path.GetFileNameWithoutExtension(group.Path);
-        return group.Sources.Count > 0 || fileName.Equals("Code", StringComparison.OrdinalIgnoreCase) ||
+        return group.Sources.Any(source => source.Kind == AppShortcutSourceKinds.VsCode) ||
+            fileName.Equals("Code", StringComparison.OrdinalIgnoreCase) ||
             fileName.Equals("Code - Insiders", StringComparison.OrdinalIgnoreCase) ||
             fileName.StartsWith("Visual Studio Code", StringComparison.OrdinalIgnoreCase) ||
             label.StartsWith("Visual Studio Code", StringComparison.OrdinalIgnoreCase) ||
@@ -618,7 +662,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         ManualShortcutScope.Global => "全局",
         _ => "范围未标注"
     };
-    private static string SourceName(AppShortcutSource source) => source.IsDefault ? "VS Code 默认导出" : "VS Code 用户配置";
+    private static string SourceName(AppShortcutSource source) => source.Kind == AppShortcutSourceKinds.WindowsTerminal
+        ? "Windows 终端配置"
+        : source.IsDefault ? "VS Code 默认导出" : "VS Code 用户配置";
     private static string RuleLabel(ImportedAppShortcut rule) =>
         rule.Command.Length == 0 ? "空动作规则" : rule.Command[0] == '-' ? $"移除 {rule.Command[1..]}" : rule.Command;
 

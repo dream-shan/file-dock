@@ -106,7 +106,8 @@ internal static class AppMappingRules
         var counts = new Dictionary<AppChord,int>();
         foreach (var entry in entries)
         {
-            if (entry.ObservedInConfig || string.IsNullOrWhiteSpace(entry.Keys) || entry.Keys.Length > 256) continue;
+            if (entry.ObservedInConfig || entry.Rule?.Status == ShortcutRuleStatuses.Disabled ||
+                string.IsNullOrWhiteSpace(entry.Keys) || entry.Keys.Length > 256) continue;
             string text = PlusSpacing.Replace(entry.Keys.Trim(),"+");
             int end = text.IndexOfAny(StrokeSeparators);
             string stroke = end < 0 ? text : text[..end];
@@ -164,8 +165,15 @@ internal static class AppMappingRules
         if ((entry.Manual == null) == (entry.Rule == null)) return "请选择一条动作记录。";
         if (entry.Manual is {Scope: not ManualShortcutScope.Application} || entry.Rule is {SystemWide:true})
             return "仅支持明确在软件内生效的动作。";
-        if (entry.Rule is {} rule && (string.IsNullOrWhiteSpace(rule.Command) || rule.Command.TrimStart().StartsWith('-')))
-            return "此条目没有可执行的软件动作。";
+        if (entry.Rule is {} rule)
+        {
+            if (rule.Status == ShortcutRuleStatuses.Disabled)
+                return "该键位已在配置中禁用，没有可执行的软件动作。";
+            if (rule.Status == ShortcutRuleStatuses.Uncertain)
+                return "无法确定此条目在软件中的实际生效键位，暂不支持设置前台映射。";
+            if (string.IsNullOrWhiteSpace(rule.Command) || rule.Command.TrimStart().StartsWith('-'))
+                return "此条目没有可执行的软件动作。";
+        }
         if (!TryParse(entry.Keys, out original)) return "原快捷键需要是可识别的单组按键，并避开系统保留键。";
         if (occupied.GetValueOrDefault(original)>1) return "原快捷键还关联其他条目或连续按键，无法确定目标动作。";
         return null;
@@ -216,17 +224,21 @@ internal static class AppMappingRules
 
     internal static void RestoreMappings(AppShortcutSource previous, AppShortcutSource refreshed)
     {
-        if (!string.Equals(previous.Path,refreshed.Path,StringComparison.OrdinalIgnoreCase) || previous.IsDefault != refreshed.IsDefault) return;
+        if (!string.Equals(previous.Path,refreshed.Path,StringComparison.OrdinalIgnoreCase) ||
+            previous.IsDefault != refreshed.IsDefault ||
+            !string.Equals(previous.Kind, refreshed.Kind, StringComparison.Ordinal)) return;
         // Argument values are intentionally absent from the catalog, so their identities cannot be compared.
-        static (string,string,string,bool,bool) Identity(ImportedAppShortcut rule) =>
-            (rule.Key,rule.Command,rule.Condition,rule.SystemWide,rule.HasArguments);
+        static (string,string,string,string,bool,bool) Identity(ImportedAppShortcut rule) =>
+            (rule.Key,rule.Command,rule.Condition,rule.Status,rule.SystemWide,rule.HasArguments);
         var old = previous.Rules.ToLookup(Identity);
         foreach (var rows in refreshed.Rules.GroupBy(Identity))
         {
             var prior = old[rows.Key];
             if (rows.Count() != 1 || prior.Count() != 1) continue;
             var row = rows.First();
-            if (!row.HasArguments && !row.SystemWide) row.Mapping = prior.First().Mapping?.Copy();
+            if (!row.HasArguments && !row.SystemWide &&
+                row.Status is not (ShortcutRuleStatuses.Disabled or ShortcutRuleStatuses.Uncertain))
+                row.Mapping = prior.First().Mapping?.Copy();
         }
     }
 }

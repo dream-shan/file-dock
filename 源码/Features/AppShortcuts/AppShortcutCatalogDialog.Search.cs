@@ -47,8 +47,12 @@ internal sealed partial class AppShortcutCatalogDialog
                 {
                     string label = SourceLabel(group, source) + " " + source.Path;
                     foreach (var rule in source.Rules)
-                        if (Matches(RuleLabel(rule), rule.Key, label, rule.Condition, rule.Mapping))
+                    {
+                        string sourceMeta = string.IsNullOrEmpty(rule.Status) ? label :
+                            label + " " + ShortcutRuleStatuses.Label(rule.Status);
+                        if (Matches(RuleLabel(rule), rule.Key, sourceMeta, rule.Condition, rule.Mapping))
                             yield return new(choice, null, source, rule, null);
+                    }
                 }
             }
             if (choice.PackageOnly && _packageMenus.TryGetValue(choice.Id!, out var observed))

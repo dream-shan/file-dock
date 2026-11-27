@@ -62,7 +62,11 @@ internal sealed partial class AppShortcutCatalogDialog
     {
         var byIdentity = new Dictionary<string,SoftwareChoice>(StringComparer.OrdinalIgnoreCase);
         foreach (var group in _getGroups())
-            byIdentity[FileService.NormalizeKey(group.Path)] = new(group.Name, group.Path, Group: group);
+        {
+            string? path = group.HasPackageIdentity ? null : group.Path;
+            string? id = group.HasPackageIdentity ? group.AppId : null;
+            byIdentity[group.IdentityKey] = new(group.Name, path, id, Group: group);
+        }
         foreach (var fixedApp in _getFixed())
         {
             string key = FileService.NormalizeKey(fixedApp.Path);
@@ -72,9 +76,11 @@ internal sealed partial class AppShortcutCatalogDialog
         }
         if (!_allSoftware && _group != null)
         {
-            string key = FileService.NormalizeKey(_group.Path);
+            string key = _group.IdentityKey;
             byIdentity.TryGetValue(key, out var existing);
-            byIdentity[key] = new(_group.Name, _group.Path, Group: _group, PinnedName: existing?.PinnedName);
+            string? path = _group.HasPackageIdentity ? null : _group.Path;
+            string? id = _group.HasPackageIdentity ? _group.AppId : existing?.Id;
+            byIdentity[key] = new(_group.Name, path, id, existing?.InstalledName, Group: _group, PinnedName: existing?.PinnedName);
         }
 
         foreach (var app in _installed)

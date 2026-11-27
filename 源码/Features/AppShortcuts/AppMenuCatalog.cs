@@ -37,7 +37,9 @@ internal static class AppMenuCatalog
         // identity so another entry point or a similarly named store app stays distinct.
         string? product = appId?.ToLowerInvariant() switch {
             "microsoft.windowscalculator_8wekyb3d8bbwe!app" => "windows-calculator",
-            "microsoft.windowsterminal_8wekyb3d8bbwe!app" => "windowsterminal.exe",
+            "microsoft.windowsterminal_8wekyb3d8bbwe!app"
+                or "microsoft.windowsterminalpreview_8wekyb3d8bbwe!app"
+                or "microsoft.windowsterminalcanary_8wekyb3d8bbwe!app" => "windowsterminal.exe",
             "msedge" => "msedge.exe",
             _ when appId?.Contains('!') == true => null,
             _ => Path.GetFileName(applicationPath)?.ToLowerInvariant()

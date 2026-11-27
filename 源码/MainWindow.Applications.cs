@@ -148,7 +148,7 @@ public partial class MainWindow
         if (_exitSaving || _quitting) return;
         OpenModuleDialog(new AppShortcutCatalogDialog(this, () => State.AppShortcutGroups, () => State.Applications,
             SaveAppShortcutGroupAsync, PickAppShortcutTarget, () => OpenShortcutSettings(), () => State.Shortcuts!, PickMenuWindow,
-            InstalledAppDiscovery.ReadAsync));
+            InstalledAppDiscovery.ReadAsync, scanOpenWindows: OpenWindowMenuScanner.ScanAsync));
     }
 
     internal Task<bool> SaveAppShortcutGroupAsync(AppShortcutGroup group)

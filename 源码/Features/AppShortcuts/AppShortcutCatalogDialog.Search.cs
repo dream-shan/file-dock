@@ -25,7 +25,7 @@ internal sealed partial class AppShortcutCatalogDialog
                 choice.PinnedName?.Contains(term, StringComparison.OrdinalIgnoreCase) != true &&
                 choice.Path?.Contains(term, StringComparison.OrdinalIgnoreCase) != true &&
                 choice.Id?.Contains(term, StringComparison.OrdinalIgnoreCase) != true).ToArray();
-            if (_allSoftware && terms.Length != 0 && remaining.Length == 0)
+            if (!_onlyLiveWindowShortcuts && _allSoftware && terms.Length != 0 && remaining.Length == 0)
                 yield return new(choice, null, null, null, null);
             bool Matches(string action, string keys, string source, string condition, ShortcutBinding? mapping)
             {
@@ -38,7 +38,7 @@ internal sealed partial class AppShortcutCatalogDialog
                         !condition.Contains(term, StringComparison.OrdinalIgnoreCase)) return false;
                 return true;
             }
-            if (choice.Group is { } group)
+            if (!_onlyLiveWindowShortcuts && choice.Group is { } group)
             {
                 foreach (var entry in group.Manual)
                     if (Matches(entry.Action, entry.Keys, "手动登记 " + ScopeLabel(entry.Scope), entry.Note, entry.Mapping))
@@ -55,11 +55,10 @@ internal sealed partial class AppShortcutCatalogDialog
                     }
                 }
             }
-            if (choice.PackageOnly && _packageMenus.TryGetValue(choice.Id!, out var observed))
-                foreach (var rule in observed.Rules)
-                    if (Matches(rule.Command, rule.Key, "本次窗口实读", rule.Condition, null))
-                        yield return new(choice, null, null, rule, null);
-            if (AppMenuCatalog.OfficialReference(choice.Path ?? "", choice.Id) is { } reference)
+            foreach (var rule in LiveRulesFor(choice, deduplicateWithSaved: !_onlyLiveWindowShortcuts))
+                if (Matches(rule.Command, rule.Key, "本次窗口实读", rule.Condition, null))
+                    yield return new(choice, null, null, rule, null);
+            if (!_onlyLiveWindowShortcuts && AppMenuCatalog.OfficialReference(choice.Path ?? "", choice.Id) is { } reference)
                 foreach (var rule in reference.Rules)
                     if (Matches(rule.Command, rule.Key, "官方默认参考", reference.Title, null))
                         yield return new(choice, null, null, rule, reference);
@@ -85,7 +84,9 @@ internal sealed partial class AppShortcutCatalogDialog
     {
         ShowDetail(rule.Command, ShowCatalogAndFocus);
         _body.Children.Add(Ui.Text($"{choice.Name} · {rule.Key}", 14));
-        _body.Children.Add(Ui.Text("本次窗口实读 · 关闭本页后清除。", 12));
+        _body.Children.Add(Ui.Text("本次窗口实读 · 仅本次查看，关闭本页后清除。", 12));
+        if (choice.Path != null)
+            _body.Children.Add(Ui.Text("如需长期保存或配置前台映射，可使用「读取窗口菜单」手动单窗读取并保存。", 12));
         if (rule.Condition.Length > 0) _body.Children.Add(Ui.Text(rule.Condition));
         FocusInitial();
     }

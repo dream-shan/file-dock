@@ -55,7 +55,8 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         Func<IntPtr,string?>? getWindowPackageId = null,
         Func<IntPtr,string,CancellationToken,Task<List<ImportedAppShortcut>>>? readMenu = null,
         Func<string>? getLocalAppData = null,
-        Func<OpenFileDialog,string?>? chooseFile = null)
+        Func<OpenFileDialog,string?>? chooseFile = null,
+        Func<CancellationToken,Task<OpenWindowMenuScanResult>>? scanOpenWindows = null)
     {
         _host = host;
         _getGroups = getGroups;
@@ -67,6 +68,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _readMenu = readMenu ?? MenuShortcutReader.ReadAsync;
         _getLocalAppData = getLocalAppData ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         _chooseFile = chooseFile;
+        _scanOpenWindows = scanOpenWindows;
         _back = back;
         _getGlobals = getGlobals ?? (() => new Dictionary<string,ShortcutBinding>());
 
@@ -100,8 +102,10 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         root.Children.Add(Ui.Button("关闭", RequestClose));
         _scroll = Ui.Scroll(root);
         SetDiscoveryHint(discover != null ? "正在读取本机软件列表…" : "");
+        SetOpenWindowsHint("");
         ShowCatalog();
         if (discover != null) _ = LoadInstalledAsync(discover);
+        if (scanOpenWindows != null) _ = ScanOpenWindowsAsync();
     }
 
     private void ShowCatalog()
@@ -114,6 +118,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         RefreshSoftwareChoices();
         _body.Children.Add(_software);
         _body.Children.Add(_discoveryHint);
+        _body.Children.Add(_openWindowsHint);
         _initialFocus = _software.Items.Count > 0 ? _software : null;
 
         var softwareActions = new WrapPanel();
@@ -124,6 +129,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         bool packageMenu = _selectedSoftware?.PackageOnly == true;
         if (_pickMenuWindow != null && (_allSoftware || SelectedExecutable || packageMenu))
             softwareActions.Children.Add(CompactButton("读取窗口菜单", BeginMenuPick));
+        AddOpenWindowCatalogControls(softwareActions);
         _body.Children.Add(softwareActions);
         var terminalIdentity = _allSoftware ? default : SelectedTerminalIdentity();
         bool isTerminal = !_allSoftware && terminalIdentity is { IsWindowsTerminal: true };
@@ -142,7 +148,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         if (_group != null)
         {
             if (!IsVsCode(_group) && !isTerminal && AppMenuCatalog.OfficialReference(_group.Path, _selectedSoftware?.Id) == null &&
-                _group.LastMenuRead == null && _group.Manual.Count == 0 && SelectedExecutable)
+                _group.LastMenuRead == null && _group.Manual.Count == 0 && !_liveWindowMenus.ContainsKey(_group.IdentityKey) && SelectedExecutable)
                 _body.Children.Add(Ui.Text("暂无可导入的配置或官方默认参考。打开软件后可读取窗口菜单，也可手动登记。", 12));
             if (isTerminal) AddWindowsTerminalCatalogSummary();
             if (_group.LastMenuRead is { } read)
@@ -230,6 +236,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         if (total == 0)
         {
             _results.Children.Add(Ui.Text(query.Length != 0 ? "没有匹配的记录。" :
+                _onlyLiveWindowShortcuts ? "当前未筛选到打开窗口的菜单快捷键。可关闭筛选查看全部，或点击「刷新打开窗口」。" :
                 _allSoftware ? "暂无快捷键记录。可搜索软件名称查看可用来源。" :
                 "暂无快捷键记录。", 12));
             return;
@@ -710,6 +717,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _closed = true;
         _importCancellation?.Cancel();
         _discoveryCancellation?.Cancel();
+        _openWindowsCancellation?.Cancel();
     }
 
     public void FocusInitial() => _initialFocus?.Focus();

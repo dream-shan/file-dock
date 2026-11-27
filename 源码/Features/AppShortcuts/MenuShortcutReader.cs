@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -89,7 +90,7 @@ internal static class MenuShortcutReader
                 !string.Equals(imagePath.ToString(), args[4], StringComparison.OrdinalIgnoreCase))
             { Environment.ExitCode = IdentityChanged; return true; }
 
-            var snapshot = new Snapshot(pid);
+            var snapshot = new Snapshot(pid, MaxNodes, MaxDepth, MaxRules);
             IntPtr menu = GetMenu(hwnd);
             if (menu != IntPtr.Zero) snapshot.ReadNative(menu, "", 0);
             // One window can expose native menu items and separate framework menus.
@@ -106,23 +107,68 @@ internal static class MenuShortcutReader
         return true;
     }
 
-    private sealed class Snapshot(uint pid)
+    internal static List<ImportedAppShortcut> ReadBatchWindow(IntPtr hwnd, uint pid, bool includeAutomation,
+        TimeSpan automationTimeout, int maxNodes = 800, int maxDepth = 16, int maxRules = 256)
+    {
+        var snapshot = new Snapshot(pid, maxNodes, maxDepth, maxRules);
+        try
+        {
+            IntPtr menu = GetMenu(hwnd);
+            if (menu != IntPtr.Zero) snapshot.ReadNative(menu, "", 0);
+        }
+        catch (InvalidDataException) { }
+        catch (Exception e) when (e is InvalidOperationException or ArgumentException or Win32Exception or
+            COMException or UnauthorizedAccessException or IOException or OverflowException) { }
+
+        if (includeAutomation && automationTimeout > TimeSpan.Zero)
+        {
+            try
+            {
+                var task = Task.Run(() => {
+                    try
+                    {
+                        var root = AutomationElement.FromHandle(hwnd);
+                        if (root != null) snapshot.ReadAutomation(root, "", false, 0);
+                    }
+                    catch (InvalidDataException) { }
+                    catch (Exception e) when (e is InvalidOperationException or ArgumentException or Win32Exception or
+                        COMException or UnauthorizedAccessException or IOException or OverflowException or
+                        ElementNotAvailableException or ElementNotEnabledException) { }
+                });
+                task.Wait(automationTimeout);
+            }
+            catch (AggregateException) { }
+        }
+        return snapshot.CopyRules();
+    }
+
+    private sealed class Snapshot(uint pid, int maxNodes, int maxDepth, int maxRules)
     {
         internal readonly List<ImportedAppShortcut> Rules = [];
         private readonly HashSet<(string, string)> seen = [];
+        private readonly object gate = new();
         private int nodes;
+
+        internal List<ImportedAppShortcut> CopyRules()
+        {
+            lock (gate) return Rules.Select(rule => rule.Copy()).ToList();
+        }
 
         private void Visit(int depth)
         {
-            if (++nodes > MaxNodes || depth > MaxDepth) throw new InvalidDataException();
+            if (++nodes > maxNodes || depth > maxDepth) throw new InvalidDataException();
         }
 
         private void Add(string action, string key)
         {
             key = key.Trim();
-            if (action.Length == 0 || key.Length == 0 || key.Length > 256 || !seen.Add((action, key))) return;
-            if (Rules.Count == MaxRules) throw new InvalidDataException();
-            Rules.Add(new ImportedAppShortcut { Command = action, Key = key });
+            if (action.Length == 0 || key.Length == 0 || key.Length > 256) return;
+            lock (gate)
+            {
+                if (!seen.Add((action, key))) return;
+                if (Rules.Count == maxRules) throw new InvalidDataException();
+                Rules.Add(new ImportedAppShortcut { Command = action, Key = key });
+            }
         }
 
         private static string Join(string parent, string name) => parent.Length == 0 ? name :

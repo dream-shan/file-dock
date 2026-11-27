@@ -95,6 +95,13 @@ internal sealed partial class AppShortcutCatalogDialog
             var entry = new SoftwareChoice(menu.Name, null, id);
             byIdentity.TryAdd(entry.Identity, entry);
         }
+        foreach (var live in _liveWindowMenus.Values)
+        {
+            string? path = live.HasPackageIdentity ? null : live.Path;
+            string? id = live.HasPackageIdentity ? live.PackageId : null;
+            var entry = new SoftwareChoice(live.Name, path, id);
+            byIdentity.TryAdd(entry.Identity, entry);
+        }
         _choices = byIdentity.Values.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(item => item.Identity, StringComparer.OrdinalIgnoreCase).ToList();
         _changingSoftware = true;

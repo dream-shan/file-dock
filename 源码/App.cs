@@ -19,6 +19,7 @@ public sealed class App : Application
     public static int Main(string[] args)
     {
         if (MenuShortcutReader.TryRunWorker(args)) return Environment.ExitCode;
+        if (OpenWindowMenuScanner.TryRunWorker(args)) return Environment.ExitCode;
         if (args.Length == 1 && args[0] == "--menu-shortcut-test") return MenuShortcutVerification.RunStandalone();
         if (args.Length == 2 && args[0] == "--launch-probe") { File.WriteAllText(args[1], Environment.CurrentDirectory); return 0; }
         if (args.Length == 2 && args[0] == "--memory-trim-probe") return MemoryTools.RunProbe(args[1]);

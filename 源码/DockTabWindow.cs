@@ -28,13 +28,13 @@ internal sealed class DockTabWindow : Form
         _memoryPercent=percent;
         _memoryWarning=MemoryPressure.Warning(_memoryWarning,percent);
         _memoryTip.SetToolTip(this,percent.HasValue ? $"内存占用 {percent.Value:0}%，点击展开整理" : "点击展开文件坞");
-        Color normalAccent=_dark ? Color.FromArgb(130,179,255) : Color.FromArgb(41,111,235);
-        Color normalBorder=_dark ? Color.FromArgb(149,162,181) : Color.FromArgb(180,197,220);
-        Color normalBackground=_dark ? Color.FromArgb(48,53,62) : Color.White;
+        Color normalAccent=_dark ? Color.FromArgb(10,132,255) : Color.FromArgb(0,122,255);
+        Color normalBorder=_dark ? Color.FromArgb(99,99,102) : Color.FromArgb(209,209,214);
+        Color normalBackground=_dark ? Color.FromArgb(44,44,46) : Color.White;
         double value=percent.HasValue && double.IsFinite(percent.Value) ? Math.Clamp(percent.Value,0,100) : 0;
         double blend=Math.Clamp((value-65)/15,0,1);
-        Color amber=_dark ? Color.FromArgb(236,188,77) : Color.FromArgb(174,111,10);
-        Color red=_dark ? Color.FromArgb(205,48,61) : Color.FromArgb(190,35,49);
+        Color amber=_dark ? Color.FromArgb(255,159,10) : Color.FromArgb(255,149,0);
+        Color red=_dark ? Color.FromArgb(255,69,58) : Color.FromArgb(255,59,48);
         Color Mix(Color a,Color b,double t) { t=Math.Clamp(t,0,1); return Color.FromArgb((int)Math.Round(a.R+(b.R-a.R)*t),(int)Math.Round(a.G+(b.G-a.G)*t),(int)Math.Round(a.B+(b.B-a.B)*t)); }
         Color fill=value<=65 ? normalBackground : value<=75 ? Mix(normalBackground,amber,Math.Clamp((value-65)/10,0,1)*.72) : Mix(Mix(normalBackground,amber,.72),red,(value-75)/5);
         _toBackground=_memoryWarning ? red : fill;
@@ -124,12 +124,20 @@ internal sealed class DockTabWindow : Form
     {
         base.OnPaint(e); float scale = (float)ScaleFactor;
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        float radius = 9f * scale;
+        float w = ClientSize.Width - 1, h = ClientSize.Height - 1;
+        path.AddArc(0, 0, radius * 2, radius * 2, 180, 90);
+        path.AddArc(Math.Max(0, w - radius * 2), 0, radius * 2, radius * 2, 270, 90);
+        path.AddArc(Math.Max(0, w - radius * 2), Math.Max(0, h - radius * 2), radius * 2, radius * 2, 0, 90);
+        path.AddArc(0, Math.Max(0, h - radius * 2), radius * 2, radius * 2, 90, 90);
+        path.CloseFigure();
         using var border = new Pen(_entryBorder, scale);
-        e.Graphics.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
-        using var pen = new Pen(_entryAccent, 1.5f * scale);
+        e.Graphics.DrawPath(border, path);
+        using var pen = new Pen(_entryAccent, 1.8f * scale) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round, LineJoin = System.Drawing.Drawing2D.LineJoin.Round };
         float center = ClientSize.Width / 2f, y = ClientSize.Height / 2f;
         float direction = _owner.State.DockSide == "Left" ? -1 : 1;
-        e.Graphics.DrawLines(pen, new[] { new PointF(center + direction * 2 * scale, y - 4 * scale), new PointF(center - direction * 2 * scale, y), new PointF(center + direction * 2 * scale, y + 4 * scale) });
+        e.Graphics.DrawLines(pen, new[] { new PointF(center + direction * 2f * scale, y - 4.5f * scale), new PointF(center - direction * 2f * scale, y), new PointF(center + direction * 2f * scale, y + 4.5f * scale) });
     }
     private void ApplyEntryOpacity() => Opacity = _hovered || Capture ? Math.Max(.9,_entryOpacity) : _entryOpacity;
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _hovered=true; ApplyEntryOpacity(); }

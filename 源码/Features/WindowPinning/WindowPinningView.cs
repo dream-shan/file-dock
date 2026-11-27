@@ -34,7 +34,7 @@ internal sealed class WindowPinningView : IModuleDialog
         var root=new StackPanel(); root.SetResourceReference(Control.ForegroundProperty,"Ink");
         _toolList.Children.Add(new TextBlock { Text="工具", FontSize=18, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,12) });
         _run=Button("窗口置顶",_pick);
-        _toolList.Children.Add(ToolRow(_run,"窗口置顶：选择窗口","窗口置顶详情","已置顶窗口与快捷键设置",ShowDetails));
+        _toolList.Children.Add(ToolRow(_run,"\uE718","ToolPinAccent","窗口置顶：选择窗口","窗口置顶详情","已置顶窗口与快捷键设置",ShowDetails));
         root.Children.Add(_toolList);
         if (screenshot != null && screenshotOptions != null)
         {
@@ -45,18 +45,44 @@ internal sealed class WindowPinningView : IModuleDialog
                 _toolList.Visibility = Visibility.Visible;
                 runScreenshot.Focus();
             });
+            backToTools.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");
+            backToTools.SetResourceReference(Control.ForegroundProperty,"Accent");
+            backToTools.HorizontalAlignment=HorizontalAlignment.Left;
+            backToTools.Margin=new Thickness(0,0,0,8);
             options.Children.Add(backToTools);
             screenshotOptions(options);
             root.Children.Add(options);
-            _toolList.Children.Add(ToolRow(runScreenshot,"截图：选择区域","截图选项","包含文件坞与快捷键设置",() => {
+            _toolList.Children.Add(ToolRow(runScreenshot,"\uE722","ToolShotAccent","截图：选择区域","截图选项","包含文件坞与快捷键设置",() => {
                 _details.Visibility = _toolList.Visibility = Visibility.Collapsed;
                 options.Visibility = Visibility.Visible;
                 backToTools.Focus();
             }));
             _screenshotOptions = options;
         }
-        if(manageAll!=null){var entry=Button("快捷键管理",manageAll);entry.MinHeight=44;entry.HorizontalContentAlignment=HorizontalAlignment.Left;entry.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");_toolList.Children.Add(entry);}
-        var back=Button("← 工具",()=>{_details.Visibility=Visibility.Collapsed;_toolList.Visibility=Visibility.Visible;_run.Focus();});back.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new Thickness(0,0,0,8);_details.Children.Add(back);
+        if(manageAll!=null)
+        {
+            var entry=Button("快捷键管理",manageAll);
+            entry.MinHeight=48;entry.Margin=new Thickness(0);entry.Padding=new Thickness(8,0,12,0);
+            entry.FontSize=13.5;entry.FontWeight=FontWeights.Medium;
+            entry.HorizontalContentAlignment=HorizontalAlignment.Left;
+            entry.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");
+            entry.SetResourceReference(Control.ForegroundProperty,"Ink");
+            var row=new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+            var badge=IconBadge("\uE765","ToolKeyAccent");badge.Margin=new Thickness(10,0,2,0);
+            row.Children.Add(badge);
+            Grid.SetColumn(entry,1);row.Children.Add(entry);
+            var chevron=new TextBlock{Text="›",FontSize=18,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,14,1),IsHitTestVisible=false};
+            chevron.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
+            Grid.SetColumn(chevron,2);row.Children.Add(chevron);
+            var card=new Border{Child=row,CornerRadius=new CornerRadius(14),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,8)};
+            card.SetResourceReference(Border.BackgroundProperty,"PaneCard");
+            card.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
+            _toolList.Children.Add(card);
+        }
+        var back=Button("← 工具",()=>{_details.Visibility=Visibility.Collapsed;_toolList.Visibility=Visibility.Visible;_run.Focus();});back.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");back.SetResourceReference(Control.ForegroundProperty,"Accent");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new Thickness(0,0,0,8);_details.Children.Add(back);
         _details.Children.Add(new TextBlock{Text="窗口置顶",FontSize=18,FontWeight=FontWeights.SemiBold});
         var pinContent=new StackPanel();
         _removeAll=Button("取消全部",()=>{int failures=_module.RestoreAll();_message.Text=failures==0?"已取消全部受管理的置顶。":$"仍有 {failures} 个窗口取消失败，请重试。";Render();});
@@ -78,32 +104,49 @@ internal sealed class WindowPinningView : IModuleDialog
     }
     private void UpdateTooltip()=>_run.ToolTip="选择窗口置顶或取消 · "+(_enabled.IsChecked==true?Format(_mods,_key):"快捷键已禁用");
     internal void UpdateShortcut(ShortcutBinding binding,string status){_mods=binding.Modifiers;_key=binding.Key;_enabled.IsChecked=binding.Enabled;_message.Text=status;UpdateTooltip();}
-    private static Border ToolRow(Button run, string actionName, string detailsName, string hint, Action showDetails)
+    private static Border IconBadge(string glyph, string accentResource)
+    {
+        var icon = new TextBlock { Text = glyph, FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, "OnAccent");
+        var badge = new Border { Width = 28, Height = 28, CornerRadius = new CornerRadius(8), Child = icon, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        badge.SetResourceReference(Border.BackgroundProperty, accentResource);
+        return badge;
+    }
+    private static Border ToolRow(Button run, string glyph, string accentResource, string actionName, string detailsName, string hint, Action showDetails)
     {
         var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
-        run.MinHeight = 44;
+        var badge = IconBadge(glyph, accentResource);
+        badge.Margin = new Thickness(10, 0, 2, 0);
+        row.Children.Add(badge);
+
+        run.MinHeight = 48;
         run.Margin = new Thickness(0);
-        run.Padding = new Thickness(12,0,8,0);
+        run.Padding = new Thickness(8,0,8,0);
+        run.FontSize = 13.5;
+        run.FontWeight = FontWeights.Medium;
         run.HorizontalContentAlignment = HorizontalAlignment.Left;
         run.SetResourceReference(FrameworkElement.StyleProperty, "QuietButton");
+        run.SetResourceReference(Control.ForegroundProperty, "Ink");
         System.Windows.Automation.AutomationProperties.SetName(run, actionName);
+        Grid.SetColumn(run, 1);
         row.Children.Add(run);
 
         var details = Button("›", showDetails);
-        details.MinHeight = 44;
+        details.MinHeight = 48;
         details.Margin = new Thickness(0);
-        details.FontSize = 20;
+        details.FontSize = 19;
         details.ToolTip = hint;
         details.SetResourceReference(FrameworkElement.StyleProperty, "QuietButton");
         System.Windows.Automation.AutomationProperties.SetName(details, detailsName);
-        var divider = new Border { BorderThickness = new Thickness(1,0,0,0), Child = details };
+        var divider = new Border { BorderThickness = new Thickness(1,0,0,0), Margin = new Thickness(0,10,0,10), Child = details };
         divider.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
-        Grid.SetColumn(divider,1);
+        Grid.SetColumn(divider,2);
         row.Children.Add(divider);
 
-        var border = new Border { Child = row, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Margin = new Thickness(0,0,0,4) };
+        var border = new Border { Child = row, CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Margin = new Thickness(0,0,0,8) };
         border.SetResourceReference(Border.BackgroundProperty,"PaneCard");
         border.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
         return border;
@@ -112,8 +155,7 @@ internal sealed class WindowPinningView : IModuleDialog
     internal static string Format(uint mods,int key) => ((mods&2)!=0?"Ctrl + ":"")+((mods&1)!=0?"Alt + ":"")+((mods&4)!=0?"Shift + ":"")+((mods&8)!=0?"Win + ":"")+KeyInterop.KeyFromVirtualKey(key);
     private static Button Button(string text,Action action)
     {
-        var b=new Button{Content=text,MinHeight=32,Margin=new Thickness(0,4,0,0),Padding=new Thickness(8,4,8,4)};
-        b.SetResourceReference(Control.BackgroundProperty,"Surface");b.SetResourceReference(Control.ForegroundProperty,"Ink");b.SetResourceReference(Control.BorderBrushProperty,"Border");
+        var b=new Button{Content=text,MinHeight=32,Margin=new Thickness(0,4,0,0),Padding=new Thickness(10,4,10,4)};
         b.Click+=(_,_)=>action();return b;
     }
     private void Record(object sender,KeyEventArgs e)

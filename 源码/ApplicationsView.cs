@@ -36,7 +36,7 @@ internal sealed class ApplicationsView : UserControl,IDisposable
     {
         _entries=entries;_launch=launch;_edit=edit;_shortcut=shortcut;_move=move;_remove=remove;_add=add;_menu=menu;
         var root=new Grid();root.RowDefinitions.Add(new(){Height=GridLength.Auto});root.RowDefinitions.Add(new());
-        var header=new DockPanel{Margin=new Thickness(0,0,0,10)};var addButton=Ui.Button("＋ 添加",addDialog);addButton.SetResourceReference(StyleProperty,"QuietButton");DockPanel.SetDock(addButton,Dock.Right);header.Children.Add(addButton);header.Children.Add(Ui.Text("应用",18));root.Children.Add(header);
+        var header=new DockPanel{Margin=new Thickness(0,0,0,10)};var addButton=Ui.Button("＋ 添加",addDialog);addButton.SetResourceReference(StyleProperty,"QuietButton");addButton.SetResourceReference(ForegroundProperty,"Accent");addButton.Margin=new Thickness(0);DockPanel.SetDock(addButton,Dock.Right);header.Children.Add(addButton);var title=Ui.Text("应用",18);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0);header.Children.Add(title);root.Children.Add(header);
         _scroll=Ui.Scroll(_items);Grid.SetRow(_scroll,1);root.Children.Add(_scroll);Content=root;AllowDrop=true;
         SizeChanged+=(_,_)=>SizeTiles();IsVisibleChanged+=(_,_)=>{if(IsVisible)Render();};
         PreviewDragOver+=(_,e)=>{e.Effects=e.Data.GetDataPresent(DragFormat)?DragDropEffects.Move:e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;};
@@ -49,11 +49,13 @@ internal sealed class ApplicationsView : UserControl,IDisposable
         if(entries.Count==0){_items.Children.Add(Ui.Text("拖入程序或快捷方式，或点击“＋ 添加”。"));return;}
         foreach(var entry in entries)
         {
-            var image=new Image{Width=36,Height=36,Margin=new Thickness(0,0,0,6)};
-            var fallback=new TextBlock{Text="\uE7C3",FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=29,HorizontalAlignment=HorizontalAlignment.Center};fallback.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
-            var icon=new Grid{Height=42};icon.Children.Add(fallback);icon.Children.Add(image);
-            var content=new StackPanel();content.Children.Add(icon);var label=new TextBlock{Text=entry.DisplayName,TextTrimming=TextTrimming.CharacterEllipsis,TextAlignment=TextAlignment.Center};content.Children.Add(label);
-            var button=new Button{Content=content,Height=80,Margin=new Thickness(2),Padding=new Thickness(6),ToolTip=entry.DisplayName+"\n"+entry.Path,Tag=entry.Id};button.SetResourceReference(StyleProperty,"QuietButton");button.SetResourceReference(ForegroundProperty,"Ink");System.Windows.Automation.AutomationProperties.SetName(button,entry.DisplayName);
+            var image=new Image{Width=34,Height=34};RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality);
+            var fallback=new TextBlock{Text="\uE7C3",FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=24,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};fallback.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
+            var iconPlate=new Border{Width=46,Height=46,CornerRadius=new CornerRadius(12),Margin=new Thickness(0,0,0,6),BorderThickness=new Thickness(1)};
+            iconPlate.SetResourceReference(Border.BackgroundProperty,"PaneCard");iconPlate.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
+            var icon=new Grid();icon.Children.Add(fallback);icon.Children.Add(image);iconPlate.Child=icon;
+            var content=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center};content.Children.Add(iconPlate);var label=new TextBlock{Text=entry.DisplayName,FontSize=11.5,TextTrimming=TextTrimming.CharacterEllipsis,TextAlignment=TextAlignment.Center};content.Children.Add(label);
+            var button=new Button{Content=content,Height=84,Margin=new Thickness(2),Padding=new Thickness(5,6,5,5),ToolTip=entry.DisplayName+"\n"+entry.Path,Tag=entry.Id};button.SetResourceReference(StyleProperty,"QuietButton");button.SetResourceReference(ForegroundProperty,"Ink");System.Windows.Automation.AutomationProperties.SetName(button,entry.DisplayName);
             button.Click+=(_,_)=>{if(!_suppressClick)_launch(entry);};
             button.PreviewMouseLeftButtonDown+=(_,e)=>{_pressed=entry.Id;_start=e.GetPosition(this);_suppressClick=false;};
             button.PreviewMouseMove+=(_,e)=>{

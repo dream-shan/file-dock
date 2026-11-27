@@ -15,8 +15,9 @@ internal sealed class BrightnessView:IDisposable
 {
     private readonly BrightnessController _controller;
     private readonly Func<string?,Task<bool>> _save;
+    private readonly Border _homeCard;
     private readonly StackPanel _home=new(),_details=new(),_rows=new();
-    private readonly ComboBox _selector=new(){MinHeight=30,DisplayMemberPath="Label"};
+    private readonly ComboBox _selector=new(){MinHeight=32,DisplayMemberPath="Label",Margin=new Thickness(0,0,0,10)};
     private readonly TextBlock _message=Ui.Text("",11);
     private readonly Dictionary<string,BrightnessRow> _screens=new();
     private readonly BrightnessRow _main;
@@ -24,15 +25,17 @@ internal sealed class BrightnessView:IDisposable
     private readonly Dictionary<BrightnessTarget,int> _pending=new();
     private string? _preferred,_saveError;
     private bool _updating,_saving,_disposed;
-    internal FrameworkElement Home=>_home;
+    internal FrameworkElement Home=>_homeCard;
     internal FrameworkElement Details=>_details;
     internal event Action? DetailsRequested;
     internal BrightnessView(BrightnessController controller,string? preferred,Func<string?,Task<bool>> save)
     {
         _controller=controller;_preferred=preferred;_save=save;
         _main=new("亮度",Queue,Flush,target=>_pending.ContainsKey(target));
-        var header=new DockPanel();var details=Ui.Button("显示器 ›",()=>DetailsRequested?.Invoke());details.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");DockPanel.SetDock(details,Dock.Right);header.Children.Add(details);header.Children.Add(Ui.Text("亮度",14));
+        var header=new DockPanel{Margin=new Thickness(0,0,0,4)};var details=Ui.Button("显示器 ›",()=>DetailsRequested?.Invoke());details.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");details.SetResourceReference(Control.ForegroundProperty,"Accent");details.FontSize=11.5;details.Padding=new Thickness(6,2,6,2);details.Margin=new Thickness(0);details.MinHeight=24;DockPanel.SetDock(details,Dock.Right);header.Children.Add(details);var heading=Ui.Text("亮度",12.5);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0);heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);
         _home.Children.Add(header);_home.Children.Add(_main);
+        _homeCard=new Border{Child=_home,CornerRadius=new CornerRadius(14),BorderThickness=new Thickness(1),Padding=new Thickness(11,8,11,9),Margin=new Thickness(0,0,0,8)};
+        _homeCard.SetResourceReference(Border.BackgroundProperty,"PaneCard");_homeCard.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
         _details.Children.Add(Ui.Text("主页面调节的屏幕"));AutomationProperties.SetName(_selector,"亮度屏幕选择");_details.Children.Add(_selector);_details.Children.Add(_rows);
         _details.Children.Add(_message);_message.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
         _selector.SelectionChanged+=async(_,_)=>{
@@ -76,8 +79,15 @@ internal sealed class BrightnessRow:StackPanel
     private bool _binding,_cancelledGesture;
     internal BrightnessRow(string name,Action<BrightnessTarget,int> change,Action flush,Func<BrightnessTarget,bool> pending,bool showError=false)
     {
-        _pending=pending;Margin=new Thickness(0,0,0,8);_name.TextTrimming=TextTrimming.CharacterEllipsis;_name.TextWrapping=TextWrapping.NoWrap;_name.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Children.Add(_name);
-        var line=new Grid();line.ColumnDefinitions.Add(new());line.ColumnDefinitions.Add(new(){Width=new GridLength(46)});line.Children.Add(_slider);Grid.SetColumn(_value,1);_value.TextAlignment=TextAlignment.Right;line.Children.Add(_value);Children.Add(line);
+        _pending=pending;Margin=new Thickness(0,0,0,showError?8:0);
+        var top=new Grid{Margin=new Thickness(0,0,0,6)};top.ColumnDefinitions.Add(new());top.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+        _name.Margin=new Thickness(0);_name.TextTrimming=TextTrimming.CharacterEllipsis;_name.TextWrapping=TextWrapping.NoWrap;_name.SetResourceReference(TextBlock.ForegroundProperty,"Muted");top.Children.Add(_name);
+        _value.FontSize=11.5;_value.FontWeight=FontWeights.SemiBold;_value.Margin=new Thickness(8,0,0,0);_value.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
+        System.Windows.Documents.Typography.SetNumeralAlignment(_value,FontNumeralAlignment.Tabular);Grid.SetColumn(_value,1);top.Children.Add(_value);Children.Add(top);
+        var line=new Grid();line.ColumnDefinitions.Add(new(){Width=GridLength.Auto});line.ColumnDefinitions.Add(new());
+        var sun=new TextBlock{Text="\uE706",FontFamily=new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),FontSize=14,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(4,0,10,0)};
+        sun.SetResourceReference(TextBlock.ForegroundProperty,"Muted");line.Children.Add(sun);
+        _slider.SetResourceReference(FrameworkElement.StyleProperty,"AppleCapsuleSlider");Grid.SetColumn(_slider,1);line.Children.Add(_slider);Children.Add(line);
         if(showError){_error.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Children.Add(_error);}
         AutomationProperties.SetName(_slider,name+"百分比");
         void Begin(){_cancelledGesture=false;_gestureTarget=_device?.Target;}

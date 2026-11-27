@@ -34,14 +34,14 @@ public sealed partial class PlannerView : UserControl
     internal DateTime RenderedDay { get; private set; }=PlanRules.Today;
     private static readonly ControlTemplate CircleTemplate=(ControlTemplate)XamlReader.Parse("""
         <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="CheckBox">
-          <Border x:Name="Circle" Width="17" Height="17" CornerRadius="9" BorderThickness="1.3" BorderBrush="{DynamicResource Muted}" Background="Transparent">
-            <TextBlock x:Name="Tick" Text="✓" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Surface}" Visibility="Collapsed" />
+          <Border x:Name="Circle" Width="18" Height="18" CornerRadius="9" BorderThickness="1.5" BorderBrush="{DynamicResource Muted}" Background="Transparent">
+            <TextBlock x:Name="Tick" Text="✓" FontSize="11.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource OnAccent}" Visibility="Collapsed" />
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True"><Setter TargetName="Circle" Property="Background" Value="{DynamicResource Accent}"/><Setter TargetName="Circle" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Circle" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger>
             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Circle" Property="Opacity" Value="0.55"/></Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Circle" Property="BorderThickness" Value="2.5"/><Setter TargetName="Circle" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Circle" Property="BorderThickness" Value="2"/><Setter TargetName="Circle" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
         """);
@@ -106,7 +106,7 @@ public sealed partial class PlannerView : UserControl
         var items=_controller.Items(_manage,PlanRules.Today);
         foreach(var p in items)Row(list,p);if(items.Count==0)list.Children.Add(Label(_manage ? "暂无计划":"今天暂无待办",true));
         _scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};AutomationProperties.SetAutomationId(_scroll,"PlannerScroll");
-        _listSurface=new Border{Child=_scroll,CornerRadius=new CornerRadius(10),VerticalAlignment=VerticalAlignment.Top};_listSurface.SetResourceReference(Border.BackgroundProperty,"ContentSurface");_root.Children.Add(_listSurface);
+        _listSurface=new Border{Child=_scroll,CornerRadius=new CornerRadius(14),BorderThickness=new Thickness(1),VerticalAlignment=VerticalAlignment.Top};_listSurface.SetResourceReference(Border.BackgroundProperty,"PaneCard");_listSurface.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");_root.Children.Add(_listSurface);
         var scroll=_scroll;if(!reveal)_ = Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(_scroll,scroll))scroll.ScrollToVerticalOffset(offset);});
     }
     private void Row(Panel list,PlanItem p)

@@ -18,9 +18,9 @@ internal static class MemoryPressure
 {
     internal static Color ColorFor(double percent, bool dark)
     {
-        Color green = dark ? Color.FromRgb(94, 207, 186) : Color.FromRgb(24, 143, 121);
-        Color yellow = dark ? Color.FromRgb(236, 200, 104) : Color.FromRgb(163, 120, 16);
-        Color red = dark ? Color.FromRgb(255, 119, 124) : Color.FromRgb(207, 55, 66);
+        Color green = dark ? Color.FromRgb(48, 209, 88) : Color.FromRgb(52, 199, 89);
+        Color yellow = dark ? Color.FromRgb(255, 159, 10) : Color.FromRgb(255, 149, 0);
+        Color red = dark ? Color.FromRgb(255, 69, 58) : Color.FromRgb(255, 59, 48);
         return percent <= 50 ? green : percent < 65 ? Mix(green, yellow, (percent - 50) / 15) : Mix(yellow, red, (percent - 65) / 15);
     }
     internal static Color Mix(Color from, Color to, double t)

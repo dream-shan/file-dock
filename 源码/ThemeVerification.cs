@@ -83,11 +83,11 @@ internal static class ThemeVerification
             await TransparencyVerification.Run(window,root,check);
             VerifyHeaderContrast(window,root,check);
             window.GoHome(); window.ExpandPanel(); window.SetThemeMode("System");
-            check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,250,251,253), "System light application theme applies to the panel");
+            check(!window.IsDarkTheme && ((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,245,245,247), "System light application theme applies to the panel");
             window.CpuCard.Set(17, "theme validation", 60, true); int history = window.CpuCard.HistoryCount;
             window.SetThemeMode("Dark");
             check(window.IsDarkTheme && window.CpuCard.ValueText == "17%" && window.CpuCard.HistoryCount == history, "Changing theme preserves current performance values and history");
-            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,32,37,45) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("PaneCard"), "Dark theme reaches panel, search and performance cards");
+            check(((SolidColorBrush)window.PanelSurface.Background).Color == Color.FromArgb(window.BlankAlpha,28,28,30) && window.SearchBox.Foreground == ThemePalette.Brush("Ink") && window.CpuCard.Background == ThemePalette.Brush("PaneCard"), "Dark theme reaches panel, search and performance cards");
             check(((BitmapImage)window.AppLogo.Source).UriSource.ToString().Contains("light.png"), "Dark panel uses the light transparent mark");
             await window.WaitForSavesAsync();check(new StorageService(Path.Combine(root,"data")).Load().ThemeMode == "Dark", "Manual appearance choice persists to the existing settings file");
             var appearance = window.CreateAppearanceMenu();
@@ -118,11 +118,11 @@ internal static class ThemeVerification
                 "Header buttons share a keyboard-navigation focus visual without changing their background");
             DemoVerification.SaveRender(window, Path.Combine(root,"theme-home-dark.png"));
             window.DockEntry.SetMemoryPressure(null,false);
-            check(window.DockEntry.BackColor == System.Drawing.Color.FromArgb(48,53,62), "Dark edge entry receives the matching native background");
+            check(window.DockEntry.BackColor == System.Drawing.Color.FromArgb(44,44,46), "Dark edge entry receives the matching native background");
             using(var native = new System.Windows.Forms.ContextMenuStrip())
             {
                 ThemeMenus.Apply(native,true);
-                check(native.BackColor == System.Drawing.Color.FromArgb(32,35,41) && native.ForeColor.R > 200, "Native tray and edge menus receive contrasted dark colors");
+                check(native.BackColor == System.Drawing.Color.FromArgb(28,28,30) && native.ForeColor.R > 200, "Native tray and edge menus receive contrasted dark colors");
             }
             await window.NavigateToFolderAsync(Path.Combine(root,"中文与空格 files"));
             window.FolderFilterComboBox.IsDropDownOpen = true;

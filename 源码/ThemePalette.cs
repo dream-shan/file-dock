@@ -12,26 +12,33 @@ internal static class ThemePalette
     private static bool? _dark;
     internal static Func<bool>? SystemAppsDarkForVerification;
     private static readonly (string Key, string Light, string Dark)[] Colors = {
-        // These are background fills only. At the default 40% shell opacity,
-        // cards compose to 64-70% opacity and inputs to 80%; text stays opaque.
-        ("ContentSurface", "#80FAFBFD", "#6620252D"),
-        ("PaneCard", "#80F0F3F8", "#662A313C"), ("PaneInput", "#AAF0F3F8", "#AA2A313C"),
-        ("PaneOutline", "#3056657B", "#30AFBACB"),
+        // Layered Apple translucent glass fills. At the default 40% shell opacity,
+        // cards compose to 66-70% opacity and inputs to 80%; text stays fully opaque.
+        ("ContentSurface", "#80FFFFFF", "#6E2C2C2E"),
+        ("PaneCard", "#80FFFFFF", "#722C2C2E"), ("PaneInput", "#AAFFFFFF", "#AA2C2C2E"),
+        ("PaneOutline", "#22000000", "#24FFFFFF"),
+        ("SpecularEdge", "#B8FFFFFF", "#30FFFFFF"),
         // The rail is a separate transparent window, without the shell underlay.
-        ("TabSurface", "#B3F0F3F8", "#B32A313C"),
-        ("TabSelected", "#CCFAFBFD", "#CC20252D"), ("TabHover", "#CCE8EFFC", "#CC354358"),
-        ("HeaderHover", "#18345480", "#18E3EEFF"), ("HeaderPressed", "#30345480", "#30E3EEFF"),
-        ("Surface", "#FAFBFD", "#20252D"), ("Card", "#F0F3F8", "#2A313C"),
-        ("Input", "#F0F3F8", "#2A313C"), ("Border", "#D6DFEB", "#414C5D"),
-        ("Ink", "#253247", "#F0F3F8"), ("Muted", "#56657B", "#AFBACB"),
-        ("Accent", "#345FCC", "#91BBFF"), ("Hover", "#E8EFFC", "#354358"),
-        ("Pressed", "#DCE7FB", "#405573"), ("IconSurface", "#E8EDF5", "#343E4D"),
-        ("Badge", "#EDF1FF", "#333D50"), ("BadgeText", "#6478AD", "#B4C4E6"),
-        ("FolderFill", "#FFF7E7", "#423B2D"), ("FolderStroke", "#956719", "#E5BB68"),
-        ("CpuAccent", "#345FCC", "#91BBFF"), ("GpuAccent", "#7954BD", "#BEA5ED"),
-        ("MemoryAccent", "#239C88", "#65C8B9"), ("VramAccent", "#C38A3A", "#E1B96A"),
-        ("Track", "#E0E7F2", "#414956"), ("Error", "#B34848", "#F29A9A"),
-        ("Selection", "#D6E2FF", "#344969")
+        ("TabSurface", "#B3F5F5F7", "#B32C2C2E"),
+        ("TabSelected", "#CCFFFFFF", "#CC1C1C1E"), ("TabHover", "#CCEBF3FF", "#CC3A3A3C"),
+        ("HeaderHover", "#14000000", "#1EFFFFFF"), ("HeaderPressed", "#24000000", "#30FFFFFF"),
+        ("Surface", "#F5F5F7", "#1C1C1E"), ("Card", "#FFFFFF", "#2C2C2E"),
+        ("Input", "#EBEBF0", "#3A3A3C"), ("Border", "#D2D2D7", "#38383A"),
+        ("Ink", "#1D1D1F", "#F5F5F7"), ("Muted", "#636366", "#C7C7CC"),
+        ("Accent", "#006EE6", "#0A84FF"), ("AccentSoft", "#1E006EE6", "#2E0A84FF"),
+        ("Hover", "#12000000", "#1AFFFFFF"),
+        ("Pressed", "#20000000", "#2AFFFFFF"), ("IconSurface", "#ECECF1", "#3A3A3C"),
+        ("Badge", "#1A007AFF", "#2B0A84FF"), ("BadgeText", "#007AFF", "#64B5FF"),
+        ("FolderFill", "#EBF5FF", "#260A84FF"), ("FolderStroke", "#007AFF", "#409CFF"),
+        ("CpuAccent", "#007AFF", "#0A84FF"), ("GpuAccent", "#AF52DE", "#BF5AF2"),
+        ("MemoryAccent", "#34C759", "#30D158"), ("VramAccent", "#FF9500", "#FF9F0A"),
+        ("Track", "#22000000", "#2EFFFFFF"), ("SliderTrack", "#22000000", "#2BFFFFFF"),
+        ("SliderFill", "#FFFFFF", "#F5F5F7"), ("SliderThumbBorder", "#26000000", "#1A000000"),
+        ("SwitchOff", "#2E000000", "#38FFFFFF"), ("SwitchOn", "#34C759", "#30D158"),
+        ("ToolPinAccent", "#AF52DE", "#BF5AF2"), ("ToolShotAccent", "#007AFF", "#0A84FF"),
+        ("ToolKeyAccent", "#5856D6", "#5E5CE6"), ("OnAccent", "#FFFFFF", "#FFFFFF"),
+        ("Error", "#FF3B30", "#FF453A"),
+        ("Selection", "#24007AFF", "#380A84FF")
     };
 
     internal static string Normalize(string? mode) => mode is "Light" or "Dark" ? mode : "System";
@@ -53,7 +60,7 @@ internal static class ThemePalette
                 brush.Freeze(); Application.Current.Resources[item.Key] = brush;
             }
             Application.Current.Resources["HeaderHaloColor"] = dark
-                ? Color.FromRgb(12, 18, 28) : System.Windows.Media.Colors.White;
+                ? Color.FromRgb(10, 10, 12) : System.Windows.Media.Colors.White;
             _dark = dark;
         }
         if (!_installed)

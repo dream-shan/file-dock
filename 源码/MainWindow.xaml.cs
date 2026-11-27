@@ -257,15 +257,15 @@ public partial class MainWindow : Window
     private EntryView MakeView(string path, string name, string id, bool pinned, string time, bool? directory = null)
     {
         string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-        string glyph = "FILE", color = "#74839B", kind = "文档";
+        string glyph = "FILE", color = "#8E8E93", kind = "文档";
         bool isDirectory = directory ?? (_directoryKinds.TryGetValue(path, out var knownKind) ? knownKind : ext == "");
-        if (isDirectory) { glyph = "▰"; color = "#E9A322"; kind = "文件夹"; }
-        else if (ext is ".doc" or ".docx" or ".rtf") { glyph = "W"; color = "#347BDA"; }
-        else if (ext is ".xls" or ".xlsx" or ".csv") { glyph = "X"; color = "#26A176"; kind = "表格"; }
-        else if (ext == ".pdf") { glyph = "PDF"; color = "#E76472"; }
-        else if (ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".svg") { glyph = "IMG"; color = "#9574D6"; kind = "图片"; }
-        else if (ext is ".ppt" or ".pptx") { glyph = "P"; color = "#D88244"; }
-        else if (ext is ".exe" or ".lnk") { glyph = "APP"; color = "#617AD0"; }
+        if (isDirectory) { glyph = "▰"; color = "#007AFF"; kind = "文件夹"; }
+        else if (ext is ".doc" or ".docx" or ".rtf") { glyph = "W"; color = "#007AFF"; }
+        else if (ext is ".xls" or ".xlsx" or ".csv") { glyph = "X"; color = "#34C759"; kind = "表格"; }
+        else if (ext == ".pdf") { glyph = "PDF"; color = "#FF3B30"; }
+        else if (ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".svg") { glyph = "IMG"; color = "#AF52DE"; kind = "图片"; }
+        else if (ext is ".ppt" or ".pptx") { glyph = "P"; color = "#FF9500"; }
+        else if (ext is ".exe" or ".lnk") { glyph = "APP"; color = "#5856D6"; }
         string parent = System.IO.Path.GetDirectoryName(path.TrimEnd('\\')) ?? path;
         if (!IconBrushes.TryGetValue(color, out Brush? iconBrush))
         {

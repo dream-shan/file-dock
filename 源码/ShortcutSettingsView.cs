@@ -110,8 +110,7 @@ internal static class Ui
     }
     internal static Button Button(string text,Action action)
     {
-        var button=new Button{Content=text,MinHeight=34,Margin=new Thickness(0,4,0,0),Padding=new Thickness(9,6,9,6)};
-        button.SetResourceReference(Control.BackgroundProperty,"Surface");button.SetResourceReference(Control.ForegroundProperty,"Ink");button.SetResourceReference(Control.BorderBrushProperty,"Border");
+        var button=new Button{Content=text,MinHeight=34,Margin=new Thickness(0,4,0,0),Padding=new Thickness(10,6,10,6)};
         button.Click+=(_,_)=>action();return button;
     }
     internal static ScrollViewer Scroll(object content)=>new(){Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};

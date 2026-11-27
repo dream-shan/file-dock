@@ -32,23 +32,26 @@ public sealed partial class PlannerView
                 row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
                 var calendar=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
                 var month=Label(target.Month+"月",true);month.FontSize=10;month.TextAlignment=TextAlignment.Center;month.Margin=new Thickness(0);
-                var day=Label(target.Day.ToString());day.FontSize=21;day.FontWeight=FontWeights.SemiBold;day.TextAlignment=TextAlignment.Center;day.Margin=new Thickness(0);
+                var day=Label(target.Day.ToString());day.FontSize=21;day.FontWeight=FontWeights.SemiBold;day.TextAlignment=TextAlignment.Center;day.Margin=new Thickness(0);System.Windows.Documents.Typography.SetNumeralAlignment(day,FontNumeralAlignment.Tabular);
                 calendar.Children.Add(month);calendar.Children.Add(day);
                 var calendarPlate=new Border{Child=calendar,BorderThickness=new Thickness(0,0,1,0),Margin=new Thickness(0,0,10,0)};
                 calendarPlate.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");row.Children.Add(calendarPlate);
                 var text=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(2,0,8,0)};Grid.SetColumn(text,1);
-                var name=Label(item.Title);name.FontSize=14;name.FontWeight=FontWeights.Medium;name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(name);
+                var name=Label(item.Title);name.FontSize=14;name.FontWeight=FontWeights.SemiBold;name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(name);
                 var date=Label(target.ToString("dddd",System.Globalization.CultureInfo.GetCultureInfo("zh-CN"))+(item.Annual?" · 每年重复":""),true);date.FontSize=11;text.Children.Add(date);row.Children.Add(text);
                 var remaining=new StackPanel{VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Right};Grid.SetColumn(remaining,2);
                 if(days>0)
                 {
                     var hint=Label("还有",true);hint.FontSize=10;hint.TextAlignment=TextAlignment.Right;hint.Margin=new Thickness(0);remaining.Children.Add(hint);
-                    var value=Label(days.ToString());value.FontFamily=new FontFamily("Segoe UI");value.FontSize=24;value.FontWeight=FontWeights.SemiBold;value.Margin=new Thickness(0);value.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
+                    var value=Label(days.ToString());value.FontFamily=new FontFamily("Segoe UI Variable, Segoe UI");value.FontSize=24;value.FontWeight=FontWeights.SemiBold;value.Margin=new Thickness(0);value.SetResourceReference(TextBlock.ForegroundProperty,"Accent");System.Windows.Documents.Typography.SetNumeralAlignment(value,FontNumeralAlignment.Tabular);
                     value.Inlines.Add(new System.Windows.Documents.Run(" 天"){FontSize=11,FontWeight=FontWeights.Normal});remaining.Children.Add(value);
                 }
-                else {var value=Label(days==0?"就是今天":"已到期");value.SetResourceReference(TextBlock.ForegroundProperty,"Accent");remaining.Children.Add(value);}
+                else {var value=Label(days==0?"就是今天":"已到期");value.FontWeight=FontWeights.SemiBold;value.SetResourceReference(TextBlock.ForegroundProperty,"Accent");remaining.Children.Add(value);}
                 row.Children.Add(remaining);
-                var edit=Button("",()=>EditCountdown(item));edit.Content=row;edit.MinHeight=60;edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;edit.Margin=new Thickness(0,0,0,4);edit.Padding=new Thickness(10,6,10,6);edit.SetResourceReference(BackgroundProperty,"PaneCard");edit.ToolTip=target.ToString("yyyy年M月d日");AutomationProperties.SetName(edit,"重要日期："+item.Title+"，"+target.ToString("yyyy年M月d日")+"，"+(days>0?$"还有{days}天":days==0?"就是今天":"已到期"));rows.Children.Add(edit);
+                var edit=Button("",()=>EditCountdown(item));edit.Content=row;edit.MinHeight=60;edit.HorizontalContentAlignment=HorizontalAlignment.Stretch;edit.Margin=new Thickness(0);edit.Padding=new Thickness(10,6,10,6);edit.ToolTip=target.ToString("yyyy年M月d日");AutomationProperties.SetName(edit,"重要日期："+item.Title+"，"+target.ToString("yyyy年M月d日")+"，"+(days>0?$"还有{days}天":days==0?"就是今天":"已到期"));
+                var card=new Border{Child=edit,CornerRadius=new CornerRadius(14),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,5)};
+                card.SetResourceReference(Border.BackgroundProperty,"PaneCard");card.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
+                rows.Children.Add(card);
             }
             if(items.Length==0)rows.Children.Add(Label("添加考试、生日等重要日期",true));
             panel.Children.Add(new ScrollViewer{Content=rows,MaxHeight=_allDates?150:128,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});

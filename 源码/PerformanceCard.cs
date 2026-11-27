@@ -15,7 +15,7 @@ public sealed class PerformanceCard : Border
     private readonly Grid _grid;
     private readonly PerformanceRing _ring;
     private bool _ringMode;
-    private readonly TextBlock _actionHintText=new() { FontSize=9, Margin=new Thickness(0,2,0,0), TextTrimming=TextTrimming.CharacterEllipsis, Visibility=Visibility.Collapsed };
+    private readonly TextBlock _actionHintText=new() { FontSize=9.5, Margin=new Thickness(0,1,0,0), TextTrimming=TextTrimming.CharacterEllipsis, Visibility=Visibility.Collapsed };
     private bool _isAction, _actionMouseDown;
     internal event EventHandler? ActionRequested;
     internal bool ActionAvailable { get; set; }=true;
@@ -69,12 +69,14 @@ public sealed class PerformanceCard : Border
             _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             if (value)
             {
+                Padding = new Thickness(12, 4, 12, 4);
+                _value.FontSize = 23;
                 _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 Grid.SetRow(_label,0); Grid.SetRow(_value,1); Grid.SetRow(_detail,2);
                 Grid.SetRowSpan(_ring,3); UpdateRingSize();
             }
-            else { _grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) }); Trend = Trend; }
+            else { Padding = new Thickness(12, 6, 12, 6); _value.FontSize = 25; _grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) }); Trend = Trend; }
         }
     }
     private void UpdateRingSize()
@@ -137,22 +139,25 @@ public sealed class PerformanceCard : Border
 
     public PerformanceCard()
     {
-        CornerRadius = new CornerRadius(10); Background = new SolidColorBrush(Color.FromRgb(243, 246, 252)); BorderThickness=new Thickness(1); Padding = new Thickness(11, 5, 11, 5);
+        CornerRadius = new CornerRadius(14); Background = new SolidColorBrush(Color.FromRgb(245, 245, 247)); BorderThickness = new Thickness(1); Padding = new Thickness(12, 6, 12, 6);
         var grid = _grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
-        _label = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(74, 87, 110)) };
-        _temperature = new TextBlock { FontSize = 11, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Right };
-        _value = new TextBlock { Text = "—", FontSize = 25, FontFamily = new FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        _label = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(29, 29, 31)) };
+        _temperature = new TextBlock { FontSize = 11, FontWeight = FontWeights.Medium, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Right };
+        System.Windows.Documents.Typography.SetNumeralAlignment(_temperature, FontNumeralAlignment.Tabular);
+        _value = new TextBlock { Text = "—", FontSize = 25, FontFamily = new FontFamily("Segoe UI Variable, Segoe UI"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        System.Windows.Documents.Typography.SetNumeralAlignment(_value, FontNumeralAlignment.Tabular);
         _detail = new TextBlock { Text = "正在读取…", FontSize = 10, Foreground = Brushes.SlateGray, TextTrimming = TextTrimming.CharacterEllipsis };
+        System.Windows.Documents.Typography.SetNumeralAlignment(_detail, FontNumeralAlignment.Tabular);
         _graph = new PerformanceGraph();
         _ring = new PerformanceRing { Width=50,Height=50,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed };
         Grid.SetRow(_value, 1); Grid.SetRow(_detail, 2); Grid.SetRow(_graph, 3);
         grid.Children.Add(_label); grid.Children.Add(_temperature); grid.Children.Add(_value); grid.Children.Add(_detail); grid.Children.Add(_graph);
         grid.Children.Add(_ring); grid.Children.Add(_actionHintText); grid.SizeChanged += (_,_) => UpdateRingSize();
-        Child = grid; Accent = new SolidColorBrush(Color.FromRgb(74, 108, 247));
+        Child = grid; Accent = new SolidColorBrush(Color.FromRgb(0, 122, 255));
         System.Windows.Automation.AutomationProperties.SetName(this, "性能指标");
     }
     internal void Set(double? percent, string detail, double? temperature = null, bool showTemperature = false)
@@ -200,7 +205,7 @@ internal sealed class PerformanceRing : FrameworkElement
         base.OnRender(drawing);
         double size=Math.Min(ActualWidth,ActualHeight);
         if(size < 8) return;
-        double thickness=size*.12, radius=(size-thickness)/2;
+        double thickness=size*.145, radius=(size-thickness)/2;
         var center=new Point(ActualWidth/2,ActualHeight/2);
         drawing.DrawEllipse(null,new Pen(Track,thickness),center,radius,radius);
         double shown=DisplayPercent;
@@ -279,12 +284,24 @@ internal sealed class PerformanceGraph : FrameworkElement
         }
         // The transparent surface also makes the entire chart available for hover.
         drawing.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, w, ActualHeight));
-        var gridPen = new Pen(background, .6) { DashStyle = DashStyles.Dot };
+        var softTrack = background.Clone(); softTrack.Opacity *= .55; softTrack.Freeze();
+        var gridPen = new Pen(softTrack, .6) { DashStyle = new DashStyle(new[] { 2d, 4d }, 0) };
         foreach (double percent in new[] { 25d, 50d, 75d })
             drawing.DrawLine(gridPen, new Point(0, PlotY(percent, ActualHeight)), new Point(w, PlotY(percent, ActualHeight)));
-        drawing.DrawLine(new Pen(background, .8), new Point(0, h + 3), new Point(w, h + 3));
-        if (!ReferenceEquals(_areaAccent, Accent)) { _areaAccent = Accent; _areaBrush = Accent.Clone(); _areaBrush.Opacity *= .12; _areaBrush.Freeze(); }
-        var pen = new Pen(Accent, 2) { LineJoin = PenLineJoin.Round };
+        drawing.DrawLine(new Pen(softTrack, .8), new Point(0, h + 3), new Point(w, h + 3));
+        if (!ReferenceEquals(_areaAccent, Accent))
+        {
+            _areaAccent = Accent;
+            if (Accent is SolidColorBrush solid)
+            {
+                var c = solid.Color;
+                var gradient = new LinearGradientBrush(Color.FromArgb(72, c.R, c.G, c.B), Color.FromArgb(4, c.R, c.G, c.B), 90);
+                gradient.Freeze();
+                _areaBrush = gradient;
+            }
+            else { _areaBrush = Accent.Clone(); _areaBrush.Opacity *= .16; _areaBrush.Freeze(); }
+        }
+        var pen = new Pen(Accent, 2.2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
         var segment = new List<Point>();
         void DrawSegment()
         {
@@ -297,12 +314,13 @@ internal sealed class PerformanceGraph : FrameworkElement
                 context.LineTo(new Point(segment[^1].X, h + 3), true, false);
             }
             area.Freeze(); drawing.DrawGeometry(_areaBrush, null, area);
-            if (segment.Count == 1) drawing.DrawEllipse(Accent, null, segment[0], 1.7, 1.7);
+            if (segment.Count == 1) drawing.DrawEllipse(Accent, null, segment[0], 2.2, 2.2);
             else
             {
                 var line = new StreamGeometry();
                 using (var context = line.Open()) { context.BeginFigure(segment[0], false, false); foreach (var point in segment.Skip(1)) context.LineTo(point, true, false); }
                 line.Freeze(); drawing.DrawGeometry(null, pen, line);
+                drawing.DrawEllipse(Accent, null, segment[^1], 2.3, 2.3);
             }
             segment.Clear();
         }

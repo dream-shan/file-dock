@@ -49,15 +49,31 @@ internal sealed class WirelessTile:Border
 
     internal WirelessTile(string title,string icon,Action toggle,Action details)
     {
-        _title=title;Margin=new Thickness(2,0,2,0);CornerRadius=new CornerRadius(7);BorderThickness=new Thickness(1);
+        _title=title;Margin=new Thickness(3,0,3,0);Padding=new Thickness(8,8,6,8);CornerRadius=new CornerRadius(14);BorderThickness=new Thickness(1);
         SetResourceReference(BackgroundProperty,"PaneCard");SetResourceReference(BorderBrushProperty,"PaneOutline");
         var panel=new DockPanel();Child=panel;
         _toggle=Ui.Button(icon,toggle);_toggle.FontFamily=new System.Windows.Media.FontFamily("Segoe MDL2 Assets");
-        _toggle.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");_toggle.FontSize=16;_toggle.MinWidth=34;
-        _toggle.Padding=new Thickness(5);_toggle.Margin=new Thickness(0);DockPanel.SetDock(_toggle,Dock.Left);panel.Children.Add(_toggle);
-        var label=new StackPanel();label.Children.Add(new TextBlock{Text=title+"  ›"});
-        _summary=new TextBlock{FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis};_summary.SetResourceReference(TextBlock.ForegroundProperty,"Muted");label.Children.Add(_summary);
-        var open=Ui.Button("",details);open.Content=label;open.Padding=new Thickness(4,2,5,3);open.Margin=new Thickness(0);open.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+        _toggle.FontSize=15;_toggle.Width=34;_toggle.Height=34;_toggle.MinHeight=34;
+        _toggle.Padding=new Thickness(0);_toggle.Margin=new Thickness(0,0,8,0);_toggle.VerticalAlignment=VerticalAlignment.Center;
+        _toggle.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("""
+            <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
+              <Border x:Name="Circle" Width="34" Height="34" CornerRadius="17" Background="{TemplateBinding Background}">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Circle" Property="Opacity" Value="0.88"/></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter TargetName="Circle" Property="Opacity" Value="0.75"/></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+            """);
+        DockPanel.SetDock(_toggle,Dock.Left);panel.Children.Add(_toggle);
+        var label=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
+        var titleBlock=new TextBlock{Text=title+"  ›",FontSize=13,FontWeight=FontWeights.SemiBold};
+        titleBlock.SetResourceReference(TextBlock.ForegroundProperty,"Ink");
+        label.Children.Add(titleBlock);
+        _summary=new TextBlock{FontSize=11,Margin=new Thickness(0,1,0,0),TextTrimming=TextTrimming.CharacterEllipsis};_summary.SetResourceReference(TextBlock.ForegroundProperty,"Muted");label.Children.Add(_summary);
+        var open=Ui.Button("",details);open.Content=label;open.Padding=new Thickness(2,2,4,2);open.Margin=new Thickness(0);open.MinHeight=34;open.HorizontalContentAlignment=HorizontalAlignment.Stretch;
         open.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");open.SetResourceReference(Control.ForegroundProperty,"Ink");
         AutomationProperties.SetName(open,title+" 详情");panel.Children.Add(open);
         Render("未读取",false,null,null);
@@ -66,7 +82,8 @@ internal sealed class WirelessTile:Border
     internal void Render(string status,bool enabled,bool? on,string? message)
     {
         _summary.Text=status;_summary.ToolTip=status;_toggle.IsEnabled=enabled;
-        _toggle.SetResourceReference(Control.ForegroundProperty,on==true?"Accent":"Muted");
+        _toggle.SetResourceReference(Control.BackgroundProperty,on==true?"Accent":"Hover");
+        _toggle.SetResourceReference(Control.ForegroundProperty,on==true?"OnAccent":"Muted");
         string title=(on==true?"关闭 ":"开启 ")+_title;
         _toggle.ToolTip=message??title;
         AutomationProperties.SetName(_toggle,title);

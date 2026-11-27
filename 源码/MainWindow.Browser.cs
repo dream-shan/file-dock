@@ -192,24 +192,27 @@ public partial class MainWindow
         for (string? item = path; item != null && IsInBrowserRoot(item); item = ParentPath(item))
             ancestors.Push(item);
         var home = new Button { Content = "我的常用", Style = (Style)FindResource("QuietButton"),
-            FontSize = 10, Padding = new Thickness(4, 2, 4, 2) };
+            FontSize = 11, Padding = new Thickness(6, 2, 6, 2) };
+        home.SetResourceReference(Control.ForegroundProperty, "Accent");
         home.Click += (_, _) => GoHome();
         Breadcrumbs.Children.Add(home);
-        var homeSeparator = new TextBlock { Text = "›", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) };
+        var homeSeparator = new TextBlock { Text = "›", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) };
         homeSeparator.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         Breadcrumbs.Children.Add(homeSeparator);
         while (ancestors.TryPop(out string? item))
         {
             string target = item;
+            bool isCurrent = FileService.NormalizeKey(item) == FileService.NormalizeKey(path);
             var button = new Button
             {
                 Content = FileName(item), ToolTip = item, Style = (Style)FindResource("QuietButton"),
-                FontSize = 10, Padding = new Thickness(4, 2, 4, 2),
-                IsEnabled = FileService.NormalizeKey(item) != FileService.NormalizeKey(path)
+                FontSize = 11, FontWeight = isCurrent ? FontWeights.SemiBold : FontWeights.Normal,
+                Padding = new Thickness(6, 2, 6, 2),
+                IsEnabled = !isCurrent
             };
             button.Click += async (_, _) => await NavigateToFolderAsync(target);
             Breadcrumbs.Children.Add(button);
-            if (ancestors.Count > 0) { var separator = new TextBlock { Text = "›", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) }; separator.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); Breadcrumbs.Children.Add(separator); }
+            if (ancestors.Count > 0) { var separator = new TextBlock { Text = "›", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) }; separator.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); Breadcrumbs.Children.Add(separator); }
         }
         Dispatcher.BeginInvoke(() => BreadcrumbScroll.ScrollToRightEnd(), System.Windows.Threading.DispatcherPriority.Loaded);
     }

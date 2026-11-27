@@ -84,7 +84,7 @@ internal static partial class NativeMethods
     internal static void RoundEdgeWindow(IntPtr window, double width, double height)
     {
         double scale = WindowDpi(window) / 96d;
-        var region = CreateRoundRectRgn(0, 0, (int)Math.Ceiling(width * scale) + 1, (int)Math.Ceiling(height * scale) + 1, (int)(16 * scale), (int)(16 * scale));
+        var region = CreateRoundRectRgn(0, 0, (int)Math.Ceiling(width * scale) + 1, (int)Math.Ceiling(height * scale) + 1, (int)(20 * scale), (int)(20 * scale));
         if (region != IntPtr.Zero && SetWindowRgn(window, region, true) == 0) DeleteObject(region);
     }
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
@@ -93,7 +93,7 @@ internal static partial class NativeMethods
     internal static void ShapePagePanel(IntPtr window,double width,double height)
     {
         double scale=WindowDpi(window)/96d;
-        var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(32*scale),(int)Math.Round(32*scale));
+        var region=CreateRoundRectRgn(0,0,(int)Math.Round(width*scale)+1,(int)Math.Round(height*scale)+1,(int)Math.Round(36*scale),(int)Math.Round(36*scale));
         if(region!=IntPtr.Zero && SetWindowRgn(window,region,true)==0)DeleteObject(region);
     }
     internal static void ShapeRailWindow(IntPtr window,double scale,bool right,int selectedIndex,int count)

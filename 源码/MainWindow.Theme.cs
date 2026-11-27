@@ -81,14 +81,14 @@ internal static class ThemeMenus
     {
         var colors = new MenuColors(dark);
         menu.BackColor = colors.ToolStripDropDownBackground;
-        menu.ForeColor = dark ? System.Drawing.Color.FromArgb(229,232,237) : System.Drawing.Color.FromArgb(39,50,71);
+        menu.ForeColor = dark ? System.Drawing.Color.FromArgb(245,245,247) : System.Drawing.Color.FromArgb(29,29,31);
         menu.Renderer = new Forms.ToolStripProfessionalRenderer(colors) { RoundedEdges = false };
     }
     private sealed class MenuColors(bool dark) : Forms.ProfessionalColorTable
     {
-        private System.Drawing.Color Surface => dark ? System.Drawing.Color.FromArgb(32,35,41) : System.Drawing.Color.FromArgb(250,251,253);
-        private System.Drawing.Color Hover => dark ? System.Drawing.Color.FromArgb(52,63,82) : System.Drawing.Color.FromArgb(233,239,255);
-        private System.Drawing.Color Border => dark ? System.Drawing.Color.FromArgb(61,69,82) : System.Drawing.Color.FromArgb(220,227,238);
+        private System.Drawing.Color Surface => dark ? System.Drawing.Color.FromArgb(28,28,30) : System.Drawing.Color.FromArgb(245,245,247);
+        private System.Drawing.Color Hover => dark ? System.Drawing.Color.FromArgb(58,58,60) : System.Drawing.Color.FromArgb(232,240,254);
+        private System.Drawing.Color Border => dark ? System.Drawing.Color.FromArgb(56,56,58) : System.Drawing.Color.FromArgb(210,210,215);
         public override System.Drawing.Color ToolStripDropDownBackground => Surface;
         public override System.Drawing.Color ImageMarginGradientBegin => Surface;
         public override System.Drawing.Color ImageMarginGradientMiddle => Surface;

@@ -42,6 +42,7 @@ internal static class DemoVerification
         await BrightnessVerification.Run(window,Check);
         await PowerVerification.Run(window,Check);
         await DisplayPowerViewVerification.Run(window,directory,Check);
+        await HardwareControlVerification.Run(window,Check);
         await AudioControlVerification.Run(window,directory,Check);
         await ShortcutRegistryVerification.Run(Check);
         await VsCodeShortcutsVerification.Run(directory,Check);

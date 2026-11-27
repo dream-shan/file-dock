@@ -24,17 +24,19 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private readonly StackPanel _devicePanel=new();
     private readonly BrightnessView? _brightness;
     private readonly PowerView? _power;
+    private readonly HardwareView? _hardware;
     private readonly BrightnessController? _brightnessController;
     private readonly PowerController? _powerController;
+    private readonly HardwareController? _hardwareController;
     private readonly WirelessView? _wireless;
     private string? _chosenOutput,_chosenMic;
     private string _deviceSignature="";
     private bool _updating,_disposed,_paused;
-    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null,bool wireless=false,bool nativeWireless=true)
+    internal ControlCenterView(AudioController audio,BrightnessController? brightness=null,PowerController? power=null,string? preferredScreen=null,Func<string?,Task<bool>>? saveScreen=null,Action? openPowerSettings=null,bool wireless=false,bool nativeWireless=true,HardwareController? hardware=null)
     {
         _audio=audio;_writeTimer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(80)};_writeTimer.Tick+=(_,_)=>Flush();
         var root=new StackPanel();var header=new DockPanel{Margin=new Thickness(0,0,0,8)};
-        var refresh=Ui.Button("刷新",()=>{CancelPending();_audio.Refresh();_brightnessController?.Refresh();_powerController?.Refresh();_wireless?.Refresh();});refresh.SetResourceReference(StyleProperty,"QuietButton");refresh.SetResourceReference(ForegroundProperty,"Accent");refresh.Padding=new Thickness(8,4,8,4);DockPanel.SetDock(refresh,Dock.Right);header.Children.Add(refresh);var headingTitle=Ui.Text("控制",18);headingTitle.FontWeight=FontWeights.SemiBold;headingTitle.Margin=new Thickness(0);header.Children.Add(headingTitle);root.Children.Add(header);
+        var refresh=Ui.Button("刷新",()=>{CancelPending();_audio.Refresh();_brightnessController?.Refresh();_powerController?.Refresh();_hardwareController?.Refresh();_wireless?.Refresh();});refresh.SetResourceReference(StyleProperty,"QuietButton");refresh.SetResourceReference(ForegroundProperty,"Accent");refresh.Padding=new Thickness(8,4,8,4);DockPanel.SetDock(refresh,Dock.Right);header.Children.Add(refresh);var headingTitle=Ui.Text("控制",18);headingTitle.FontWeight=FontWeights.SemiBold;headingTitle.Margin=new Thickness(0);header.Children.Add(headingTitle);root.Children.Add(header);
         if(wireless)
         {
             _wireless=new WirelessView(()=>ShowExtra(_wireless!.WifiDetails,"Wi-Fi"),()=>ShowExtra(_wireless!.BluetoothDetails,"蓝牙"),()=>ShowDetails(true),nativeWireless);
@@ -42,9 +44,10 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         }
         _output=new AudioLevelRow("音量",QueueVolume,SetMute,Flush,HasPending,false);_microphone=new AudioLevelRow("麦克风",QueueVolume,SetMute,Flush,HasPending,true);
         _home.Children.Add(_output);_home.Children.Add(_microphone);
-        _brightnessController=brightness;_powerController=power;
+        _brightnessController=brightness;_powerController=power;_hardwareController=hardware;
         if(brightness!=null){_brightness=new(brightness,preferredScreen,saveScreen??(_=>Task.FromResult(false)));_home.Children.Add(_brightness.Home);_brightness.Details.Visibility=Visibility.Collapsed;_brightness.DetailsRequested+=()=>ShowExtra(_brightness.Details,"显示器");}
         if(power!=null){_power=new(power,openPowerSettings??(()=>{}));_home.Children.Add(_power.Home);_power.Details.Visibility=Visibility.Collapsed;_power.DetailsRequested+=()=>ShowExtra(_power.Details,"电源");}
+        if(hardware!=null){_hardware=new(hardware);_home.Children.Add(_hardware.Home);_hardware.Details.Visibility=Visibility.Collapsed;_hardware.DetailsRequested+=()=>ShowExtra(_hardware.Details,"硬件与性能");}
         var audioLinks=new StackPanel();
         _sessionsButton=Ui.Button("应用音量  ›",()=>ShowDetails(false));
         _sessionsButton.SetResourceReference(StyleProperty,"QuietButton");_sessionsButton.SetResourceReference(ForegroundProperty,"Ink");_sessionsButton.HorizontalContentAlignment=HorizontalAlignment.Left;_sessionsButton.Margin=new Thickness(0);_sessionsButton.Padding=new Thickness(12,9,12,9);_sessionsButton.MinHeight=38;
@@ -62,7 +65,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         _devicePanel.Children.Add(Ui.Text("选择要调节的设备，不改变 Windows 默认设备。"));
         DeviceSelector(_devicePanel,"输出设备",_outputs,false);DeviceSelector(_devicePanel,"输入设备",_microphones,true);
         _details.Children.Add(_devicePanel);_details.Children.Add(_sessionPanel);_details.Visibility=Visibility.Collapsed;root.Children.Add(_details);
-        if(_brightness!=null)_details.Children.Add(_brightness.Details);if(_power!=null)_details.Children.Add(_power.Details);
+        if(_brightness!=null)_details.Children.Add(_brightness.Details);if(_power!=null)_details.Children.Add(_power.Details);if(_hardware!=null)_details.Children.Add(_hardware.Details);
         if(_wireless!=null)
         {
             _wireless.WifiDetails.Visibility=Visibility.Collapsed;_details.Children.Add(_wireless.WifiDetails);
@@ -90,7 +93,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private void CancelPending(){_writeTimer.Stop();_pending.Clear();_brightness?.Cancel();}
     internal void SetPaused(bool paused){if(_paused==paused||_disposed)return;_paused=paused;SyncActivity();}
     private void SyncActivity(){bool active=IsVisible&&!_paused;if(!active)CancelPending();SetActive(active);}
-    private void SetActive(bool active){_audio.SetActive(active);_brightnessController?.SetActive(active);_powerController?.SetActive(active);_wireless?.SetActive(active);}
+    private void SetActive(bool active){_audio.SetActive(active);_brightnessController?.SetActive(active);_powerController?.SetActive(active);_hardwareController?.SetActive(active);_wireless?.SetActive(active);}
     private void ScrollTop(){if(Content is ScrollViewer scroll)scroll.ScrollToTop();}
     internal void RefreshWireless()=>_wireless?.Refresh();
     private void ShowWirelessPanel(FrameworkElement? panel)
@@ -103,13 +106,13 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private void ShowExtra(FrameworkElement detail,string title)
     {
         Flush();_home.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;_devicePanel.Visibility=_sessionPanel.Visibility=Visibility.Collapsed;
-        if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;detail.Visibility=Visibility.Visible;_detailTitle.Text=title;
+        if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;if(_hardware!=null)_hardware.Details.Visibility=Visibility.Collapsed;detail.Visibility=Visibility.Visible;_detailTitle.Text=title;
         ShowWirelessPanel(detail);ScrollTop();
     }
     private void ShowDetails(bool devices)
     {
         Flush();_home.Visibility=Visibility.Collapsed;_details.Visibility=Visibility.Visible;
-        if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;
+        if(_brightness!=null)_brightness.Details.Visibility=Visibility.Collapsed;if(_power!=null)_power.Details.Visibility=Visibility.Collapsed;if(_hardware!=null)_hardware.Details.Visibility=Visibility.Collapsed;
         _devicePanel.Visibility=devices?Visibility.Visible:Visibility.Collapsed;_sessionPanel.Visibility=devices?Visibility.Collapsed:Visibility.Visible;
         _detailTitle.Text=devices?"音频设备":"应用音量";
         ShowWirelessPanel(null);ScrollTop();
@@ -149,7 +152,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         var entries=new[]{new AudioDevice("",devices.Length==0?"无可用设备":"跟随系统默认",input,false)}.Concat(devices).ToArray();
         combo.ItemsSource=entries;combo.SelectedItem=entries.FirstOrDefault(d=>d.Id==selected)??entries[0];combo.IsEnabled=devices.Length>0;
     }
-    public void Dispose(){if(_disposed)return;_disposed=true;CancelPending();_audio.Changed-=Render;_audio.Dispose();_brightness?.Dispose();_power?.Dispose();_wireless?.Dispose();}
+    public void Dispose(){if(_disposed)return;_disposed=true;CancelPending();_audio.Changed-=Render;_audio.Dispose();_brightness?.Dispose();_power?.Dispose();_hardware?.Dispose();_wireless?.Dispose();}
 }
 
 internal sealed class AudioLevelRow : Border

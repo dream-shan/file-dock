@@ -13,9 +13,10 @@ public partial class MainWindow
         var audio=new AudioController(()=>new CoreAudioBackend(),Dispatcher);
         var brightness=new BrightnessController(()=>new WindowsBrightnessBackend(!App.IsSelfTest),Dispatcher);
         var power=new PowerController(()=>new WindowsPowerBackend(!App.IsSelfTest),Dispatcher);
+        var hardware=new HardwareController(()=>new WindowsHardwareBackend(!App.IsSelfTest),Dispatcher);
         _controlCenter=new ControlCenterView(audio,brightness,power,State.PreferredBrightnessDisplayId,id=>{
             var task=SavePreferredBrightnessAsync(id);_controlPreferenceSave=task;return task;
-        },()=>Process.Start(new ProcessStartInfo("ms-settings:powersleep"){UseShellExecute=true}),wireless:true,nativeWireless:!App.IsSelfTest);ControlSection.Content=_controlCenter;
+        },()=>Process.Start(new ProcessStartInfo("ms-settings:powersleep"){UseShellExecute=true}),wireless:true,nativeWireless:!App.IsSelfTest,hardware:hardware);ControlSection.Content=_controlCenter;
         Activated+=(_,_)=>_controlCenter?.RefreshWireless();
     }
     internal Task<bool> SavePreferredBrightnessAsync(string? id)=>_exitSaving?Task.FromResult(false):_saves.CommitAsync(s=>s.PreferredBrightnessDisplayId=id,s=>State.PreferredBrightnessDisplayId=s.PreferredBrightnessDisplayId);

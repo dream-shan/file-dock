@@ -35,6 +35,7 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     private readonly ScrollViewer _scroll;
     private AppShortcutGroup? _group;
     private Func<bool>? _hasDraft;
+    private Action? _detailReturn;
     private Control? _initialFocus;
     private CancellationTokenSource? _importCancellation;
     private int _page;
@@ -96,7 +97,10 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         SetStatus("");
 
         var root = new StackPanel();
-        root.Children.Add(Ui.Text("软件内部快捷键", 18));
+        var title = Ui.Text("软件内部快捷键", 18);
+        title.FontWeight = FontWeights.SemiBold;
+        title.Margin = new Thickness(0, 0, 0, 6);
+        root.Children.Add(title);
         root.Children.Add(_status);
         root.Children.Add(_body);
         root.Children.Add(Ui.Button("关闭", RequestClose));
@@ -113,8 +117,9 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         if (_allSoftware) _group = null;
         _catalogVisible = true;
         _hasDraft = null;
+        _detailReturn = null;
         _body.Children.Clear();
-        _body.Children.Add(Ui.Button("返回快捷键管理", () => { if (!_busy) _back(); }));
+        _body.Children.Add(NavBackButton("返回快捷键管理", () => { if (!_busy) _back(); }));
         RefreshSoftwareChoices();
         _body.Children.Add(_software);
         _body.Children.Add(_discoveryHint);
@@ -550,13 +555,27 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     {
         _catalogVisible = false;
         _hasDraft = null;
+        _detailReturn = returnToCatalog;
         _body.Children.Clear();
         SetStatus("");
-        var back = Ui.Button("返回软件快捷键", returnToCatalog);
+        var back = NavBackButton("返回软件快捷键", returnToCatalog);
         _body.Children.Add(back);
-        _body.Children.Add(Ui.Text(heading, 16));
+        var headingBlock = Ui.Text(heading, 16);
+        headingBlock.FontWeight = FontWeights.SemiBold;
+        _body.Children.Add(headingBlock);
         _initialFocus = back;
         _scroll.ScrollToTop();
+    }
+
+    private static Button NavBackButton(string title, Action handler)
+    {
+        var button = Ui.Button(title, handler);
+        button.SetResourceReference(FrameworkElement.StyleProperty, "QuietButton");
+        button.SetResourceReference(Control.ForegroundProperty, "Accent");
+        button.HorizontalAlignment = HorizontalAlignment.Left;
+        button.Padding = new Thickness(6, 4, 8, 4);
+        button.Margin = new Thickness(0, 0, 0, 4);
+        return button;
     }
 
     private void ReturnFromDetail()
@@ -718,6 +737,13 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
         _importCancellation?.Cancel();
         _discoveryCancellation?.Cancel();
         _openWindowsCancellation?.Cancel();
+        _installed = [];
+        _choices = [];
+        _liveWindowMenus.Clear();
+        _packageMenus.Clear();
+        _results.Children.Clear();
+        _body.Children.Clear();
+        _scroll.Content = null;
     }
 
     public void FocusInitial() => _initialFocus?.Focus();
@@ -727,6 +753,12 @@ internal sealed partial class AppShortcutCatalogDialog : IModuleDialog
     {
         if (e.Key != Key.Escape || _software.IsDropDownOpen) return;
         e.Handled = true;
+        if (!_catalogVisible && _detailReturn != null)
+        {
+            if (_busy) { SetStatus("正在处理，请稍候。"); return; }
+            _detailReturn();
+            return;
+        }
         RequestClose();
     }
 }

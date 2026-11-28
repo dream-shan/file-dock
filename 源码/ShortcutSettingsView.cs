@@ -27,7 +27,9 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     internal ShortcutSettingsView(IModuleHost host,ShortcutRegistry registry,Func<string,ShortcutBinding,Task<ShortcutResult>> save,string? action=null,Action? openAppShortcuts=null)
     {
         _host=host;_registry=registry;_save=save;_openAppShortcuts=openAppShortcuts;
-        var root=new StackPanel();root.Children.Add(Ui.Text("快捷键管理",18));root.Children.Add(_body);root.Children.Add(_message);root.Children.Add(Ui.Button("关闭",RequestClose));
+        var root=new StackPanel();
+        var title=Ui.Text("快捷键管理",18);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0,0,0,6);
+        root.Children.Add(title);root.Children.Add(_body);root.Children.Add(_message);root.Children.Add(Ui.Button("关闭",RequestClose));
         View=Ui.Scroll(root);ShowList();
         if(action!=null&&registry.Items.FirstOrDefault(a=>a.Key==action) is {} item)Edit(item);
     }
@@ -47,7 +49,10 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     private void Edit(ShortcutAction item)
     {
         _body.Children.Clear();_editing=item;_draft=item.Binding.Copy();_dirty=false;
-        _body.Children.Add(Ui.Button("← 全部快捷键",()=>{if(!_dirty||_host.ConfirmDiscardChanges())ShowList();}));
+        var back=Ui.Button("← 全部快捷键",()=>{if(!_dirty||_host.ConfirmDiscardChanges())ShowList();});
+        back.SetResourceReference(FrameworkElement.StyleProperty,"QuietButton");back.SetResourceReference(Control.ForegroundProperty,"Accent");
+        back.HorizontalAlignment=HorizontalAlignment.Left;back.Padding=new Thickness(6,4,8,4);back.Margin=new Thickness(0,0,0,4);
+        _body.Children.Add(back);
         _body.Children.Add(Ui.Text(item.Name,15));_body.Children.Add(Ui.Text(item.Scope+"生效 · 文件坞管理"));
         var enabled=new CheckBox{Content="启用快捷键",IsChecked=_draft.Enabled,Margin=new Thickness(0,8,0,8)};enabled.SetResourceReference(Control.ForegroundProperty,"Ink");
         enabled.Checked+=(_,_)=>{_draft.Enabled=true;_dirty=true;};enabled.Unchecked+=(_,_)=>{_draft.Enabled=false;_dirty=true;};_body.Children.Add(enabled);
@@ -97,7 +102,18 @@ internal sealed class ShortcutSettingsView : IModuleDialog
     public void OnClosed(){}
     public void FocusInitial(){if(_input!=null)_input.Focus();else View.Focus();}
     public void RestoreFocus(){}
-    public void HandleWindowKey(KeyEventArgs e){if(e.Key==Key.Escape){RequestClose();e.Handled=true;}}
+    public void HandleWindowKey(KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape) return;
+        e.Handled = true;
+        if (_editing != null)
+        {
+            if (_busy) { _message.Text = "正在保存，请稍候。"; return; }
+            if (!_dirty || _host.ConfirmDiscardChanges()) ShowList();
+            return;
+        }
+        RequestClose();
+    }
     public void RefreshTheme(){}
 }
 

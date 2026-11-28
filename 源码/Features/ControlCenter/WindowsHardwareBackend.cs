@@ -35,7 +35,7 @@ internal sealed class WindowsHardwareBackend : IHardwareBackend
     }
 
     public void Start(Action changed) { }
-    public void Stop() { }
+    public void Stop() => _nvml.Release();
 
     public HardwareSnapshot Read()
     {
@@ -330,7 +330,7 @@ internal sealed class WindowsHardwareBackend : IHardwareBackend
                 ? Marshal.GetDelegateForFunctionPointer<T>(address)
                 : null;
 
-        public void Dispose()
+        internal void Release()
         {
             _shutdown?.Invoke();
             _shutdown = null;
@@ -340,7 +340,14 @@ internal sealed class WindowsHardwareBackend : IHardwareBackend
                 NativeLibrary.Free(_library);
                 _library = IntPtr.Zero;
             }
+            _attempted = false;
+            _powerUsage = _defaultLimit = _enforcedLimit = _managementLimit = _fanSpeed = _pstate = null;
+            _constraints = null;
+            _temperature = null;
+            _clockInfo = _maxClockInfo = null;
         }
+
+        public void Dispose() => Release();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int NvmlSimple();
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int NvmlDevice(uint index, out IntPtr device);

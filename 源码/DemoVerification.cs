@@ -526,6 +526,7 @@ internal static class DemoVerification
         await CaptureInteractionVerification.Run(window,Check);
         await DesktopPresenceVerification.Run(window,directory,Check);
         await PagesVerification.Run(window,directory,Check);
+        await GlobalIntegrationVerification.Run(window, directory, Check, note => checks.Add(note));
         File.WriteAllLines(Path.Combine(directory, "verification.txt"), checks);
         window.Close();
     }

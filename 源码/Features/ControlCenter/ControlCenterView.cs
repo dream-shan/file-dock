@@ -59,7 +59,7 @@ internal sealed class ControlCenterView : UserControl,IDisposable
         var linkCard=new Border{Child=audioLinks,CornerRadius=new CornerRadius(14),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,8)};
         linkCard.SetResourceReference(Border.BackgroundProperty,"PaneCard");linkCard.SetResourceReference(Border.BorderBrushProperty,"PaneOutline");
         _home.Children.Add(linkCard);root.Children.Add(_home);
-        var backButton=Ui.Button("← 控制",()=>{Flush();_wireless?.ShowDetails(null);_details.Visibility=Visibility.Collapsed;_home.Visibility=Visibility.Visible;ScrollTop();});
+        var backButton=Ui.Button("← 控制",NavigateHome);
         backButton.SetResourceReference(StyleProperty,"QuietButton");backButton.SetResourceReference(ForegroundProperty,"Accent");backButton.HorizontalAlignment=HorizontalAlignment.Left;backButton.Padding=new Thickness(6,4,8,4);backButton.Margin=new Thickness(0,0,0,4);
         _details.Children.Add(backButton);_detailTitle.FontWeight=FontWeights.SemiBold;_details.Children.Add(_detailTitle);
         _devicePanel.Children.Add(Ui.Text("选择要调节的设备，不改变 Windows 默认设备。"));
@@ -95,7 +95,13 @@ internal sealed class ControlCenterView : UserControl,IDisposable
     private void SyncActivity(){bool active=IsVisible&&!_paused;if(!active)CancelPending();SetActive(active);}
     private void SetActive(bool active){_audio.SetActive(active);_brightnessController?.SetActive(active);_powerController?.SetActive(active);_hardwareController?.SetActive(active);_wireless?.SetActive(active);}
     private void ScrollTop(){if(Content is ScrollViewer scroll)scroll.ScrollToTop();}
-    internal void RefreshWireless()=>_wireless?.Refresh();
+    private void NavigateHome(){Flush();_wireless?.ShowDetails(null);_details.Visibility=Visibility.Collapsed;_home.Visibility=Visibility.Visible;ScrollTop();}
+    internal bool TryNavigateBack()
+    {
+        if(_disposed||_details.Visibility!=Visibility.Visible)return false;
+        NavigateHome();return true;
+    }
+    internal void RefreshWireless(){if(!_disposed&&IsVisible&&!_paused)_wireless?.Refresh();}
     private void ShowWirelessPanel(FrameworkElement? panel)
     {
         if(_wireless==null)return;

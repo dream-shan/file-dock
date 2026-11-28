@@ -48,11 +48,29 @@ internal sealed partial class AppShortcutCatalogDialog
             RenderResults();
         });
         AutomationProperties.SetName(_liveFilterButton, "仅看当前窗口实读");
+        ApplyLiveFilterStyle();
         softwareActions.Children.Add(_liveFilterButton);
     }
 
     private string LiveFilterLabel() =>
         _onlyLiveWindowShortcuts ? "仅看当前窗口实读 · 已开启" : "仅看当前窗口实读";
+
+    private void ApplyLiveFilterStyle()
+    {
+        if (_liveFilterButton == null) return;
+        if (_onlyLiveWindowShortcuts)
+        {
+            _liveFilterButton.SetResourceReference(Control.BackgroundProperty, "Accent");
+            _liveFilterButton.SetResourceReference(Control.ForegroundProperty, "OnAccent");
+            _liveFilterButton.FontWeight = FontWeights.SemiBold;
+        }
+        else
+        {
+            _liveFilterButton.ClearValue(Control.BackgroundProperty);
+            _liveFilterButton.ClearValue(Control.ForegroundProperty);
+            _liveFilterButton.FontWeight = FontWeights.Normal;
+        }
+    }
 
     private void UpdateOpenWindowsButtons()
     {
@@ -62,7 +80,10 @@ internal sealed partial class AppShortcutCatalogDialog
             _refreshOpenWindowsButton.IsEnabled = !_scanningOpenWindows;
         }
         if (_liveFilterButton != null)
+        {
             _liveFilterButton.Content = LiveFilterLabel();
+            ApplyLiveFilterStyle();
+        }
     }
 
     private async Task ScanOpenWindowsAsync()
